@@ -39,7 +39,7 @@ struct FontGrid: View {
 
         func fit(size: Double, ratio: CGFloat?, restingTile: CGFloat, drawn: Double) -> SampleFit {
             let room = minimumWidth(size: size, ratio: ratio) - padding * 2 - 8
-            return SampleFit(width: min(room, restingTile - padding * 2 - 8), factor: drawn / size)
+            return SampleFit(width: max(1, min(room, restingTile - padding * 2 - 8)), factor: drawn / size)
         }
 
         var baselineBelowCentre: CGFloat { (above - below) / 2 }
@@ -167,7 +167,7 @@ struct FontGrid: View {
         let resting = gridWidth + Self.infoPanelNarrowing(shown: gridRoom.infoShown, scale: scale) - hidden
         guard gridWidth > 0, resting > 0 else { return (1, minimum, minimum) }
         let count = min(Self.mostColumns, max(1, Int((resting + Self.spacing) / (minimum + Self.spacing))))
-        let width = { (row: CGFloat) in (row - Self.spacing * CGFloat(count - 1)) / CGFloat(count) }
+        let width = { (row: CGFloat) in max(1, (row - Self.spacing * CGFloat(count - 1)) / CGFloat(count)) }
         return (count, width(gridWidth), width(resting))
     }
 
@@ -188,7 +188,7 @@ final class GridScale {
     var factor: CGFloat?
 
     static func drawn(_ size: Double, factor: CGFloat) -> Double {
-        (size * factor + 1e-6).rounded(.down)
+        max(1, (size * factor + 1e-6).rounded(.down))
     }
 
     static func chosen(drawing drawn: Double, factor: CGFloat) -> Double {

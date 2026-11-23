@@ -87,15 +87,17 @@ private struct RuleRow: View {
                 ForEach(fields, id: \.self) { Text($0.title).tag($0) }
             }
             .fixedSize()
-            Picker("Comparison", selection: $rule.comparison) {
+            Picker("Comparison", selection: comparison) {
                 ForEach(rule.field.comparisons, id: \.self) { Text($0.title(for: rule.field)).tag($0) }
             }
             .fixedSize()
             value
             Spacer(minLength: 0)
             rowButton("Remove Rule", icon: "minus.circle", action: remove)
+                .fixedSize()
                 .disabled(!canRemove)
             rowButton("Add Rule", icon: "plus.circle", action: add)
+                .fixedSize()
         }
         .labelsHidden()
     }
@@ -116,6 +118,16 @@ private struct RuleRow: View {
 
     private var fields: [SmartRule.Field] {
         SmartRule.Field.offered.contains(rule.field) ? SmartRule.Field.offered : SmartRule.Field.offered + [rule.field]
+    }
+
+    private var comparison: Binding<SmartRule.Comparison> {
+        Binding(get: { rule.comparison }, set: { new in
+            guard new != rule.comparison else { return }
+            rule.comparison = new
+            if rule.field == .foundry, new != .contains, !model.foundryNames.contains(rule.value) {
+                rule.value = model.foundryNames.first ?? ""
+            }
+        })
     }
 
     private var field: Binding<SmartRule.Field> {
@@ -226,7 +238,7 @@ private struct RuleRow: View {
                     }
                 }
             }
-            .fixedSize()
+            .frame(maxWidth: 260, alignment: .leading)
         }
     }
 
@@ -259,7 +271,7 @@ private struct RuleRow: View {
                 }
             }
         }
-        .fixedSize()
+        .frame(maxWidth: 260, alignment: .leading)
     }
 
     private static func statusTitle(_ value: String) -> String {

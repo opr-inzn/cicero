@@ -66,9 +66,9 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView view: NSTextView, context: Context) -> CGSize? {
-        guard let width = proposal.width, width.isFinite, let manager = view.textLayoutManager, let container = view.textContainer
+        guard let width = proposal.width, width.isFinite, width > 0, let manager = view.textLayoutManager, let container = view.textContainer
         else { return nil }
-        let lineWidth = width - 2 * margin
+        let lineWidth = max(1, width - 2 * margin)
         if container.size.width != lineWidth { container.size = NSSize(width: lineWidth, height: .greatestFiniteMagnitude) }
         var bottom: CGFloat = 0
         manager.enumerateTextLayoutFragments(from: manager.documentRange.location, options: [.ensuresLayout, .ensuresExtraLineFragment]) {

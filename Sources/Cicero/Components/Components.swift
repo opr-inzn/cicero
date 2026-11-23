@@ -140,6 +140,7 @@ struct FontLine: View {
     }
 
     private static func draw(_ text: String, font: CTFont, in context: inout GraphicsContext, x: CGFloat, width: CGFloat, baseline: CGFloat) {
+        guard width > 0 else { return }
         let color = Color.ink.resolve(in: context.environment).cgColor
         let attributes: [NSAttributedString.Key: Any] = [.font: font, NSAttributedString.Key(kCTForegroundColorAttributeName as String): color]
         let shown = NSMutableAttributedString(string: text, attributes: attributes)
@@ -897,22 +898,33 @@ struct FlowLayout: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout [Child]) -> CGSize {
         let width = proposal.width ?? .infinity
-        let lines = lines(of: cache, width: width)
+        let fitted = fittedChildren(cache, subviews: subviews, width: width)
+        let lines = lines(of: fitted, width: width)
         let widest = lines.map(\.width).max() ?? 0
         let height = lines.map(\.height).reduce(0, +) + lineSpacing * CGFloat(max(lines.count - 1, 0))
         return CGSize(width: min(widest, width), height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout [Child]) {
+        let fitted = fittedChildren(cache, subviews: subviews, width: bounds.width)
         var y = bounds.minY
-        for line in lines(of: cache, width: bounds.width) {
+        for line in lines(of: fitted, width: bounds.width) {
             var x = bounds.minX
             for index in line.children {
-                let child = cache[index]
+                let child = fitted[index]
                 subviews[index].place(at: CGPoint(x: x, y: y + line.baseline - child.baseline), proposal: ProposedViewSize(child.size))
                 x += child.size.width + spacing
             }
             y += line.height + lineSpacing
+        }
+    }
+
+    private func fittedChildren(_ cache: [Child], subviews: Subviews, width: CGFloat) -> [Child] {
+        guard width.isFinite, width > 0 else { return cache }
+        return cache.enumerated().map { index, child in
+            guard child.size.width > width else { return child }
+            let dimensions = subviews[index].dimensions(in: ProposedViewSize(width: width, height: nil))
+            return Child(size: CGSize(width: min(dimensions.width, width), height: dimensions.height), baseline: dimensions[.firstTextBaseline])
         }
     }
 

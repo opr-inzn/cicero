@@ -41,7 +41,7 @@ struct ImportSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
                 }
-                .frame(height: contentHeight.map { min($0, 640 - headerHeight - 70) })
+                .frame(height: contentHeight.map { min($0, max(0, 640 - headerHeight - 70)) })
                 .disabled(stage != nil)
                 Divider()
                 footer

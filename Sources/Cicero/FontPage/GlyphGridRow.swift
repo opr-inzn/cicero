@@ -39,6 +39,7 @@ struct GlyphGridRow: View {
     let selected: Int?
     let actions: GridRowActions
     @Environment(\.topRowKeeper) private var keeper
+    @State private var rowID = UUID()
 
     var body: some View {
         let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize, weight: weight, variations: variations)
@@ -51,10 +52,11 @@ struct GlyphGridRow: View {
             .allowsHitTesting(false)
             .padding(EdgeInsets(top: -room.top, leading: -room.leading, bottom: -room.bottom, trailing: -room.trailing))
             .modifier(SquareRow(columns: columns))
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(TopRowKeeper.space)) } action: { [keeper, key] in
-                keeper?.moved(key, to: $0)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(TopRowKeeper.space)) } action: { [keeper, rowID, cells] in
+                keeper?.moved(rowID, cells: cells, to: $0)
             }
-            .onDisappear { [keeper, key] in keeper?.gone(key) }
+            .onChange(of: cells) { [keeper, rowID] _, new in keeper?.update(rowID, cells: new) }
+            .onDisappear { [keeper, rowID] in keeper?.gone(rowID) }
             .overlay {
                 GridRowEvents(labels: cells.map(\.label), columns: columns, actions: actions) { index, size, isDark, scale in
                     let cell = GridRowDrawing(cells: [cells[index]], columns: 1, face: face, generation: generation, weight: weight,
@@ -69,14 +71,11 @@ struct GlyphGridRow: View {
             .popover(isPresented: .constant(false)) { EmptyView() }
     }
 
-    private var key: Int {
-        cells.map(\.label).hashValue
-    }
-
     nonisolated static func frames(width: CGFloat, columns: Int, count: Int, scale: CGFloat? = nil) -> [CGRect] {
+        guard width > 0, columns > 0, count > 0 else { return [] }
         let spacing = GlyphsSection.spacing
         func pixel(_ x: CGFloat) -> CGFloat { scale.map { (x * $0).rounded() / $0 } ?? x }
-        var left = width - spacing * CGFloat(columns - 1)
+        var left = max(0, width - spacing * CGFloat(columns - 1))
         var x: CGFloat = 0
         return (0..<count).map { index in
             // As SwiftUI's stack shares out its width, to the last bit: a character can sit exactly between two pixels, where the last bit of the sums decides which one it's drawn on.
@@ -85,7 +84,7 @@ struct GlyphGridRow: View {
                 left -= cell
                 x += cell + spacing
             }
-            return CGRect(x: pixel(x), y: 0, width: pixel(x + cell) - pixel(x), height: side(width: width, columns: columns))
+            return CGRect(x: pixel(x), y: 0, width: max(0, pixel(x + cell) - pixel(x)), height: side(width: width, columns: columns))
         }
     }
 
@@ -128,7 +127,7 @@ private struct SquareRowLayout: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let resting = GlyphsSection.cell * CGFloat(columns) + GlyphsSection.spacing * CGFloat(columns - 1)
-        let width = proposal.width ?? resting
+        let width = proposal.width.flatMap { $0.isFinite ? max(0, $0) : nil } ?? resting
         return CGSize(width: width, height: GlyphGridRow.side(width: width, columns: columns))
     }
 
@@ -237,6 +236,7 @@ private struct GridRowDrawing: View, Equatable {
     var body: some View {
         Canvas { context, size in
             let width = size.width - room.leading - room.trailing
+            guard width > 0 else { return }
             let side = GlyphGridRow.side(width: width, columns: columns)
             let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize * GlyphGridRow.zoom(side: side), weight: weight,
                                               variations: variations)

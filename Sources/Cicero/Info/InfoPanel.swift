@@ -113,7 +113,7 @@ struct KeepsTopOnResize: ViewModifier {
             .onScrollTargetVisibilityChange(idType: String.self) { if let first = $0.first { topID = first } }
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top < 1 } action: { isAtTop = $1 }
             // Reported before the visible families update, so `topID` is still the one from before.
-            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width } action: { _, _ in
+            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width - $0.contentInsets.leading - $0.contentInsets.trailing } action: { _, _ in
                 if !isAtTop, let topID { position.scrollTo(id: topID, anchor: .top) }
             }
     }

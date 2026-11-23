@@ -255,10 +255,13 @@ struct FontList: View {
                             .onAppear { ReadAhead.around(row.family, in: families) }
                     }
                 }
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .scrollTargetLayout()
                 .padding(.bottom, 8)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { visibleWidth = $0 }
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width - $0.contentInsets.leading - $0.contentInsets.trailing } action: { _, width in
+                if width > 0 { visibleWidth = width }
             }
             .topBar {
                 header(columns: columns, widths: widths, sort: sort)

@@ -93,13 +93,15 @@ private struct TextTab: View {
         HStack(spacing: 16) {
             TextField("Text", text: $savedText.value, prompt: Text("Type or paste text"))
                 .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 400)
+                .frame(minWidth: 160, maxWidth: 400)
             Stepper(value: $maxMissing, in: 0...20) {
                 Text("Missing characters allowed: \(maxMissing.plain)")
             }
+            .fixedSize()
             Toggle("Active only", isOn: $activatedOnly)
-            Spacer()
-            Text(summary).foregroundStyle(.secondary).monospacedDigit()
+                .fixedSize()
+            Spacer(minLength: 0)
+            Text(summary).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
         }
         .padding(12)
     }

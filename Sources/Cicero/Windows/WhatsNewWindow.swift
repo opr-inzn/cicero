@@ -143,7 +143,7 @@ final class WhatsNew {
 
 struct WhatsNewWindow: View {
     @Environment(\.dismissWindow) private var dismissWindow
-    @State private var contentHeight: CGFloat = 0
+    @State private var contentHeight: CGFloat?
     @State private var barHeight: CGFloat = 0
 
     private static let width: CGFloat = 560
@@ -181,7 +181,8 @@ struct WhatsNewWindow: View {
         }
         .onExitCommand { dismissWindow() }
         .windowMinimizeBehavior(.disabled)
-        .frame(width: Self.width, height: min(contentHeight + barHeight, Self.maximumHeight))
+        .frame(width: Self.width, height: contentHeight.map { min($0 + barHeight, Self.maximumHeight) })
+        .frame(maxHeight: Self.maximumHeight)
     }
 }
 

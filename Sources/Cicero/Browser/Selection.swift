@@ -89,7 +89,7 @@ struct DeselectsOnEmptyClick: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .frame(maxWidth: .infinity, minHeight: height, alignment: .top)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: height, alignment: .top)
             .background {
                 Color.clear
                     .contentShape(.rect)

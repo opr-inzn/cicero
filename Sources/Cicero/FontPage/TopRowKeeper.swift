@@ -5,27 +5,36 @@ final class TopRowKeeper {
     static let space = "fontPageContent"
     var scrollTo: ((CGFloat) -> Void)?
     var visibleTop: CGFloat = 0
-    private var frames: [Int: CGRect] = [:]
+    private var rows: [UUID: Row] = [:]
     private var held: Held?
     private var settling: Task<Void, Never>?
 
+    private struct Row {
+        var frame: CGRect
+        var cells: [GridCell]
+    }
+
     private struct Held {
-        let key: Int
+        let cell: GridCell
         var fraction: CGFloat?
         var gap: CGFloat?
     }
 
     private var isResizing: Bool { settling != nil }
 
-    func moved(_ key: Int, to frame: CGRect) {
+    func moved(_ id: UUID, cells: [GridCell], to frame: CGRect) {
         // A row as wide as it was not: the page is changing width, and rows say so before the page does.
-        if let before = frames[key], abs(before.width - frame.width) >= 0.5 { resizing() }
-        frames[key] = frame
-        if let held, held.key == key, isResizing { keep(held, at: frame) }
+        if let before = rows[id], abs(before.frame.width - frame.width) >= 0.5 { resizing() }
+        rows[id] = Row(frame: frame, cells: cells)
+        if let held, isResizing, cells.contains(held.cell) { keep(held, at: frame) }
     }
 
-    func gone(_ key: Int) {
-        frames[key] = nil
+    func update(_ id: UUID, cells: [GridCell]) {
+        rows[id]?.cells = cells
+    }
+
+    func gone(_ id: UUID) {
+        rows[id] = nil
     }
 
     private func resizing() {
@@ -34,7 +43,7 @@ final class TopRowKeeper {
         settling = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled, let self else { return }
-            if let held, let frame = frames[held.key] { keep(held, at: frame) }
+            if let held, let row = rows.values.first(where: { $0.cells.contains(held.cell) }) { keep(held, at: row.frame) }
             settling = nil
         }
     }
@@ -45,10 +54,11 @@ final class TopRowKeeper {
 
     private func top() -> Held? {
         guard visibleTop > 0.5,
-              let (key, frame) = frames.filter({ $0.value.maxY > visibleTop }).min(by: { $0.value.minY < $1.value.minY })
+              let row = rows.values.filter({ $0.frame.maxY > visibleTop && !$0.cells.isEmpty }).min(by: { $0.frame.minY < $1.frame.minY }),
+              let cell = row.cells.first
         else { return nil }
-        return frame.minY <= visibleTop ? Held(key: key, fraction: (visibleTop - frame.minY) / max(frame.height, 1))
-            : Held(key: key, gap: frame.minY - visibleTop)
+        return row.frame.minY <= visibleTop ? Held(cell: cell, fraction: (visibleTop - row.frame.minY) / max(row.frame.height, 1))
+            : Held(cell: cell, gap: row.frame.minY - visibleTop)
     }
 }
 

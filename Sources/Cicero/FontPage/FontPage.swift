@@ -295,7 +295,8 @@ private struct TypeTester: View {
                 }
                 .labelsHidden()
             }
-            .fixedSize()
+            .frame(maxWidth: 220, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
             .help("Which style to show; until you pick one, it is the regular style, or a style the search names, like Italic")
             .layoutValue(key: TesterControls.RoleKey.self, value: .menu)
         }
@@ -404,7 +405,7 @@ private struct TesterControls: Layout {
             return CGSize(width: proposed ?? width(of: row, cache), height: height(of: row, cache))
         }
         let (top, bottom) = twoRows(cache)
-        return CGSize(width: max(proposed ?? 0, width(of: top, cache), width(of: bottom, cache)),
+        return CGSize(width: proposed ?? max(width(of: top, cache), width(of: bottom, cache)),
                       height: height(of: top, cache) + 10 + height(of: bottom, cache))
     }
 
@@ -421,7 +422,7 @@ private struct TesterControls: Layout {
         let buttons = top.filter { cache.roles[$0] == .button }
         var x = bounds.minX
         for index in top {
-            if index == buttons.first { x = bounds.maxX - width(of: buttons, cache) }
+            if index == buttons.first { x = max(x, bounds.maxX - width(of: buttons, cache)) }
             subviews[index].place(at: CGPoint(x: x, y: bounds.minY + topHeight / 2), anchor: .leading,
                                   proposal: ProposedViewSize(cache.sizes[index]))
             x += cache.sizes[index].width + 16

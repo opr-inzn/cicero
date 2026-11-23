@@ -421,10 +421,11 @@ private struct FamilyQuickLook: View {
                 HStack(spacing: 6) {
                     Button("Previous", systemImage: "chevron.left") { _ = model.quickLook.step(-1) }
                         .help("Show the previous family")
-                    Text("\((index + 1).plain) of \(count.plain)").monospacedDigit()
+                    Text("\((index + 1).plain) of \(count.plain)").monospacedDigit().lineLimit(1)
                     Button("Next", systemImage: "chevron.right") { _ = model.quickLook.step(1) }
                         .help("Show the next family")
                 }
+                .fixedSize()
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
                 Divider().frame(height: 16)

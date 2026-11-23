@@ -31,6 +31,10 @@ struct CompareWindow: View {
     @State private var viewport: CGSize = .zero
     @FocusState private var focused: Bool
 
+    private var minViewport: CGSize {
+        if #unavailable(macOS 26) { viewport } else { .zero }
+    }
+
     var body: some View {
         let entries = model.compareEntries.compactMap { entry in
             model.family(entry.familyID).map { family in
@@ -56,16 +60,16 @@ struct CompareWindow: View {
                     Group {
                         switch layout {
                         case .stacked: StackedLayout(samples: samples)
-                        case .overlay: OverlayLayout(samples: samples)
+                        case .overlay: OverlayLayout(samples: samples, viewportWidth: viewport.width)
                         }
                     }
                     .padding(24)
                     // As big as the window at least, so samples smaller than it sit at its top left: macOS 15 centres them in a scroll view of both axes, whatever its alignment anchor.
-                    .frame(minWidth: viewport.width, minHeight: viewport.height, alignment: .topLeading)
+                    .frame(minWidth: minViewport.width, minHeight: minViewport.height, alignment: .topLeading)
                 }
                 .defaultScrollAnchor(.topLeading, for: .alignment)
                 .onScrollGeometryChange(for: CGSize.self, of: \.containerSize) { _, size in
-                    if #unavailable(macOS 26) { viewport = size }
+                    viewport = size
                 }
             }
         }
@@ -305,6 +309,7 @@ private struct StackedLayout: View {
 
 private struct OverlayLayout: View {
     let samples: [CompareSample]
+    let viewportWidth: CGFloat
 
     var body: some View {
         let ascent = CompareSample.topAscent(of: samples)
@@ -333,7 +338,7 @@ private struct OverlayLayout: View {
                 chip(sample)
                     .background(Color.canvas, in: .capsule)
             }
-            .frame(width: max(width, 480), alignment: .leading)
+            .frame(width: max(viewportWidth - 48, 480), alignment: .leading)
         }
     }
 
