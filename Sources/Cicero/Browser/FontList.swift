@@ -596,7 +596,8 @@ private struct HeaderCell: View {
         HStack(spacing: 4) {
             Text(title).lineLimit(1)
             if column == sortColumn {
-                Image(systemName: ascending ? "chevron.up" : "chevron.down").font(.caption2.weight(.bold))
+                Spacer(minLength: 0)
+                Image(systemName: ascending ? "chevron.up" : "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

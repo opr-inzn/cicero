@@ -126,6 +126,8 @@ struct SortButton: View {
         } label: {
             Label("Sort", systemImage: "arrow.up.arrow.down")
         }
+        .menuStyle(.button)
+        .toolbarButtonStyle()
         .menuIndicator(.hidden)
         .help("Sort the fonts")
     }
