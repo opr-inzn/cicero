@@ -228,7 +228,7 @@ struct FontList: View {
     @AppStorage("fontList.columnWidths") private var columnWidths = ""
     @AppStorage("fontList.columnOrder") private var columnOrder = ""
     @State private var anchor = SelectionAnchor()
-    @State private var resizing: (column: FontListColumn, start: CGFloat, room: CGFloat)?
+    @State private var resizing: (column: FontListColumn, start: [FontListColumn: CGFloat])?
     @State private var fitting: FontListColumn?
     @State private var moving: (column: FontListColumn, start: CGFloat, offset: CGFloat)?
     @FocusState private var focused: Bool
@@ -483,7 +483,10 @@ struct FontList: View {
     @ViewBuilder
     private func divider(between left: FontListColumn, and right: FontListColumn, in columns: [FontListColumn], widths: [FontListColumn: CGFloat]) -> some View {
         let endResize = { resizing = nil }
-        if resizeEdge(right, in: columns) == .leading {
+        if resizeEdge(right, in: columns) == .leading, resizeEdge(left, in: columns) == .leading {
+            let givers = Array(columns.drop { $0 != right })
+            ColumnDivider(resize: { resize(left, by: $0, takingFrom: givers, widths: widths) }, endResize: endResize) { fitting = left }
+        } else if resizeEdge(right, in: columns) == .leading {
             ColumnDivider(resize: { resize(right, by: -$0, widths: widths) }, endResize: endResize) { fitting = right }
         } else if resizeEdge(left, in: columns) == .trailing {
             ColumnDivider(resize: { resize(left, by: $0, widths: widths) }, endResize: endResize) { fitting = left }
@@ -501,11 +504,30 @@ struct FontList: View {
     private func resize(_ column: FontListColumn, by change: CGFloat, widths: [FontListColumn: CGFloat]) {
         if resizing?.column != column {
             setWidths(widths)
-            let room = (widths[.preview] ?? 0) - FontListColumn.preview.minimumWidth
-            resizing = (column, widths[column] ?? column.minimumWidth, max(0, room))
+            resizing = (column, widths)
         }
-        guard let resizing else { return }
-        setWidths([column: resizing.start + min(change, resizing.room)])
+        guard let start = resizing?.start else { return }
+        let room = max(0, (start[.preview] ?? 0) - FontListColumn.preview.minimumWidth)
+        setWidths([column: (start[column] ?? column.minimumWidth) + min(change, room)])
+    }
+
+    private func resize(_ column: FontListColumn, by change: CGFloat, takingFrom givers: [FontListColumn], widths: [FontListColumn: CGFloat]) {
+        if resizing?.column != column {
+            setWidths(widths)
+            resizing = (column, widths)
+        }
+        guard let start = resizing?.start else { return }
+        let width = start[column] ?? column.minimumWidth
+        var needed = max(change, column.minimumWidth - width)
+        var result: [FontListColumn: CGFloat] = [:]
+        for giver in givers.reversed() {
+            let available = (start[giver] ?? giver.minimumWidth) - giver.minimumWidth
+            let taken = needed > 0 ? min(needed, max(0, available)) : needed
+            result[giver] = (start[giver] ?? giver.minimumWidth) - taken
+            needed -= taken
+        }
+        result[column] = width + max(change, column.minimumWidth - width) - needed
+        setWidths(result)
     }
 
     private func widest(_ column: FontListColumn, in rows: [FontRow]) -> [FontRow] {
