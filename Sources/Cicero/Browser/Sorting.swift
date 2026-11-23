@@ -96,7 +96,7 @@ struct FamilyGroupHeader: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(group.title ?? "")
                     .font(.headline)
-                    .foregroundStyle(.primary.opacity(appearsActive ? 1 : 0.82))
+                    .foregroundStyle(.primary.opacity(appearsActive ? 0.83 : 0.34))
                 Text(count == 1 ? "1 family" : "\(count.plain) families")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
