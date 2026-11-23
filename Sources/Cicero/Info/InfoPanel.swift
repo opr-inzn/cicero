@@ -14,7 +14,7 @@ struct InfoPanelOverlay: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content.animation(Self.slide) { $0.modifier(Panel(shown: model.isInfoPresented ? 1 : 0)) }
+        content.animation(Self.slide) { $0.modifier(Panel(shown: model.isInfoShown ? 1 : 0)) }
     }
 
     private struct Panel: ViewModifier, Animatable {
@@ -61,13 +61,20 @@ struct InfoPanelInset: ViewModifier {
     @Environment(AppModel.self) private var model
     var isCovered = false
     @State private var coveredShown: CGFloat?
+    static let narrowestPage: CGFloat = 600
 
     func body(content: Content) -> some View {
-        let shown: CGFloat = model.isInfoPresented ? 1 : 0
+        let shown: CGFloat = model.isInfoShown ? 1 : 0
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(InfoPanelOverlay.slide) { $0.modifier(Room(shown: isCovered ? coveredShown ?? shown : shown)) }
             .onChange(of: isCovered, initial: true) { coveredShown = isCovered ? shown : nil }
+            .onGeometryChange(for: Bool.self) { proxy in
+                let page = proxy.size.width - proxy.safeAreaInsets.leading - proxy.safeAreaInsets.trailing
+                return page - InfoPanelOverlay.room(shown: 1, scale: 1) >= Self.narrowestPage
+            } action: { [isCovered] fits in
+                if !isCovered { model.infoFits = fits }
+            }
             .background(Color.canvas)
     }
 

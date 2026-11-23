@@ -188,6 +188,17 @@ final class AppModel {
     @ObservationIgnored var lastTyped = ""
     var isEditingSidebar = false
     var isInfoPresented = false
+    var infoFits = true {
+        didSet { if infoFits != oldValue { infoForced = false } }
+    }
+    private var infoForced = false
+    var isInfoShown: Bool {
+        get { isInfoPresented && (infoFits || infoForced) }
+        set {
+            isInfoPresented = newValue
+            infoForced = newValue && !infoFits
+        }
+    }
     var infoTab: InfoTab = .info
     var shownInfoTab: InfoTab { infoTab == .axes && inspectedFamily?.isVariable != true ? .info : infoTab }
     var familyFeatures: [String: [FeatureSetting]] = [:]

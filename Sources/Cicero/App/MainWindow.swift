@@ -7,6 +7,7 @@ struct MainWindow: View {
     @State private var promptText = ""
     @FocusState private var isSearchFocused: Bool
     @State private var startFocus = StartFocus()
+    @State private var autoHide = SidebarAutoHide()
 
     var body: some View {
         @Bindable var model = model
@@ -14,7 +15,10 @@ struct MainWindow: View {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: SidebarWidth.minimum, ideal: SidebarWidth.ideal, max: SidebarWidth.maximum)
                 .background { SidebarItemReader() }
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { SidebarRoom.shared.sidebar = $0 }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    SidebarRoom.shared.sidebar = $0
+                    if !SidebarRoom.shared.isCollapsed, $0.maxX >= SidebarWidth.minimum { autoHide.sidebarEdge = $0.maxX }
+                }
         } detail: {
             // A stack in a split view's detail column swaps the whole column for a page pushed onto it, dropping whatever is around the stack: each page makes room for the Info panel and takes dropped files.
             NavigationStack(path: Binding(
@@ -34,6 +38,8 @@ struct MainWindow: View {
             }
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { SidebarRoom.shared.detailStart = $0 }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { fitSidebar(width: $0) }
+        .onChange(of: model.isInfoPresented) { fitSidebar(width: autoHide.windowWidth) }
         // On the split view: on the stack, the search field doesn't show at all.
         .searchable(text: searchText, tokens: searchTokens, placement: .toolbar, prompt: "Search", token: tokenLabel)
         .searchSuggestions { SearchSuggestions() }
@@ -297,6 +303,32 @@ private struct ReplaceAlerts: ViewModifier {
     }
 }
 
+private struct SidebarAutoHide {
+    static let narrowestPage: CGFloat = 800
+    static let gap: CGFloat = 8
+    var sidebarEdge = SidebarWidth.ideal
+    var windowWidth: CGFloat = 0
+    var fits: Bool?
+    var hidSidebar = false
+}
+
+private extension MainWindow {
+    func fitSidebar(width: CGFloat) {
+        autoHide.windowWidth = width
+        let info = model.isInfoPresented ? InfoPanelOverlay.room(shown: 1, scale: 1) : 0
+        let fits = width - autoHide.sidebarEdge - SidebarAutoHide.gap - info >= SidebarAutoHide.narrowestPage
+        guard width > 0, fits != autoHide.fits else { return }
+        autoHide.fits = fits
+        if !fits, !SidebarRoom.shared.isCollapsed {
+            DispatchQueue.main.async { SidebarRoom.shared.setCollapsed(true) }
+            autoHide.hidSidebar = true
+        } else if fits, autoHide.hidSidebar {
+            DispatchQueue.main.async { SidebarRoom.shared.setCollapsed(false) }
+            autoHide.hidSidebar = false
+        }
+    }
+}
+
 private struct DetailPage: ViewModifier {
     var isCovered = false
 
@@ -318,7 +350,7 @@ private struct CoveredSize: ViewModifier {
             .frame(width: isCovered ? size?.width : nil, height: isCovered ? size?.height : nil, alignment: .topLeading)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { [isCovered] in if !isCovered { size = $0 } }
             // Not clipped: the browser scrolls under the toolbar's glass, and while it's covered nothing of it shows.
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 

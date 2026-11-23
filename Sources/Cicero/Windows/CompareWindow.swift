@@ -203,6 +203,7 @@ private struct AddFamilies: View {
             Text(family.name)
                 .foregroundStyle(isHighlighted ? Color.white : Color(Color.primary.resolve(in: environment)))
                 .lineLimit(1)
+                .truncationMode(.middle)
                 .opacity(isAvailable ? 1 : 0.4)
             Spacer(minLength: 8)
             Image(systemName: "checkmark")

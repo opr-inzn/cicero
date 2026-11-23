@@ -122,7 +122,7 @@ private struct TextTab: View {
         return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
-                        Text(family.name).lineLimit(1)
+                        Text(family.name).lineLimit(1).truncationMode(.middle)
                         StatusTag(family: family)
                     }
                     .frame(width: 220, alignment: .leading)
@@ -280,7 +280,7 @@ private struct LanguagesTab: View {
             ], selection: $selection) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
-                        Text(family.name).lineLimit(1)
+                        Text(family.name).lineLimit(1).truncationMode(.middle)
                         StatusTag(family: family)
                     }
                     .frame(width: 220, alignment: .leading)

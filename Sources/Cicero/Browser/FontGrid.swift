@@ -209,11 +209,13 @@ final class SidebarRoom {
         }
     }
     // Set from AppKit the moment the sidebar starts to slide: SwiftUI's column visibility changes only once it has, and on macOS 15 SwiftUI's sidebar stays put while AppKit's view around it narrows.
-    private var isCollapsed = false
+    private(set) var isCollapsed = false
     private var isShowing = false
     private var beside: CGFloat?
     private var inset: CGFloat = 0
     @ObservationIgnored private var observation: NSKeyValueObservation?
+    @ObservationIgnored private weak var item: NSSplitViewItem?
+    @ObservationIgnored private weak var controller: NSSplitViewController?
     @ObservationIgnored private var settling: Task<Void, Never>?
 
     var hiddenWidth: CGFloat {
@@ -231,7 +233,14 @@ final class SidebarRoom {
         sidebar.map { $0.width + (beside ?? inset) }
     }
 
-    func watch(_ item: NSSplitViewItem) {
+    func setCollapsed(_ collapsed: Bool) {
+        guard let item, item.isCollapsed != collapsed else { return }
+        controller?.toggleSidebar(nil)
+    }
+
+    func watch(_ item: NSSplitViewItem, in controller: NSSplitViewController) {
+        self.item = item
+        self.controller = controller
         isCollapsed = item.isCollapsed
         observation = item.observe(\.isCollapsed, options: [.new]) { [weak self] _, change in
             guard let collapsed = change.newValue else { return }
@@ -281,7 +290,7 @@ struct SidebarItemReader: NSViewRepresentable {
             while let current = view, !(current is NSSplitView) { view = current.superview }
             guard let controller = (view as? NSSplitView)?.delegate as? NSSplitViewController,
                   let item = controller.splitViewItems.first(where: { $0.behavior == .sidebar }) else { return }
-            SidebarRoom.shared.watch(item)
+            SidebarRoom.shared.watch(item, in: controller)
         }
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -342,6 +351,7 @@ private struct Tile: View {
                     Text(family.name)
                         .font(.callout.weight(.medium))
                         .lineLimit(1)
+                        .truncationMode(.middle)
                     TagDots(colors: model.tagColors(of: family))
                     let note = model.note(of: family), rating = model.rating(of: family)
                     if note != nil || rating != nil {

@@ -64,7 +64,7 @@ struct DuplicatesSheet: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(duplicate.family).lineLimit(1)
+                    Text(duplicate.family).lineLimit(1).truncationMode(.middle)
                     Tag(text: duplicate.version.title, tint: duplicate.version == .newer ? .green : .secondary)
                 }
                 Text(detail(duplicate))

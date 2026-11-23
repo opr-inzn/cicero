@@ -701,7 +701,7 @@ private struct FontListRow: View {
             ActivationSwitch(family: family, model: model).accessibilityHidden(true)
         case .name:
             HStack(spacing: 6) {
-                Text(row.name).lineLimit(1)
+                Text(row.name).lineLimit(1).truncationMode(.middle)
                 TagDots(colors: row.tags)
                 StatusTag(family: family)
                 VariableTag(family: family)
@@ -716,9 +716,9 @@ private struct FontListRow: View {
         case .styles:
             Text(row.styles.plain).monospacedDigit().foregroundStyle(.secondary)
         case .classification:
-            Text(row.classification).foregroundStyle(.secondary).lineLimit(1)
+            Text(row.classification).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
         case .foundry:
-            Text(row.foundry).foregroundStyle(.secondary).lineLimit(1)
+            Text(row.foundry).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
         case .year:
             if row.year > 0 {
                 Text(String(row.year)).monospacedDigit().foregroundStyle(.secondary)
@@ -729,7 +729,7 @@ private struct FontListRow: View {
             }
         case .series:
             if case .largest(let name, _) = model.coverageCell(column, of: row) {
-                Text(name).foregroundStyle(.secondary).lineLimit(1)
+                Text(name).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
         case .characterSet:
             switch model.coverageCell(column, of: row) {

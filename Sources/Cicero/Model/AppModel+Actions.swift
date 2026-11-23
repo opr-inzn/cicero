@@ -492,11 +492,11 @@ extension AppModel {
     // MARK: Info panel
 
     func toggleInfo() {
-        if isInfoPresented && shownInfoTab == .info {
-            isInfoPresented = false
+        if isInfoShown && shownInfoTab == .info {
+            isInfoShown = false
         } else {
             infoTab = .info
-            isInfoPresented = true
+            isInfoShown = true
         }
     }
 

@@ -163,7 +163,7 @@ private struct FileRow: View {
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(file.title ?? (file.path as NSString).lastPathComponent).lineLimit(1)
+                    Text(file.title ?? (file.path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle)
                     if isNewest { NewestTag() }
                     if !file.preferredFor.isEmpty && file.preferredStyles == nil { PreferredTag(names: file.preferredFor) }
                 }
@@ -171,6 +171,7 @@ private struct FileRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
                     .truncationMode(.middle)
                 Text(Self.facts(of: file)).font(.caption).foregroundStyle(.secondary)
                 if let styles = file.preferredStyles {
@@ -215,6 +216,7 @@ private struct FolderRow: View {
                         Text((folder.path as NSString).abbreviatingWithTildeInPath)
                             .lineLimit(1)
                             .truncationMode(.middle)
+                            .truncationMode(.middle)
                         if isNewest { NewestTag() }
                     }
                     Text(facts).font(.caption).foregroundStyle(.secondary)
@@ -243,7 +245,7 @@ private struct FolderRow: View {
                     ForEach(folder.files, id: \.path) { file in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text((file.path as NSString).lastPathComponent).lineLimit(1)
+                                Text((file.path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle)
                                 if filesDiffer {
                                     Text(FileRow.facts(of: file)).font(.caption).foregroundStyle(.secondary)
                                 }

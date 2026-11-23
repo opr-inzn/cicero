@@ -61,14 +61,14 @@ struct DocumentFontsSheet: View {
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(title(match)).lineLimit(1)
+                    Text(title(match)).lineLimit(1).truncationMode(.middle)
                     if match.font.isEmbedded == true {
                         Tag(text: "Embedded", tint: .secondary)
                             .help("The PDF carries the font, so it shows as it should even where the font is missing.")
                     }
                 }
                 if let postScriptName = match.font.postScriptName, postScriptName != title(match) {
-                    Text(postScriptName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(postScriptName).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
             }
             Spacer(minLength: 12)

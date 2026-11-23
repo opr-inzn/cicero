@@ -137,7 +137,8 @@ private struct Header: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            Spacer(minLength: 16)
+            .layoutPriority(1)
+            Spacer(minLength: 0)
             let titles = ActivationTitles([family])
             HStack(spacing: 8) {
                 if family.hasActivatable {
@@ -160,6 +161,7 @@ private struct Header: View {
                     }
                 }
             }
+            .fixedSize()
         }
         .padding(.horizontal, 24)
         .padding(.top, 8)
@@ -233,7 +235,7 @@ private struct FamilyName: View {
             baseline = (area.height - set.ink.height) / 2 + set.ink.maxY
         }
         let ellipsis = TextLine("…", font: set.font, kerning: 0, showsNotdef: false).line
-        let shown = CTLineCreateTruncatedLine(set.line, max(1, area.width - lead), .end, ellipsis) ?? set.line
+        let shown = CTLineCreateTruncatedLine(set.line, max(1, area.width - lead), .middle, ellipsis) ?? set.line
         context.saveGState()
         context.setFillColor(color)
         context.textMatrix = .identity
@@ -363,9 +365,9 @@ private struct AxesButton: View {
 
     var body: some View {
         Button {
-            let isShowing = model.isInfoPresented && model.infoTab == .axes
+            let isShowing = model.isInfoShown && model.infoTab == .axes
             model.infoTab = .axes
-            model.isInfoPresented = !isShowing
+            model.isInfoShown = !isShowing
         } label: {
             Label("Axes", systemImage: "slider.horizontal.3")
         }
@@ -681,18 +683,24 @@ private struct GlyphColumnsReader: ViewModifier {
 private struct StyleRows: View {
     @Environment(AppModel.self) private var model
     let family: Family
+    @State private var tableWidth: CGFloat?
+    private static let gap: CGFloat = 24
+    private static let narrowestPreview: CGFloat = 200
 
     var body: some View {
         let model = self.model
         let headerFont = NSFont.systemFont(ofSize: NSFont.preferredFont(forTextStyle: .subheadline).pointSize, weight: .semibold)
         let axes = family.styleAxes.map { (tag: $0.tag, name: $0.name, width: Self.width(fitting: [$0.name], in: headerFont)) }
-        let styleWidth = Self.width(fitting: family.faces.map(\.face.styleName), in: .preferredFont(forTextStyle: .body), minimum: 140, maximum: 240)
         let statuses = family.faces.flatMap { style in
             [style.state.label, "Active", "Inactive"] + (style.app.map { [FaceState.appOnly($0).label] } ?? [])
         }
         let statusWidth = 26 + 8 + Self.width(fitting: statuses, in: .preferredFont(forTextStyle: .body))
         let showsWeight = family.stylesDifferInWeight
         let showsFormat = Set(family.faces.map { ($0.face.path as NSString).pathExtension.lowercased() }).count > 1
+        let others = [statusWidth, showsWeight ? 56 : 0, showsFormat ? 56 : 0].reduce(0, +) + axes.map(\.width).reduce(0, +)
+        let gaps = CGFloat(2 + (showsWeight ? 1 : 0) + (showsFormat ? 1 : 0) + axes.count) * Self.gap
+        let styleRoom = tableWidth.map { $0 - Self.narrowestPreview - others - gaps } ?? 240
+        let styleWidth = Self.width(fitting: family.faces.map(\.face.styleName), in: .preferredFont(forTextStyle: .body), minimum: 140, maximum: max(140, styleRoom))
         // Not lazy: in a lazy stack, rows each as high as their own font's line moved the page below, and with it the glyph row `TopRowKeeper` keeps at the top.
         VStack(spacing: 0) {
             row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat) {
@@ -735,7 +743,7 @@ private struct StyleRows: View {
                         MiniSwitch(position: model.position(of: style), isEnabled: style.canActivate || style.canDeactivate) {
                             model.toggle(style, in: family)
                         }
-                        Text(style.state.label).foregroundStyle(.secondary).lineLimit(1)
+                        Text(style.state.label).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     }
                 }
                 .padding(.vertical, 8)
@@ -750,6 +758,7 @@ private struct StyleRows: View {
             }
             Divider()
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tableWidth = $0 }
         .padding(.horizontal, 24)
         .padding(.top, 12)
     }
@@ -763,9 +772,9 @@ private struct StyleRows: View {
                      @ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
                      @ViewBuilder weight: () -> some View, @ViewBuilder format: () -> some View, @ViewBuilder axes: () -> some View,
                      @ViewBuilder status: () -> some View) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Self.gap) {
             preview().frame(maxWidth: .infinity, alignment: .leading)
-            style().lineLimit(1).frame(width: styleWidth, alignment: .leading)
+            style().lineLimit(1).truncationMode(.middle).frame(width: styleWidth, alignment: .leading)
             if showsWeight { weight().frame(width: 56, alignment: .leading) }
             if showsFormat { format().lineLimit(1).frame(width: 56, alignment: .leading) }
             axes().lineLimit(1)

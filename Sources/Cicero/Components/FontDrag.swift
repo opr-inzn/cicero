@@ -29,6 +29,7 @@ struct FamilyDragPreview: View {
             FontText(text: "Aa", face: family.regular.face, size: 16, weight: family.regular.face.styleWeight)
             Text(family.name)
                 .lineLimit(1)
+                .truncationMode(.middle)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

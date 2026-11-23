@@ -1056,7 +1056,7 @@ struct InfoButton: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Toggle(isOn: Binding(get: { model.isInfoPresented }, set: { model.isInfoPresented = $0 })) {
+        Toggle(isOn: Binding(get: { model.isInfoShown }, set: { model.isInfoShown = $0 })) {
             Label("Info", systemImage: "info.circle")
         }
         .toggleStyle(.toolbar)

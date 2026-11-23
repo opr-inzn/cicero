@@ -229,7 +229,7 @@ final class QuickLookPanel: NSPanel {
         bar.addSubview(closeButton)
         titleLabel.font = .titleBarFont(ofSize: 0)
         titleLabel.textColor = QuickLookTitleButton.titleColor
-        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.lineBreakMode = .byTruncatingMiddle
         titleLabel.sizeToFit()
         let start = (centre.x + QuickLookTitleButton.diameter / 2 + 9 - 2.5).rounded()
         titleLabel.frame = NSRect(x: start, y: (centre.y - titleLabel.frame.height / 2).rounded(),

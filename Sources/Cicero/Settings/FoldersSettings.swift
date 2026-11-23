@@ -66,6 +66,7 @@ private struct FolderRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .truncationMode(.middle)
                 status
             }
             Spacer()
