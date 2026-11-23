@@ -210,15 +210,13 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
         switch self {
         case .status: KeyPathComparator(\.activation)
         case .name: KeyPathComparator(\.libraryPosition)
-        case .preview: nil
+        case .preview, .classification, .format: nil
         case .styles: KeyPathComparator(\.styles)
-        case .classification: KeyPathComparator(\.classification)
         case .foundry: KeyPathComparator(\.foundry, comparator: .localizedStandard)
         case .year: KeyPathComparator(\.year)
         case .rating: KeyPathComparator(\.rating)
         case .series, .characterSet: KeyPathComparator(\FontRow.[rank: self])
         case .added: KeyPathComparator(\.added)
-        case .format: KeyPathComparator(\.format)
         }
     }
 }

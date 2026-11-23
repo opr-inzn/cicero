@@ -166,7 +166,7 @@ final class AppModel {
     var similarStyleID: FaceID? {
         didSet { if similarStyleID != oldValue { keepsOwnOrder = true } }
     }
-    var sortColumn = UserDefaults.standard.string(forKey: AppModel.sortColumnKey).flatMap(FontListColumn.init(id:)) ?? .name {
+    var sortColumn = UserDefaults.standard.string(forKey: AppModel.sortColumnKey).flatMap(FontListColumn.init(id:)).flatMap { $0.comparator == nil ? nil : $0 } ?? .name {
         didSet { UserDefaults.standard.set(sortColumn.id, forKey: Self.sortColumnKey) }
     }
     var sortsAscending = UserDefaults.standard.object(forKey: AppModel.sortsAscendingKey) as? Bool ?? true {

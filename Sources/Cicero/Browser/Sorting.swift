@@ -6,7 +6,7 @@ extension AppModel {
 
     func sort(by column: FontListColumn) {
         sortColumn = column
-        sortsAscending = column != .added
+        sortsAscending = ![.added, .year, .rating, .styles].contains(column)
         keepsOwnOrder = false
     }
 
@@ -24,7 +24,7 @@ extension AppModel {
 }
 
 extension FontListColumn {
-    static let sortable: [FontListColumn] = [.name, .added, .foundry, .year, .rating, .status, .styles, .classification, .format]
+    static let sortable: [FontListColumn] = [.name, .added, .foundry, .year, .rating, .status, .styles]
 }
 
 struct FamilyGroup: Identifiable {
