@@ -310,7 +310,8 @@ enum GlyphDrawing {
 
     nonisolated static func middle(of font: CTFont) -> CGFloat {
         let capHeight = CTFontGetCapHeight(font), ascent = CTFontGetAscent(font)
-        return capHeight > 0 && capHeight <= ascent ? capHeight / 2 : (ascent - CTFontGetDescent(font)) / 2
+        // A font's ascent can come out a hair below its cap height, like 699.997 for a cap height of 700.
+        return capHeight > 0 && capHeight <= ascent + CTFontGetSize(font) / 100 ? capHeight / 2 : (ascent - CTFontGetDescent(font)) / 2
     }
 
     private static func fit(_ bounds: CGRect, font: CTFont, in rect: CGRect) -> (origin: CGPoint, scale: CGFloat) {
