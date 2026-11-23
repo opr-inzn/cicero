@@ -75,16 +75,19 @@ struct FamilyGroupHeader: View {
 
     var body: some View {
         let count = group.families.count
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(group.title ?? "")
-                .font(.title2.weight(.semibold))
-            Text(count == 1 ? "1 family" : "\(count.plain) families")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(group.title ?? "")
+                    .font(.headline)
+                    .foregroundStyle(.primary.opacity(0.87))
+                Text(count == 1 ? "1 family" : "\(count.plain) families")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.leading, 2)
         }
-        .padding(.top, 12)
-        .padding(.bottom, 2)
-        .padding(.leading, 2)
+        .padding(.top, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
