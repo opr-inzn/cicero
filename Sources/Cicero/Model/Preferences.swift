@@ -159,7 +159,7 @@ enum BrowserMode: String, CaseIterable {
 
     var icon: String {
         switch self {
-        case .list: "list.bullet"
+        case .list: "list.triangle"
         case .grid: "square.grid.2x2"
         case .specimens: "rectangle.grid.1x2"
         }
