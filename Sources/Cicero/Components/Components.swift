@@ -1054,9 +1054,14 @@ extension View {
 
 struct WindowTitleTint: ViewModifier {
     @Environment(\.appearsActive) private var appearsActive
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
-        content.foregroundStyle(.primary.opacity(appearsActive ? 0.83 : 0.34))
+        if appearsActive && colorScheme == .dark {
+            content.foregroundStyle(Color.ink.opacity(0.92))
+        } else {
+            content.foregroundStyle(.primary.opacity(appearsActive ? 0.83 : 0.34))
+        }
     }
 }
 
