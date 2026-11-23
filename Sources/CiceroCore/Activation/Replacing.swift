@@ -77,9 +77,24 @@ extension ActivationEngine {
             records.installedCopies[replacement.old] = nil
         }
 
-        let back = { (paths: [String]) in paths.filter { fm.fileExists(atPath: $0) } }
-        if !back(persistent).isEmpty { _ = await registerAndConfirm(back(persistent), scope: .persistent) }
-        if !back(session).isEmpty { _ = await registerAndConfirm(back(session), scope: .session) }
+        for (old, new) in placed {
+            if records.inPlace.remove(old) != nil { records.inPlace.insert(new) }
+            if let temp = records.temporary.removeValue(forKey: old) { records.temporary[new] = temp }
+            if let origin = records.installedCopies.removeValue(forKey: old) { records.installedCopies[new] = origin }
+            if let origin = records.appFolderOrigins.removeValue(forKey: old) { records.appFolderOrigins[new] = origin }
+        }
+        for (copy, origin) in records.installedCopies where placed[origin] != nil {
+            records.installedCopies[copy] = placed[origin]
+        }
+
+        let back = { (paths: [String]) -> [String] in
+            var seen = Set<String>()
+            return paths.map { placed[$0] ?? $0 }.filter { fm.fileExists(atPath: $0) && seen.insert($0).inserted }
+        }
+        let persistentBack = back(persistent)
+        let sessionBack = back(session)
+        if !persistentBack.isEmpty { _ = await registerAndConfirm(persistentBack, scope: .persistent) }
+        if !sessionBack.isEmpty { _ = await registerAndConfirm(sessionBack, scope: .session) }
 
         func new(_ replacement: FileReplacement) -> String { placed[replacement.old] ?? replacement.old }
         if moving {
@@ -104,10 +119,6 @@ extension ActivationEngine {
                 let undone = FontNames.describe(FontNames.fonts(inFiles: failed.filter { fm.fileExists(atPath: $0) }))
                 message += ". Couldn’t replace " + (undone ?? (failed.count == 1 ? "1 file" : "\(failed.count) files"))
             }
-        }
-        for (old, new) in placed {
-            guard let origin = records.appFolderOrigins.removeValue(forKey: old) else { continue }
-            records.appFolderOrigins[new] = origin
         }
         var result = ActivationResult(records: records, succeeded: done.count, failed: failed, message: message)
         result.placed = placed

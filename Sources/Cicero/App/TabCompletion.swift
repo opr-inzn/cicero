@@ -19,7 +19,10 @@ nonisolated enum TabCompletion {
         let output = FileManager.default.temporaryDirectory.appendingPathComponent("cicero-zsh-\(UUID().uuidString).txt")
         guard FileManager.default.createFile(atPath: output.path, contents: nil),
               let handle = try? FileHandle(forWritingTo: output) else { return nil }
-        defer { try? FileManager.default.removeItem(at: output) }
+        defer {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: output)
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shellPath)
         process.arguments = ["-l", "-i", "-c", #"print -r -- "@@cicero-zdotdir ${ZDOTDIR:-$HOME}"; print -r -- "@@cicero-compdef $(whence -w compdef)""#]
@@ -35,11 +38,16 @@ nonisolated enum TabCompletion {
         guard (try? process.run()) != nil else { return nil }
         let deadline = ContinuousClock.now + timeout
         while process.isRunning {
-            if ContinuousClock.now > deadline {
+            if Task.isCancelled || ContinuousClock.now > deadline {
                 process.terminate()
                 return nil
             }
-            try? await Task.sleep(for: .milliseconds(50))
+            do {
+                try await Task.sleep(for: .milliseconds(50))
+            } catch {
+                process.terminate()
+                return nil
+            }
         }
         try? handle.close()
         let lines = (try? String(contentsOf: output, encoding: .utf8))?.split(separator: "\n").map(String.init) ?? []

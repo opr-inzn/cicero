@@ -84,21 +84,26 @@ struct AxisControls: View {
 
     private func row(_ axis: AxisRange, axes: [AxisRange], style: LibraryFace, weight: Double, moved: [String: Double],
                      drawn: [String: Double]) -> some View {
-        let value = Binding { moved[axis.tag] ?? drawn[axis.tag] ?? axis.defaultValue } set: {
-            set(axis.tag, to: $0, axes: axes, on: style, weight: weight, moved: moved)
+        let low = min(axis.minimum, axis.maximum)
+        let high = max(axis.minimum, axis.maximum)
+        let range = low...high
+        let family = family
+        let value = Binding {
+            model.variations(for: family, face: style.id)[axis.tag] ?? drawn[axis.tag] ?? axis.defaultValue
+        } set: {
+            set(axis.tag, to: $0, axes: axes, on: style, weight: weight, moved: model.variations(for: family, face: style.id))
         }
-        let range = axis.minimum...axis.maximum
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text(axis.name).lineLimit(1)
                 Text(axis.tag).foregroundStyle(.secondary)
                 Spacer(minLength: 4)
-                ValueField(axis.name, value: value, range: range, step: axis.step)
+                ValueField(axis.name, value: value, range: range, step: axis.step, scope: family.id)
             }
             ValueSlider(value: value, range: range, step: axis.step)
                 .accessibilityLabel(axis.name)
         }
-        .help("\(axis.name) (\(axis.tag)), from \(Self.number(axis.minimum)) to \(Self.number(axis.maximum)), \(Self.number(axis.defaultValue)) by default")
+        .help("\(axis.name) (\(axis.tag)), from \(Self.number(low)) to \(Self.number(high)), \(Self.number(axis.defaultValue)) by default")
     }
 
     private static func number(_ value: Double) -> String {
@@ -147,7 +152,7 @@ struct AxisControls: View {
 
 extension AxisRange {
     var step: Double {
-        let span = maximum - minimum
+        let span = abs(maximum - minimum)
         return span > 20 ? 1 : span > 2 ? 0.1 : 0.01
     }
 }

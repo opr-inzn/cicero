@@ -190,7 +190,7 @@ struct FontDropTarget: NSViewRepresentable {
         }
 
         private func operation(for sender: any NSDraggingInfo) -> NSDragOperation {
-            if let files, sender.draggingSource == nil, !Self.fileURLs(on: sender.draggingPasteboard).isEmpty {
+            if let files, sender.draggingSource == nil, sender.draggingPasteboard.availableType(from: [.fileURL]) != nil {
                 isOver?(false)
                 files.isOver(true)
                 sender.draggingFormation = .pile

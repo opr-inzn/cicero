@@ -160,8 +160,10 @@ public final class CoverageIndex: Sendable {
             else { return }
             let order = languages.order
             for entry in cache.entries {
+                let bounds = entry.bounds.array(of: UInt32.self)
+                guard ScalarRanges.isValid(bounds: bounds) else { continue }
                 let coverage = FaceCoverage(
-                    scalars: ScalarRanges(bounds: entry.bounds.array(of: UInt32.self)), order: order,
+                    scalars: ScalarRanges(bounds: bounds), order: order,
                     bits: LanguageBits(base: entry.base.array(of: UInt64.self), full: entry.full.array(of: UInt64.self))
                 )
                 state.entries[FaceID(path: entry.path, index: entry.index)] = Entry(stamp: CoverageStamp(modified: entry.modified, size: entry.size), coverage: coverage)

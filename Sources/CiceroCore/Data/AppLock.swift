@@ -1,10 +1,11 @@
 import Foundation
+import Synchronization
 
-public final class AppLock: @unchecked Sendable {
-    private var descriptor: Int32
+public final class AppLock: Sendable {
+    private let descriptor: Mutex<Int32>
 
     private init(descriptor: Int32) {
-        self.descriptor = descriptor
+        self.descriptor = Mutex(descriptor)
     }
 
     deinit { release() }
@@ -100,9 +101,13 @@ public final class AppLock: @unchecked Sendable {
     }
 
     public func release() {
-        guard descriptor >= 0 else { return }
-        flock(descriptor, LOCK_UN)
-        close(descriptor)
-        descriptor = -1
+        let fd = descriptor.withLock { fd -> Int32 in
+            let current = fd
+            fd = -1
+            return current
+        }
+        guard fd >= 0 else { return }
+        flock(fd, LOCK_UN)
+        close(fd)
     }
 }

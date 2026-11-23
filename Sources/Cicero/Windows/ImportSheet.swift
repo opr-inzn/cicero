@@ -50,6 +50,7 @@ struct ImportSheet: View {
         .frame(width: 600)
         .interactiveDismissDisabled(stage != nil)
         .onAppear { appIsOpen = isAppRunning }
+        .onDisappear { rereading?.cancel() }
         .task(id: "\(prompt.id) \(model.data.installsIntoFontLibrary)") { await findCopies() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
             if isOtherApp(note), stage == nil, summary == nil { appIsOpen = isAppRunning }

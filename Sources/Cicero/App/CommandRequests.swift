@@ -16,6 +16,7 @@ final class CommandRequests {
     }
 
     func start() {
+        guard source == nil else { return }
         let folder = Requests.folder(support: support)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         Requests.tidy(support: support)
@@ -42,6 +43,7 @@ final class CommandRequests {
         let beat = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: Requests.beat)
+                guard !Task.isCancelled else { break }
                 Requests.stillAnswering(taken.id, support: support)
             }
         }
@@ -112,9 +114,9 @@ final class AppRequestWriter: Writer {
     }
 
     func activate(_ faces: [LibraryFace], untilQuit: Bool) async throws -> ActivationResult {
-        let operation = model.expect(faces, at: .on)
-        return try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             let queued = model.enqueue { model in
+                let operation = model.expect(faces, at: .on)
                 let result = untilQuit
                     ? await model.engine.activateTemporarily(faces, records: model.data.records)
                     : await model.engine.activate(faces, method: .inPlace, records: model.data.records)
@@ -131,9 +133,9 @@ final class AppRequestWriter: Writer {
     }
 
     func deactivate(_ faces: [LibraryFace]) async throws -> ActivationResult {
-        let operation = model.expect(faces, at: .off)
-        return try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             let queued = model.enqueue { model in
+                let operation = model.expect(faces, at: .off)
                 let result = await model.engine.deactivate(faces, records: model.data.records)
                 model.finish(result, operation: operation, undo: model.undo(restoring: faces, failed: result.failed))
                 continuation.resume(returning: result)

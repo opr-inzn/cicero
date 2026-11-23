@@ -651,13 +651,11 @@ public struct ActivationEngine: Sendable {
                 }
             }
         }
-        for path in leaving where !failed.contains(path) {
-            do {
-                try moveOutOfAppFolder(path, records: &records)
-                succeeded += 1
-            } catch {
-                failed.append(path)
-            }
+        let movingOut = leaving.filter { !failed.contains($0) }
+        if !movingOut.isEmpty {
+            let movedOut = moveOutOfAppFolders(movingOut, records: &records)
+            succeeded += movedOut.succeeded
+            failed += movedOut.failed
         }
         let done = Set(inFontsFolder + persistent + session + leaving).subtracting(failed)
         let message = failed.isEmpty && succeeded == 0 && !locked.isEmpty
@@ -1113,11 +1111,38 @@ public struct ActivationEngine: Sendable {
         return !isIdenticalCopy(copy, of: original)
     }
 
-    private func moveOutOfAppFolder(_ path: String, records: inout ActivationRecords) throws {
-        let destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: try locations.inactiveFolderForNewFiles())
-        try AppFolderMoves.note(moved: destination.path, origin: path, support: locations.support)
-        try move(Self.url(path), to: destination)
-        records.appFolderOrigins[destination.path] = path
+    private func moveOutOfAppFolders(_ paths: [String], records: inout ActivationRecords) -> (succeeded: Int, failed: [String]) {
+        guard let inactive = try? locations.inactiveFolderForNewFiles() else { return (0, paths) }
+        var reserved = Set<String>()
+        var plan: [(origin: String, destination: URL)] = []
+        for path in paths {
+            var destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: inactive)
+            while reserved.contains(destination.path) {
+                let stem = destination.deletingPathExtension().lastPathComponent
+                let ext = destination.pathExtension
+                let next = ext.isEmpty ? "\(stem) 2" : "\(stem) 2.\(ext)"
+                destination = Self.uniqueURL(for: next, in: inactive)
+            }
+            reserved.insert(destination.path)
+            plan.append((origin: path, destination: destination))
+        }
+        do {
+            try AppFolderMoves.note(plan.map { (moved: $0.destination.path, origin: $0.origin) }, support: locations.support)
+        } catch {
+            return (0, paths)
+        }
+        var succeeded = 0
+        var failed: [String] = []
+        for item in plan {
+            do {
+                try move(Self.url(item.origin), to: item.destination)
+                records.appFolderOrigins[item.destination.path] = item.origin
+                succeeded += 1
+            } catch {
+                failed.append(item.origin)
+            }
+        }
+        return (succeeded, failed)
     }
 
     func hasGoneAppFolder(_ path: String, records: ActivationRecords) -> Bool {

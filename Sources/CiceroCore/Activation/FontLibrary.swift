@@ -129,13 +129,29 @@ extension ActivationEngine {
         records.installedCopies = Dictionary(records.installedCopies.map { (moved($0.key), moved($0.value)) }, uniquingKeysWith: { first, _ in first })
         records.inPlace = Set(records.inPlace.map(moved))
         records.temporary = Dictionary(records.temporary.map { (moved($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
-        if !persistent.isEmpty { _ = await registrar.register(persistent.map { Self.url(moved($0)) }, scope: .persistent) }
-        if !session.isEmpty { _ = await registrar.register(session.map { Self.url(moved($0)) }, scope: .session) }
+        var failedRegistration: [String] = []
+        if !persistent.isEmpty {
+            let stuck = await registrar.register(persistent.map { Self.url(moved($0)) }, scope: .persistent)
+            for path in stuck {
+                records.inPlace.remove(path)
+                failedRegistration.append(path)
+            }
+        }
+        if !session.isEmpty {
+            let stuck = await registrar.register(session.map { Self.url(moved($0)) }, scope: .session)
+            for path in stuck {
+                records.temporary[path] = nil
+                failedRegistration.append(path)
+            }
+        }
         let firstPlaces = [locations.defaultFontLibrary, locations.formerDefaultFontLibrary].map(\.standardizedFileURL.path)
         if firstPlaces.contains(fontLibrary.standardizedFileURL.path) {
             _ = Self.removeIfEmpty(fontLibrary.deletingLastPathComponent().path)
         }
-        return ActivationResult(records: records, succeeded: 1, failed: [], message: "Cicero’s Library moved to \(place)")
+        let message = failedRegistration.isEmpty
+            ? "Cicero’s Library moved to \(place)"
+            : "Cicero’s Library moved to \(place), but \(failedRegistration.count == 1 ? "1 font" : "\(failedRegistration.count) fonts") couldn’t be reactivated"
+        return ActivationResult(records: records, succeeded: 1, failed: failedRegistration, message: message)
     }
 
     private func finishedEarlierMove(records: ActivationRecords) async -> Bool {

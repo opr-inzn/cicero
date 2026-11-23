@@ -12,7 +12,6 @@ struct GeneralSettings: View {
     @State private var isClearingCaches = false
     @State private var loginItem = LoginItem.status
     @State private var isBackingUp = false
-    @State private var restoring: BackupContents?
 
     var body: some View {
         @Bindable var model = model
@@ -105,7 +104,12 @@ struct GeneralSettings: View {
                 LabeledContent("Library") {
                     HStack {
                         Button("Back Up") { isBackingUp = true }
-                        Button("Restore") { Task { restoring = await model.chooseBackupToRestore() } }
+                        Button("Restore") {
+                            Task {
+                                guard let contents = await model.chooseBackupToRestore() else { return }
+                                model.ask { $0.restorePrompt = contents }
+                            }
+                        }
                     }
                     .disabled(model.job != nil)
                 }
@@ -133,7 +137,6 @@ struct GeneralSettings: View {
         }
         .fontCacheSheet(isPresented: $isClearingCaches)
         .backupSheet(isPresented: $isBackingUp)
-        .restoreSheet(contents: $restoring)
         .onAppear { loginItem = LoginItem.status }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem = LoginItem.status

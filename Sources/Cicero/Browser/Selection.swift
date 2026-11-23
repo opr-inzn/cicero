@@ -255,7 +255,6 @@ struct FamilyKeys: ViewModifier {
                 model.quickLook.updateOrder(families.map(\.id))
                 return model.quickLook.step(forward ? 1 : -1) ? .handled : .ignored
             }
-            if case .list = layout { return .ignored }
         }
         var ids = families.map(\.id)
         if let pinned, ids.first == pinned {

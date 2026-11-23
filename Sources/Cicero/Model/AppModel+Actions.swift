@@ -123,9 +123,17 @@ extension AppModel {
 
     func finish(_ result: ActivationResult, operation: Int? = nil, operations: [Int] = [], undo: (() -> Void)? = nil) {
         var data = data
+        let hadMoves = result.records.appFolderOrigins != data.records.appFolderOrigins
         data.records = result.records
         data.forgetInstalledAddedFiles()
         self.data = data
+        if hadMoves {
+            let support = locations.support
+            let store = store
+            Task.detached(priority: .utility) {
+                if store.flush(durably: true) { AppFolderMoves.remove(support: support) }
+            }
+        }
         if !result.message.isEmpty { showToast(result.message, undo: undo) }
         let scan = rescan()
         for operation in [operation].compactMap(\.self) + operations { settle(operation, after: scan) }

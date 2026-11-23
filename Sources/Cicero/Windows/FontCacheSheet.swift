@@ -81,7 +81,7 @@ struct FontCacheSheet: View {
                     .disabled(isClearing)
                 Button("Clear") { clear() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(isClearing || (!currentUser && !allUsers && apps.isEmpty))
+                    .disabled(isClearing || (!currentUser && !allUsers && eligibleApps.isEmpty))
             }
         }
         .padding(20)
@@ -114,12 +114,18 @@ struct FontCacheSheet: View {
         return "macOS asks for permission before Cicero looks inside Office’s folders."
     }
 
+    private var eligibleApps: [AppFontCaches.App] {
+        AppFontCaches.App.allCases.filter { app in
+            apps.contains(app) && runningApps[app] == nil && (app != .adobe || adobeCaches?.isEmpty != true)
+        }
+    }
+
     private func clear() {
         isClearing = true
         var scopes: [SystemFontCaches.Scope] = []
         if currentUser { scopes.append(.currentUser) }
         if allUsers { scopes.append(.allUsers) }
-        let chosen = AppFontCaches.App.allCases.filter { apps.contains($0) && runningApps[$0] == nil }
+        let chosen = eligibleApps
         Task {
             let cleared = await model.clearCaches(scopes: scopes, apps: chosen)
             onCleared(cleared)

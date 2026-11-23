@@ -100,11 +100,12 @@ final class PageContents {
     private func task(for face: FontFace) -> Task<PageContent, Never> {
         let version = FontLoader.shared.generation(of: face.path)
         if let under = loading[face.id], under.generation == version { return under.task }
+        loading[face.id]?.task.cancel()
         let coverage = coverage
         let started = generation
         let task = Task {
             let content = await Self.read(face, version: version, coverage: coverage)
-            guard started == generation, loading[face.id]?.generation == version else { return content }
+            guard !Task.isCancelled, started == generation, loading[face.id]?.generation == version else { return content }
             loading[face.id] = nil
             keep(content, for: face.id)
             return content
@@ -115,8 +116,10 @@ final class PageContents {
 
     func forget(paths: Set<String>) {
         guard !paths.isEmpty else { return }
-        generation += 1
-        loading = [:]
+        for (id, entry) in loading where paths.contains(id.path) {
+            entry.task.cancel()
+            loading[id] = nil
+        }
         for id in recent where paths.contains(id.path) { ready[id] = nil }
         recent.removeAll { paths.contains($0.path) }
     }
@@ -184,6 +187,7 @@ final class PageFeatures {
     }
 
     func forget() {
+        for task in loading.values { task.cancel() }
         ready = [:]
         loading = [:]
     }

@@ -18,7 +18,7 @@ struct SidebarView: View {
             SidebarContent(highlight: highlight, drag: drag, fit: fit)
         }
         .listStyle(.sidebar)
-        .outsideFileDrops(isOver: { highlight.filesOver = $0 }) { urls in
+        .outsideFileDrops(isOver: { if highlight.filesOver != $0 { highlight.filesOver = $0 } }) { urls in
             highlight.filesOver = false
             model.openOnSidebar(urls)
         }
@@ -174,7 +174,8 @@ private struct SidebarContent: View {
         draggedGroup = group
         Task {
             while NSEvent.pressedMouseButtons & 1 != 0 { try? await Task.sleep(for: .milliseconds(100)) }
-            draggedGroup = nil
+            try? await Task.sleep(for: .milliseconds(250))
+            if draggedGroup == group { draggedGroup = nil }
             groupDropTarget = nil
         }
         return GroupDrag(group: group)
@@ -284,7 +285,7 @@ private struct SidebarContent: View {
                     } else if highlight.dropTarget == row.item {
                         highlight.dropTarget = nil
                     }
-                }, files: .init(isOver: { highlight.filesOver = $0 }) { urls in
+                }, files: .init(isOver: { if highlight.filesOver != $0 { highlight.filesOver = $0 } }) { urls in
                     highlight.filesOver = false
                     model.openOnSidebar(urls)
                 }) { drags in
@@ -794,7 +795,9 @@ final class SidebarDrag {
         let rows = session == nil ? [] : rows.filter(\.canHide)
         session = nil
         self.rows = []
+        pictures = []
         lastAsked = nil
+        if NSCursor.current == NSCursor.disappearingItem { NSCursor.arrow.set() }
         // With the button still down, Escape ended the drag.
         guard !rows.isEmpty, operation.isEmpty, NSEvent.pressedMouseButtons & 1 == 0, !listFrame.contains(point) else { return }
         hide(rows)
@@ -830,7 +833,7 @@ private enum SidebarDataSource {
             // As a drag leaves, AppKit asks about a drop at child index -2, its nowhere, which SwiftUI's data source looks up as a row and stops Cicero.
             index == -2 ? [] : swiftUIValidate(source, validate, outline, info, item, index)
         }
-        method_setImplementation(validateMethod, imp_implementationWithBlock(validateAnswer))
+        replace(type, validate, method: validateMethod, with: imp_implementationWithBlock(validateAnswer))
 
         let update = #selector(NSOutlineViewDataSource.outlineView(_:updateDraggingItemsForDrag:))
         if let updateMethod = class_getInstanceMethod(type, update) {
@@ -840,7 +843,7 @@ private enum SidebarDataSource {
                 // SwiftUI draws the dragged rows again as the drag comes over the list, with a white symbol.
                 if let info = info as? NSDraggingInfo { sidebarDrag(of: outline)?.redraw(info, in: outline) }
             }
-            method_setImplementation(updateMethod, imp_implementationWithBlock(updateAnswer))
+            replace(type, update, method: updateMethod, with: imp_implementationWithBlock(updateAnswer))
         }
 
         let begin = #selector(NSOutlineViewDataSource.outlineView(_:draggingSession:willBeginAt:forItems:))
@@ -851,16 +854,22 @@ private enum SidebarDataSource {
                 swiftUIBegin(source, begin, outline, session, point, items)
                 sidebarDrag(of: outline)?.began(session, count: items.count, in: outline)
             }
-            method_setImplementation(beginMethod, imp_implementationWithBlock(beginAnswer))
+            replace(type, begin, method: beginMethod, with: imp_implementationWithBlock(beginAnswer))
             let swiftUIEnd = unsafeBitCast(method_getImplementation(endMethod), to: Ended.self)
             let endAnswer: @convention(block) (AnyObject, NSOutlineView, NSDraggingSession, NSPoint, NSDragOperation) -> Void = { source, outline, session, point, operation in
                 swiftUIEnd(source, end, outline, session, point, operation)
                 sidebarDrag(of: outline)?.ended(at: point, operation: operation)
             }
-            method_setImplementation(endMethod, imp_implementationWithBlock(endAnswer))
+            replace(type, end, method: endMethod, with: imp_implementationWithBlock(endAnswer))
         }
         answering.insert(ObjectIdentifier(type))
         return true
+    }
+
+    private static func replace(_ type: AnyClass, _ selector: Selector, method: Method, with implementation: IMP) {
+        if !class_addMethod(type, selector, implementation, method_getTypeEncoding(method)) {
+            method_setImplementation(method, implementation)
+        }
     }
 
     private static func followMoves(of outline: NSOutlineView) {
@@ -872,10 +881,7 @@ private enum SidebarDataSource {
             appKit(outline, move, image, point)
             sidebarDrag(of: outline)?.moved(to: point)
         }
-        let implementation = imp_implementationWithBlock(moved)
-        if !class_addMethod(type, move, implementation, method_getTypeEncoding(inherited)) {
-            method_setImplementation(inherited, implementation)
-        }
+        replace(type, move, method: inherited, with: imp_implementationWithBlock(moved))
         // macOS 26 tells a drag's source of its moves this way, and there SwiftUI's outline view has the method itself.
         let movedTo = #selector(NSDraggingSource.draggingSession(_:movedTo:))
         if let own = class_getInstanceMethod(type, movedTo) {
@@ -884,7 +890,7 @@ private enum SidebarDataSource {
                 swiftUIMoved(outline, movedTo, session, point)
                 sidebarDrag(of: outline)?.moved(to: point)
             }
-            method_setImplementation(own, imp_implementationWithBlock(sessionMoved))
+            replace(type, movedTo, method: own, with: imp_implementationWithBlock(sessionMoved))
         } else {
             let sessionMoved: @convention(block) (NSOutlineView, NSDraggingSession, NSPoint) -> Void = { outline, session, point in
                 sidebarDrag(of: outline)?.moved(to: point)
@@ -904,10 +910,7 @@ private enum SidebarDataSource {
                     appKitEnd(outline, end, session, point, operation)
                 }
             }
-            let endImplementation = imp_implementationWithBlock(ended)
-            if !class_addMethod(type, end, endImplementation, method_getTypeEncoding(inheritedEnd)) {
-                method_setImplementation(inheritedEnd, endImplementation)
-            }
+            replace(type, end, method: inheritedEnd, with: imp_implementationWithBlock(ended))
         }
         answering.insert(ObjectIdentifier(type))
     }

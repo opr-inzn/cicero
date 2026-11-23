@@ -22,6 +22,18 @@ public struct ScalarRanges: Sendable, Equatable {
         self.bounds = bounds
     }
 
+    static func isValid(bounds: [UInt32]) -> Bool {
+        guard bounds.count.isMultiple(of: 2) else { return false }
+        var previous: UInt32?
+        for i in stride(from: 0, to: bounds.count, by: 2) {
+            let low = bounds[i], high = bounds[i + 1]
+            guard low <= high else { return false }
+            if let previous, low <= previous { return false }
+            previous = high
+        }
+        return true
+    }
+
     public init(characterSet: CFCharacterSet) {
         guard let data = CFCharacterSetCreateBitmapRepresentation(nil, characterSet) else {
             self.init(bounds: [])

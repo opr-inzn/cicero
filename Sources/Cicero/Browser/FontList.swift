@@ -275,9 +275,6 @@ struct FontList: View {
             .focusEffectDisabled()
             .modifier(TakesStartFocus(focused: $focused))
             .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position))
-            .onKeyPress(keys: [.upArrow, .downArrow]) { press in
-                move(press.key == .downArrow ? 1 : -1, in: families, extending: press.modifiers.contains(.shift), proxy: proxy)
-            }
         }
         .onChange(of: model.shownSort, initial: true) {
             if let column = model.shownSort, column.canHide, allColumns.contains(column), !shownColumns.contains(column) { setShown(true, column) }
@@ -593,14 +590,6 @@ struct FontList: View {
             width == column.defaultWidth ? nil : "\(column.id):\(Int(width))"
         }.sorted().joined(separator: ",")
         if text != columnWidths { columnWidths = text }
-    }
-
-    private func move(_ step: Int, in families: [Family], extending: Bool, proxy: ScrollViewProxy) -> KeyPress.Result {
-        guard let target = FamilySelection.step(step, in: families.map(\.id), selection: &model.selectedIDs, anchor: &anchor, extending: extending) else {
-            return .ignored
-        }
-        proxy.scrollTo(target)
-        return .handled
     }
 }
 

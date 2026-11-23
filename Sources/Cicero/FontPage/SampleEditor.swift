@@ -61,8 +61,18 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         update(view, context: context)
         if caseChange != coordinator.caseChange {
             coordinator.caseChange = caseChange
-            if let caseChange { (view as? SampleTextView)?.convert(caseChange.conversion, in: font) }
+            if let caseChange {
+                let conversion = caseChange.conversion
+                let font = font
+                DispatchQueue.main.async { [weak view] in
+                    (view as? SampleTextView)?.convert(conversion, in: font)
+                }
+            }
         }
+    }
+
+    static func dismantleNSView(_ view: NSTextView, coordinator: Coordinator) {
+        (view as? SampleTextView)?.tearDown()
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView view: NSTextView, context: Context) -> CGSize? {
@@ -79,8 +89,8 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
     }
 
     private func setMenu(of view: NSTextView) {
-        (view as? SampleTextView)?.makeMenu = { [menu] in
-            NSHostingMenu(rootView: SampleMenu(view: view, content: menu()))
+        (view as? SampleTextView)?.makeMenu = { [weak view, menu] in
+            view.map { NSHostingMenu(rootView: SampleMenu(view: $0, content: menu())) }
         }
     }
 
@@ -95,6 +105,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         let restyles = style != coordinator.style || storage.length != coordinator.styledLength
         // Only on a change, not on every keystroke, which would upset typing with an input method.
         guard restyles || glyphStyle != coordinator.glyphStyle || glyphs != coordinator.markedGlyphs else { return }
+        guard !view.hasMarkedText() else { return }
         coordinator.style = style
         coordinator.glyphStyle = glyphStyle
         coordinator.markedGlyphs = glyphs
@@ -184,6 +195,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
         func textStorage(_ storage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range: NSRange,
                          changeInLength: Int) {
             guard editedMask.contains(.editedCharacters), !isSettingText else { return }
+            styledLength = storage.length
             if storage.string != text.wrappedValue { text.wrappedValue = storage.string }
             let pasted = storage.sampleGlyphs()
             markedGlyphs = pasted
@@ -234,7 +246,7 @@ struct SampleEditor<MenuContent: View>: NSViewRepresentable {
 
 private final class SampleTextView: NSTextView {
     var content: NSTextContentStorage?
-    var makeMenu: (() -> NSMenu)?
+    var makeMenu: (() -> NSMenu?)?
     var roomAbove: CGFloat = 0 {
         didSet {
             guard roomAbove != oldValue else { return }
@@ -243,6 +255,11 @@ private final class SampleTextView: NSTextView {
         }
     }
     private var shownMenu: NSMenu?
+
+    func tearDown() {
+        makeMenu = nil
+        shownMenu = nil
+    }
 
     override var textContainerOrigin: NSPoint { NSPoint(x: textContainerInset.width, y: roomAbove) }
 

@@ -96,10 +96,13 @@ public struct AppFolderMoves: Codable, Sendable {
         support.appendingPathComponent("moved-out-of-app-folders.json", isDirectory: false)
     }
 
-    static func note(moved: String, origin: String, support: URL) throws {
+    static func note(_ entries: [(moved: String, origin: String)], support: URL) throws {
+        guard !entries.isEmpty else { return }
         let url = url(support: support)
         var list = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(AppFolderMoves.self, from: $0) } ?? AppFolderMoves()
-        list.moves.append(Move(moved: moved, origin: origin, digest: ActivationJournal.digest(of: origin)))
+        for entry in entries {
+            list.moves.append(Move(moved: entry.moved, origin: entry.origin, digest: ActivationJournal.digest(of: entry.origin)))
+        }
         try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
         try JSONEncoder().encode(list).write(to: url, options: .atomic)
         _ = UserDataStore.syncToDisk(url)

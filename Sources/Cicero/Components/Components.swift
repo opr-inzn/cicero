@@ -429,7 +429,8 @@ struct ValueSlider: View {
     private var drawn: some View {
         GeometryReader { geometry in
             let travel = max(geometry.size.width - knob, 1)
-            let fraction = (min(max(value, range.lowerBound), range.upperBound) - range.lowerBound) / (range.upperBound - range.lowerBound)
+            let span = range.upperBound - range.lowerBound
+            let fraction = span > 0 ? (min(max(value, range.lowerBound), range.upperBound) - range.lowerBound) / span : 0
             ZStack(alignment: .leading) {
                 Capsule().fill(.quaternary).frame(height: 4)
                 Capsule().fill(isEnabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
@@ -468,17 +469,21 @@ struct ValueField: View {
     var step: Double = 1
     var unit = ""
     var alignment = HorizontalAlignment.trailing
+    var scope: AnyHashable? = nil
     @State private var text = ""
-    @State private var owner: Binding<Double>?
+    @State private var edited = false
+    @State private var owner: (binding: Binding<Double>, range: ClosedRange<Double>, step: Double)?
     @FocusState private var isFocused: Bool
 
-    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "", alignment: HorizontalAlignment = .trailing) {
+    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "",
+         alignment: HorizontalAlignment = .trailing, scope: AnyHashable? = nil) {
         self.title = title
         _value = value
         self.range = range
         self.step = step
         self.unit = unit
         self.alignment = alignment
+        self.scope = scope
         // The number from the start, not once it appears: a field measured before it's on screen, as `TesterControls` does, would measure as wide as its title, which it shows while empty.
         _text = State(initialValue: Self.formatted(value.wrappedValue, step: step))
     }
@@ -501,21 +506,38 @@ struct ValueField: View {
             }
         }
         .monospacedDigit()
-        .onAppear { text = formatted(value) }
-        .onChange(of: value) { text = formatted($1) }
+        .onAppear {
+            edited = false
+            text = formatted(value)
+        }
+        .onChange(of: scope) { _, _ in
+            if edited { commit() }
+            owner = isFocused ? ($value, range, step) : nil
+            edited = false
+            text = formatted(value)
+        }
+        .onChange(of: value) { _, new in
+            edited = false
+            text = formatted(new)
+        }
         .onChange(of: isFocused) {
             if $1 {
-                owner = $value
+                owner = ($value, range, step)
             } else {
-                commit()
+                if edited { commit() }
                 owner = nil
+                edited = false
+                text = formatted(value)
             }
         }
     }
 
     @ViewBuilder
     private var number: some View {
-        let field = TextField(title, text: $text)
+        let field = TextField(title, text: Binding(get: { text }, set: {
+            if $0 != text { edited = true }
+            text = $0
+        }))
             .labelsHidden()
             .textFieldStyle(.plain)
             .focused($isFocused)
@@ -539,16 +561,18 @@ struct ValueField: View {
     }
 
     private func commit() {
-        let target = owner ?? $value
-        guard text != formatted(target.wrappedValue) else { return }
+        let target = owner ?? ($value, range, step)
+        edited = false
+        guard text != Self.formatted(target.binding.wrappedValue, step: target.step) else { return }
         if let typed { set(typed, on: target) } else { text = formatted(value) }
     }
 
-    private func set(_ new: Double, on target: Binding<Double>? = nil) {
-        let target = target ?? owner ?? $value
-        let new = min(max((new / step).rounded() * step, range.lowerBound), range.upperBound)
+    private func set(_ new: Double, on target: (binding: Binding<Double>, range: ClosedRange<Double>, step: Double)? = nil) {
+        let target = target ?? owner ?? ($value, range, step)
+        edited = false
+        let clamped = min(max((new / target.step).rounded() * target.step, target.range.lowerBound), target.range.upperBound)
         // Within a thousandth of a step: rounding to the step can leave the same number a hair apart.
-        if abs(new - target.wrappedValue) > step / 1000 { target.wrappedValue = new }
+        if abs(clamped - target.binding.wrappedValue) > target.step / 1000 { target.binding.wrappedValue = clamped }
         text = formatted(value)
     }
 
@@ -715,10 +739,15 @@ struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
         let titles = options.map(\.title)
         if button.itemTitles != titles {
             button.removeAllItems()
-            button.addItems(withTitles: titles)
+            for title in titles {
+                button.menu?.addItem(NSMenuItem(title: title, action: nil, keyEquivalent: ""))
+            }
         }
         button.selectItem(at: options.firstIndex { $0.value == selection } ?? -1)
-        context.coordinator.onChoose = { index in selection = options[index].value }
+        context.coordinator.onChoose = { index in
+            guard options.indices.contains(index) else { return }
+            selection = options[index].value
+        }
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
@@ -756,7 +785,10 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
 
     func updateNSView(_ control: NSSegmentedControl, context: Context) {
         control.selectedSegment = options.firstIndex { $0.value == selection } ?? -1
-        context.coordinator.onChoose = { index in selection = options[index].value }
+        context.coordinator.onChoose = { index in
+            guard options.indices.contains(index) else { return }
+            selection = options[index].value
+        }
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSSegmentedControl, context: Context) -> CGSize? {

@@ -64,10 +64,11 @@ enum SidebarSnap {
         let previous = class_getInstanceMethod(type, selector).map { unsafeBitCast(method_getImplementation($0), to: Constrain.self) }
         let answer: @convention(block) (AnyObject, NSSplitView, CGFloat, Int) -> CGFloat = { delegate, splitView, proposed, index in
             let position = previous?(delegate, selector, splitView, proposed, index) ?? proposed
-            guard index == 0, let sidebar = splitView.arrangedSubviews.first,
+            guard index == 0, let fit = objc_getAssociatedObject(splitView, fitKey) as? SidebarFit,
+                  let sidebar = splitView.arrangedSubviews.first,
                   position >= sidebar.frame.minX + SidebarWidth.hiding else { return position }
             var snapped = position
-            if let fit = objc_getAssociatedObject(splitView, fitKey) as? SidebarFit, let narrowing = fit.narrowing {
+            if let narrowing = fit.narrowing {
                 let whole = sidebar.frame.maxX - narrowing
                 if abs(position - whole) < distance { snapped = whole }
             }

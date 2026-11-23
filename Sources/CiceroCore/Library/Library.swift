@@ -81,7 +81,7 @@ public struct Library: Sendable {
     public let unreadableFiles: [String]
     public let activePaths: Set<String>
     public let fingerprint: Int
-    public let changedPaths: Set<String>
+    public var changedPaths: Set<String>
     public let unavailableFolders: [UUID: FolderAvailability]
     public let onlineOnlyFiles: [UUID: [String]]
     public let offlineFamilies: Set<String>
@@ -350,20 +350,34 @@ public final class LibraryScanner: Sendable {
             state.withLock { state in if state.lastFindScan == number { state.lastFind = nil } }
         }
 
-        let files = updateCache(found: found, parsed: parsed, keeping: reach)
+        let files = updateCache(found: found, parsed: parsed, keeping: reach, scan: number)
         if rereadAll { state.withLock { $0.rereadsDone = max($0.rereadsDone, rereads) } }
         let inputs = Self.inputHash(found: found, records: input.records, reach: reach)
         if parsed.isEmpty, let last = state.withLock({ $0.last }), last.inputs == inputs {
             return last.library
         }
-        let library = signposter.withIntervalSignpost("Build") { build(found: found, files: files, input: input, reach: reach, read: Set(parsed.keys)) }
-        let newest = state.withLock { state in
-            guard number > state.lastBuiltScan else { return false }
+        let (built, offlineKnown) = signposter.withIntervalSignpost("Build") {
+            build(found: found, files: files, input: input, reach: reach, read: Set(parsed.keys), scan: number)
+        }
+        let newest = state.withLock { state -> Library? in
+            guard number > state.lastBuiltScan else { return nil }
+            var changed = Set(state.lastStamps.filter { found[$0.key]?.stamp != $0.value }.keys)
+            if state.built {
+                for path in found.keys where state.lastStamps[path] == nil && !parsed.keys.contains(path) { changed.insert(path) }
+            }
+            state.built = true
+            state.changedSinceTaken.formUnion(changed)
+            changed = state.changedSinceTaken
+            state.lastStamps = found.mapValues(\.stamp)
+            state.restored = nil
+            state.offlineKnown = offlineKnown
+            var library = built
+            library.changedPaths = changed
             state.lastBuiltScan = number
             state.last = (inputs, library)
-            return true
+            return library
         }
-        guard newest else { return library }
+        guard let library = newest else { return built }
         let save = { [self] in
             signposter.withIntervalSignpost("Save cache") {
                 saveCacheIfNeeded()
@@ -839,11 +853,15 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    private func updateCache(found: [String: FoundFile], parsed: [String: CachedFile], keeping reach: OutOfReach) -> [String: CachedFile] {
+    private func updateCache(found: [String: FoundFile], parsed: [String: CachedFile], keeping reach: OutOfReach, scan number: Int) -> [String: CachedFile] {
         state.withLock { state in
             let before = state.files.count
-            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) }
-            state.files.merge(parsed) { _, new in new }
+            if number >= state.lastBuiltScan {
+                state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) }
+            }
+            for (path, file) in parsed where number >= state.lastBuiltScan || state.files[path] == nil {
+                state.files[path] = file
+            }
             if !parsed.isEmpty || state.files.count != before { state.dirty = true }
             return state.files
         }
@@ -903,7 +921,7 @@ public final class LibraryScanner: Sendable {
         var app: String?
     }
 
-    private func build(found: [String: FoundFile], files: [String: CachedFile], input: ScanInput, reach: OutOfReach, read: Set<String>) -> Library {
+    private func build(found: [String: FoundFile], files: [String: CachedFile], input: ScanInput, reach: OutOfReach, read: Set<String>, scan number: Int) -> (Library, [String: Set<String>]) {
         var candidates: [FaceKey: [Candidate]] = [:]
         candidates.reserveCapacity(files.values.reduce(0) { $0 + $1.faces.count })
         var unreadable: [String] = []
@@ -993,22 +1011,10 @@ public final class LibraryScanner: Sendable {
         hasher.combine(reach.folders)
         hasher.combine(reach.onlineOnly)
         hasher.combine(offline)
-        let changed: Set<String> = state.withLock { state in
-            var changed = Set(state.lastStamps.filter { found[$0.key]?.stamp != $0.value }.keys)
-            if state.built {
-                for path in found.keys where state.lastStamps[path] == nil && !read.contains(path) { changed.insert(path) }
-            }
-            state.built = true
-            state.changedSinceTaken.formUnion(changed)
-            changed = state.changedSinceTaken
-            state.lastStamps = found.mapValues(\.stamp)
-            state.restored = nil
-            state.offlineKnown = offlineKnown
-            return changed
-        }
-        return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: changed,
-                       unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
-                       goneFiles: reach.goneFiles)
+        let library = Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: [],
+                              unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
+                              goneFiles: reach.goneFiles)
+        return (library, offlineKnown)
     }
 
     private static func offlineKnown(in library: Library) -> [String: Set<String>] {

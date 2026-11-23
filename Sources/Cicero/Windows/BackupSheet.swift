@@ -15,6 +15,7 @@ struct BackupSheet: View {
     @State private var fonts: [BackupFont]?
     @State private var progress: BackupProgress?
     @State private var task: Task<Void, Never>?
+    @State private var runID = UUID()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -54,6 +55,7 @@ struct BackupSheet: View {
         }
         .padding(20)
         .frame(width: 520)
+        .interactiveDismissDisabled(progress != nil)
         .task { fonts = await model.backupInventory() }
     }
 
@@ -74,13 +76,22 @@ struct BackupSheet: View {
         guard panel.runModal() == .OK, let destination = panel.url else { return }
         let fonts = fonts ?? []
         let include = includeFonts && !fonts.isEmpty
+        let run = UUID()
+        runID = run
         progress = include ? .copying(done: 0, total: fonts.count) : .compressing
         task = Task {
+            defer { task = nil }
             do {
                 try await model.backUp(to: destination, fonts: fonts, includeFonts: include) { step in
-                    Task { @MainActor in progress = step }
+                    Task { @MainActor in
+                        if runID == run, task != nil { progress = step }
+                    }
                 }
-                if !Task.isCancelled { NSWorkspace.shared.activateFileViewerSelecting([destination]) }
+                guard !Task.isCancelled else {
+                    dismiss()
+                    return
+                }
+                NSWorkspace.shared.activateFileViewerSelecting([destination])
                 model.showToast(include ? "Backed up your library and \(fonts.count == 1 ? "1 font file" : "\(fonts.count.plain) font files")" : "Backed up your library")
                 dismiss()
             } catch is CancellationError {
