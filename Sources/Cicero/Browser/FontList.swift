@@ -225,8 +225,8 @@ nonisolated enum FontListColumn: Hashable, Identifiable, Sendable {
 
 struct FontList: View {
     @Environment(AppModel.self) private var model
-    @State private var sortColumn = FontListColumn.name
-    @State private var ascending = true
+    @AppStorage("fontList.sortColumn") private var sortColumnID = FontListColumn.name.id
+    @AppStorage("fontList.sortAscending") private var ascending = true
     @State private var keepsOwnOrder = true
     @AppStorage("fontList.hiddenColumns") private var hiddenColumns = "added,format"
     @AppStorage("fontList.characterSetColumns") private var addedColumns = ""
@@ -240,6 +240,11 @@ struct FontList: View {
     @State private var visibleWidth: CGFloat = 900
     @State private var visibleHeight: CGFloat = 0
     @State private var position = ScrollPosition(idType: String.self)
+
+    private var sortColumn: FontListColumn {
+        get { FontListColumn(id: sortColumnID) ?? .name }
+        nonmutating set { sortColumnID = newValue.id }
+    }
 
     var body: some View {
         let columns = shownColumns
