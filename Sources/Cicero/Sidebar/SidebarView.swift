@@ -164,7 +164,6 @@ private struct SidebarContent: View {
                         if group.rows.contains(where: { model.isVisible($0.key) }) {
                             Button("Hide from Sidebar", systemImage: "eye.slash") { model.hideGroup(group.id) }
                         }
-                        EditSidebarButton(model: model)
                     }
             }
         }
@@ -273,6 +272,9 @@ private struct SidebarContent: View {
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
         .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
         .tag(row.item)
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
+            if row.isRenamable { highlight.renaming = row.item }
+        })
         .contextMenu { SidebarRowMenu(row: row, model: model, highlight: highlight) }
         // Asked for as the list starts dragging the row, which tells which rows a drag has.
         .itemProvider { drag.provider(for: row) }
@@ -322,13 +324,13 @@ private struct SidebarRowMenu: View {
             tagItems(rows.compactMap { if case .tag(let name) = $0.item { name } else { nil } })
         case .foundry(let name):
             if rows.count == 1 {
-                Button("Rename Foundry", systemImage: "pencil") {
+                Button("Rename", systemImage: "pencil") {
                     model.prompt("Rename Foundry", text: name, confirm: "Rename") { model.renameFoundry(name, to: $0) }
                 }
             }
         case .classification(let name):
             if rows.count == 1 {
-                Button("Rename Classification", systemImage: "pencil") {
+                Button("Rename", systemImage: "pencil") {
                     model.prompt("Rename Classification", text: name, confirm: "Rename") { model.renameClassification(name, to: $0) }
                 }
             }
@@ -357,12 +359,11 @@ private struct SidebarRowMenu: View {
             Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportFonts(in: exported) }
         }
-        Divider()
         let shown = rows.filter { $0.canHide && model.isVisible($0.key) }
         if !shown.isEmpty {
+            Divider()
             Button("Hide from Sidebar", systemImage: "eye.slash") { model.hide(shown.map(\.key)) }
         }
-        EditSidebarButton(model: model)
     }
 
     private var noun: String {
@@ -380,9 +381,7 @@ private struct SidebarRowMenu: View {
     @ViewBuilder
     private func locationItems(_ ids: [UUID]) -> some View {
         if ids.count == 1, let id = ids.first {
-            Button("Rename Location", systemImage: "pencil") {
-                model.prompt("Rename Location", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
-            }
+            Button("Rename", systemImage: "pencil") { highlight.renaming = .folder(id) }
             switch id {
             case WatchedFolder.adobeFontsID:
                 Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
@@ -403,7 +402,7 @@ private struct SidebarRowMenu: View {
         let removable = ids.filter(model.isRemovableFolder)
         if !removable.isEmpty {
             if ids.count > 1 { Divider() }
-            Button(removable.count == 1 ? "Remove Location from Library" : "Remove Locations from Library", systemImage: "folder.badge.minus") {
+            Button(removable.count == 1 ? "Remove Location" : "Remove Locations", systemImage: "folder.badge.minus") {
                 model.removeFolders(Set(removable))
             }
         }
@@ -424,14 +423,17 @@ private struct SidebarRowMenu: View {
         let smartSets = Set(rows.compactMap { if case .smartSet(let id) = $0.item { id } else { nil } })
         let kind = sets.isEmpty ? "Smart Folder" : "Folder"
         let kinds = rows.count == 1 ? kind : kind + "s"
-        Button("Activate \(kinds)", systemImage: "checkmark.seal") { model.activateFonts(in: rows) }
+        let single = rows.count == 1 ? sets.first.flatMap { id in model.data.sets.first { $0.id == id } } : nil
+        Button("Activate", systemImage: "checkmark.seal") { model.activateFonts(in: rows) }
         Button("Activate Temporarily", systemImage: "clock") { model.activateFontsTemporarily(in: rows.map(\.item)) }
-        Button("Deactivate \(kinds)", systemImage: "xmark.seal") { model.deactivateFonts(in: rows.map(\.item)) }
+        if let single {
+            Button(single.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.ask { $0.editingAppsForSet = single.id } }
+        }
+        Button("Deactivate", systemImage: "xmark.seal") { model.deactivateFonts(in: rows.map(\.item)) }
         Divider()
         if rows.count == 1 {
-            if let id = sets.first, let set = model.data.sets.first(where: { $0.id == id }) {
-                Button("Rename Folder", systemImage: "pencil") { model.prompt("Rename Folder", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
-                Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.ask { $0.editingAppsForSet = id } }
+            if let single {
+                Button("Rename", systemImage: "pencil") { highlight.renaming = .set(single.id) }
             } else if let id = smartSets.first, let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
                 Button("Edit Smart Folder", systemImage: "slider.horizontal.3") { model.ask { $0.editingSmartSet = smartSet } }
             }
@@ -445,7 +447,7 @@ private struct SidebarRowMenu: View {
     @ViewBuilder
     private func tagItems(_ names: [String]) -> some View {
         if names.count == 1, let name = names.first {
-            Button("Rename Tag", systemImage: "pencil") { model.prompt("Rename Tag", text: name, confirm: "Rename") { model.renameTag(name, to: $0) } }
+            Button("Rename", systemImage: "pencil") { highlight.renaming = .tag(name) }
         }
         Menu {
             Toggle("None", isOn: Binding(
@@ -521,6 +523,7 @@ final class SidebarHighlight {
     var selected: Set<SidebarItem> = []
     var dropTarget: SidebarItem?
     var filesOver = false
+    var renaming: SidebarItem?
 }
 
 private struct OrganizeRow: View {
@@ -549,7 +552,55 @@ private struct SidebarLabel: View {
         let style: AnyShapeStyle = highlight.dropTarget == row.item ? AnyShapeStyle(.white)
             : highlight.selected.contains(row.item) ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary)
         // On the symbol too: a sidebar styles symbols itself. A tag's dot keeps its own colour.
-        Label { Text(row.title).lineLimit(1).foregroundStyle(style).sidebarTitle(row.title, key: row.key, fit: fit) } icon: { SidebarIcon(row: row).foregroundStyle(style) }
+        Label {
+            if highlight.renaming == row.item {
+                SidebarRenameField(row: row, highlight: highlight)
+            } else {
+                Text(row.title).lineLimit(1).foregroundStyle(style).sidebarTitle(row.title, key: row.key, fit: fit)
+            }
+        } icon: { SidebarIcon(row: row).foregroundStyle(style) }
+    }
+}
+
+private struct SidebarRenameField: View {
+    @Environment(AppModel.self) private var model
+    let row: SidebarRow
+    let highlight: SidebarHighlight
+    @State private var name = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        TextField(row.title, text: $name)
+            .textFieldStyle(.plain)
+            .labelsHidden()
+            .focused($isFocused)
+            .onSubmit(commit)
+            .onExitCommand { highlight.renaming = nil }
+            .onChange(of: isFocused) { if !isFocused { commit() } }
+            .task {
+                name = row.title
+                isFocused = true
+            }
+    }
+
+    private func commit() {
+        guard highlight.renaming == row.item else { return }
+        highlight.renaming = nil
+        switch row.item {
+        case .set(let id): model.renameSet(id, to: name)
+        case .folder(let id): model.renameFolder(id, to: name)
+        case .tag(let old): model.renameTag(old, to: name)
+        default: break
+        }
+    }
+}
+
+private extension SidebarRow {
+    var isRenamable: Bool {
+        switch item {
+        case .set, .tag, .folder: true
+        default: false
+        }
     }
 }
 
