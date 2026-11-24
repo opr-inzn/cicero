@@ -21,10 +21,46 @@ enum LetterShapes {
         case (.missing, .measured(let l)):
             if l.foot > serif { return .serif }
             if l.reach < plain { return .sansSerif }
+        case (.missing, .missing):
+            if isSymbol(font) { return .symbol }
         default:
             break
         }
         return nil
+    }
+
+    private static func isSymbol(_ font: CTFont) -> Bool {
+        var letters = 0
+        var symbols = 0
+        for range in CharacterMap.characters(of: font).ranges {
+            if isPrivateUse(range) {
+                symbols += Int(range.upperBound - range.lowerBound) + 1
+                continue
+            }
+            for value in range {
+                guard let scalar = Unicode.Scalar(value) else { continue }
+                let properties = scalar.properties
+                if properties.isWhitespace || properties.generalCategory == .control { continue }
+                if properties.isAlphabetic {
+                    letters += 1
+                    if letters >= 10 { return false }
+                } else {
+                    switch properties.generalCategory {
+                    case .mathSymbol, .currencySymbol, .modifierSymbol, .otherSymbol, .privateUse:
+                        symbols += 1
+                    default:
+                        break
+                    }
+                }
+            }
+        }
+        return symbols >= 10 && symbols >= letters * 3
+    }
+
+    private static func isPrivateUse(_ range: ClosedRange<UInt32>) -> Bool {
+        range.lowerBound >= 0xE000 && range.upperBound <= 0xF8FF
+            || range.lowerBound >= 0xF0000 && range.upperBound <= 0xFFFFD
+            || range.lowerBound >= 0x100000 && range.upperBound <= 0x10FFFD
     }
 
     static func isMonospaced(_ font: CTFont) -> Bool {

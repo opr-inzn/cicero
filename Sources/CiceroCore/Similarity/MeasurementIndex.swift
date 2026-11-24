@@ -27,6 +27,10 @@ public final class MeasurementIndex: Sendable {
             entries[face]?.tags
         }
 
+        public func classifications(of face: FaceID) -> [Float]? {
+            entries[face]?.classification
+        }
+
         public func classification(of face: FaceID) -> (classification: Classification, likelihood: Float)? {
             guard let chances = entries[face]?.classification,
                   let best = chances.indices.max(by: { chances[$0] < chances[$1] }) else { return nil }
@@ -141,7 +145,8 @@ public final class MeasurementIndex: Sendable {
     static func measuredFaces(of families: [Family], weights: Bool = false) -> [FontFace] {
         families.flatMap { family in
             var faces = [family.regular.face]
-            for face in family.kinds.compactMap(family.representative(of:)) + (weights ? family.weightNeighbors : [])
+            let extraWeights = weights || (family.classification == .unclassified && !family.mixesSerifAndSans)
+            for face in family.kinds.compactMap(family.representative(of:)) + (extraWeights ? family.weightNeighbors : [])
             where !faces.contains(where: { $0.id == face.id }) {
                 faces.append(face.face)
             }
@@ -173,8 +178,12 @@ public final class MeasurementIndex: Sendable {
         (LetterMeasurements.measure(font, glyphMap: glyphMap), embedder?.read(font, glyphMap: glyphMap))
     }
 
+    public func classifications(of face: FaceID) -> [Float]? {
+        state.withLock { $0.entries[face]?.classification }
+    }
+
     public func classification(of face: FaceID) -> (classification: Classification, likelihood: Float)? {
-        guard let chances = state.withLock({ $0.entries[face]?.classification }),
+        guard let chances = classifications(of: face),
               let best = chances.indices.max(by: { chances[$0] < chances[$1] }) else { return nil }
         return (LetterEmbedding.classifications[best], chances[best])
     }
