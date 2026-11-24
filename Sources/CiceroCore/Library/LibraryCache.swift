@@ -76,7 +76,7 @@ enum LibraryCache {
             do {
                 guard try reader.u32() == magic, try reader.u32() == version else { return nil }
                 let faces = try reader.u32()
-                guard faces == FaceCache.version || faces == FaceCache.withoutFigures else { return nil }
+                guard faces == FaceCache.version || faces == FaceCache.withoutSymbols || faces == FaceCache.withoutFigures else { return nil }
                 let fingerprint = Int(try reader.i64())
                 var members: [SavedFamily] = []
                 for _ in 0..<Int(try reader.u32()) {

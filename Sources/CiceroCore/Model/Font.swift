@@ -794,16 +794,18 @@ extension Classification {
         if faces.contains(where: { $0.face.isMonospaced }) { return .monospaced }
         if let byClass = Classification(familyClass: judged(faces)[0].familyClass) { return byClass }
         let name = name.lowercased()
+        let words = Set(name.split { !$0.isLetter }.map(String.init))
         let hints: [(Classification, [String])] = [
             (.monospaced, ["mono", "code"]),
             (.ornamental, ["stencil", "inline", "outline", "fraktur", "blackletter"]),
             (.sansSerif, ["sans", "grotesk", "grotesque", "gothic"]),
-            (.serif, ["serif", "slab", "garamond", "antiqua"]),
-            (.script, ["script", "brush", "hand"]),
+            (.serif, ["serif", "slab", "garamond", "antiqua", "didone", "old style", "oldstyle", "transitional"]),
+            (.script, ["script", "brush", "hand", "calligraph"]),
             // Symbol fonts' letters, when they have any, are often plain.
-            (.symbol, ["symbol", "dingbat", "emoji"]),
+            (.symbol, ["symbol", "dingbat", "emoji", "wingding", "webding", "pictogram", "braille"]),
         ]
-        for (classification, words) in hints where words.contains(where: name.contains) { return classification }
+        for (classification, hints) in hints where hints.contains(where: name.contains) { return classification }
+        if words.contains("icons") { return .symbol }
         let judged = judged(faces)
         func agreed(_ answers: [Classification?]) -> Classification? {
             let found = Set(answers.compactMap { $0 })

@@ -27,7 +27,8 @@ extension Classification {
 
 enum FaceCache {
     private static let magic: UInt32 = 0x4346_5450
-    static let version: UInt32 = 12
+    static let version: UInt32 = 13
+    static let withoutSymbols: UInt32 = 12
     static let withoutFigures: UInt32 = 11
 
     static func encode(_ files: [String: CachedFile]) -> Data {
@@ -53,7 +54,7 @@ enum FaceCache {
             do {
                 guard try reader.u32() == magic else { return nil }
                 let saved = try reader.u32()
-                guard saved == version || saved == withoutFigures else { return nil }
+                guard saved == version || saved == withoutSymbols || saved == withoutFigures else { return nil }
                 let count = Int(try reader.u32())
                 var files: [String: CachedFile] = [:]
                 files.reserveCapacity(min(count, reader.remaining / 32))
@@ -67,6 +68,9 @@ enum FaceCache {
                     var faces: [FontFace] = []
                     faces.reserveCapacity(min(faceCount, reader.remaining / 16))
                     for _ in 0..<faceCount { faces.append(try reader.face(path: path)) }
+                    if saved == withoutSymbols, faces.contains(where: { $0.familyClass == 0 && !$0.isMonospaced && $0.letterShape == nil }) {
+                        stamp.size = -1
+                    }
                     files[path] = CachedFile(stamp: stamp, dateAdded: dateAdded, faces: faces)
                 }
                 return files
