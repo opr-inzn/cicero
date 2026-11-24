@@ -8,12 +8,15 @@ public final class LetterEmbedding: Sendable {
     private let url: URL
     private let state = Mutex(ModelState.unloaded)
     private let loadQueue = DispatchQueue(label: "Cicero.LetterEmbedding.load", qos: .utility)
+    private let loadedTagNames = Mutex<[String]?>(nil)
 
     private struct LoadedModel: @unchecked Sendable {
         let model: MLModel
         let takesStrips: Bool
         let takesDetails: Bool
         let takesAdvances: Bool
+        let letterCount: Int
+        let tagNames: [String]
     }
 
     private enum ModelState: Sendable {
@@ -28,11 +31,17 @@ public final class LetterEmbedding: Sendable {
     public struct Reading: Equatable, Sendable {
         public var embedding: [Float]
         public var classification: [Float]?
+        public var tags: [Float]?
     }
 
     public init?(contentsOf url: URL?) {
         guard let url, FileManager.default.fileExists(atPath: url.path) else { return nil }
         self.url = url
+    }
+
+    public var tagNames: [String] {
+        if let names = loadedTagNames.withLock({ $0 }) { return names }
+        return loadedModel()?.tagNames ?? []
     }
 
     public func embedding(of font: CTFont) -> [Float]? {
@@ -66,8 +75,8 @@ public final class LetterEmbedding: Sendable {
         }
     }
 
-    public func read(_ font: CTFont) -> Reading? {
-        if case .read(let reading) = outcome(font) { return reading }
+    public func read(_ font: CTFont, glyphMap: ((Character) -> CGGlyph?)? = nil) -> Reading? {
+        if case .read(let reading) = outcome(font, glyphMap: glyphMap) { return reading }
         return nil
     }
 
@@ -82,9 +91,13 @@ public final class LetterEmbedding: Sendable {
             return nil
         }
         let inputs = mlModel.modelDescription.inputDescriptionsByName
+        let meta = mlModel.modelDescription.metadata[.creatorDefinedKey] as? [String: String]
         let loaded = LoadedModel(model: mlModel, takesStrips: inputs["strips"] != nil,
-                                 takesDetails: inputs["details"] != nil, takesAdvances: inputs["advances"] != nil)
+                                 takesDetails: inputs["details"] != nil, takesAdvances: inputs["advances"] != nil,
+                                 letterCount: inputs["letters"]?.multiArrayConstraint?.shape[1].intValue ?? LetterImages.letters.count,
+                                 tagNames: (meta?["tags"]).map { $0.split(separator: ",").map(String.init) } ?? [])
         state.withLock { $0 = .loaded(loaded) }
+        loadedTagNames.withLock { $0 = loaded.tagNames }
         return loaded
     }
 
@@ -97,11 +110,13 @@ public final class LetterEmbedding: Sendable {
         return loadQueue.sync { loadOnQueue() }
     }
 
-    func outcome(_ font: CTFont) -> Outcome {
+    func outcome(_ font: CTFont, glyphMap: ((Character) -> CGGlyph?)? = nil) -> Outcome {
         guard let loaded = loadedModel() else { return .failed }
-        guard let drawn = LetterImages.draw(font, strips: loaded.takesStrips, details: loaded.takesDetails) else { return .undrawable }
-        var letters = [Float](repeating: 0, count: drawn.pixels.count)
-        vDSP.convertElements(of: drawn.pixels, to: &letters)
+        guard let drawn = LetterImages.draw(font, strips: loaded.takesStrips, details: loaded.takesDetails, glyphMap: glyphMap) else { return .undrawable }
+        let usableLetters = min(loaded.letterCount, LetterImages.letters.count)
+        let pixelCount = usableLetters * LetterImages.size * LetterImages.size
+        var letters = [Float](repeating: 0, count: pixelCount)
+        vDSP.convertElements(of: drawn.pixels.prefix(pixelCount), to: &letters)
         letters = vDSP.divide(letters, 255)
         var lines = [Float](repeating: 0, count: drawn.strips.count)
         vDSP.convertElements(of: drawn.strips, to: &lines)
@@ -109,12 +124,12 @@ public final class LetterEmbedding: Sendable {
         var large = [Float](repeating: 0, count: drawn.details.count)
         vDSP.convertElements(of: drawn.details, to: &large)
         large = vDSP.divide(large, 255)
-        let shape = [1, LetterImages.letters.count, LetterImages.size, LetterImages.size] as [NSNumber]
+        let shape = [1, usableLetters, LetterImages.size, LetterImages.size] as [NSNumber]
         guard let input = try? MLMultiArray(shape: shape, dataType: .float32),
-              let advances = try? MLMultiArray(shape: [1, LetterImages.letters.count] as [NSNumber], dataType: .float32)
+              let advances = try? MLMultiArray(shape: [1, usableLetters] as [NSNumber], dataType: .float32)
         else { return .failed }
         input.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: letters) }
-        advances.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: drawn.advances) }
+        advances.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: drawn.advances.prefix(usableLetters)) }
         var inputs: [String: Any] = ["letters": input]
         if loaded.takesAdvances { inputs["advances"] = advances }
         if loaded.takesStrips {
@@ -133,10 +148,17 @@ public final class LetterEmbedding: Sendable {
               let output = try? loaded.model.prediction(from: features),
               let embedding = output.featureValue(for: "embedding")?.multiArrayValue.map(Self.values)
         else { return .failed }
-        var reading = Reading(embedding: embedding, classification: output.featureValue(for: "classification")?.multiArrayValue.map(Self.values))
+        var reading = Reading(
+            embedding: embedding,
+            classification: output.featureValue(for: "classification")?.multiArrayValue.map(Self.values),
+            tags: output.featureValue(for: "tags")?.multiArrayValue.map(Self.values)
+        )
         guard reading.embedding.count == Self.dimensions, reading.embedding.allSatisfy(\.isFinite) else { return .failed }
         if let classification = reading.classification, classification.count != Self.classifications.count || !classification.allSatisfy(\.isFinite) {
             reading.classification = nil
+        }
+        if let tags = reading.tags, tags.isEmpty || !tags.allSatisfy(\.isFinite) {
+            reading.tags = nil
         }
         return .read(reading)
     }

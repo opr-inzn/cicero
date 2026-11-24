@@ -77,3 +77,11 @@ struct RenderLetters {
         String(bytes: [24, 16, 8, 0].map { UInt8(truncatingIfNeeded: identifier >> $0) }, encoding: .ascii) ?? ""
     }
 }
+
+extension CTFont {
+    func glyph(for character: Character) -> CGGlyph? {
+        var characters = Array(String(character).utf16)
+        var glyph: CGGlyph = 0
+        return CTFontGetGlyphsForCharacters(self, &characters, &glyph, 1) && glyph != 0 ? glyph : nil
+    }
+}

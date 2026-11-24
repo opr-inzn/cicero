@@ -51,7 +51,7 @@ extension AppModel {
     }
 
     var targetForAddedFiles: SidebarItem? {
-        guard openFamilyID == nil, similarFamilyID == nil, documentList == nil, selectedItems.count == 1, let selection else { return nil }
+        guard openFamilyID == nil, similarFamilyID == nil, documentList == nil, externalSimilar == nil, selectedItems.count == 1, let selection else { return nil }
         switch selection {
         case .set(let id): return data.sets.contains { $0.id == id } ? selection : nil
         case .tag(let name): return data.tags.contains(name) ? selection : nil

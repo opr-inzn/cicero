@@ -13,17 +13,18 @@ T=~/Downloads/cicero-training
 git clone --depth 1 https://github.com/google/fonts "$T/google-fonts"
 python3 -m venv "$T/venv" && "$T/venv/bin/pip" install torch numpy coremltools
 
-# The families and styles to draw, then the letters, drawn with Cicero's own LetterImages.swift.
-"$T/venv/bin/python" -I scripts/embedding/prepare.py "$T/google-fonts" "$T/work"
+# The families and styles to draw (optionally adding extra verified OFL/Apache/MIT repos with --extra), then the letters drawn with Cicero's own LetterImages.swift.
+swiftc -O -parse-as-library scripts/embedding/inspect-fonts.swift -o /tmp/inspect-fonts
+"$T/venv/bin/python" -I scripts/embedding/prepare.py "$T/google-fonts" "$T/work" --extra "$T/extra-fonts"
 swiftc -O -parse-as-library scripts/embedding/render-letters.swift Sources/CiceroCore/Similarity/LetterImages.swift -o /tmp/render-letters
 /tmp/render-letters "$T/work/manifest.json" "$T/work/letters"
 
 # Optionally each style's letter measurements, for the model to learn to tell them: the tests' EmbeddingEvaluation
 # writes them to measurements.tsv (CICERO_EMBEDDING_WORK="$T/work" swift test --filter EmbeddingEvaluation).
 
-# The model in Resources: designs of a kind alike (--soft), learned for 60 epochs from every family (--fold -1).
+# The model in Resources: ResNet + cross-letter attention (--arch resnet), 19 letters, measurement-aware soft targets (--soft 2), learned from every family (--fold -1).
 "$T/venv/bin/python" -I scripts/embedding/train.py train "$T/work" --measurements "$T/work/measurements.tsv" \
-    --epochs 60 --fold -1 --soft 2 --instance 0.3
+    --arch resnet --epochs 60 --fold -1 --soft 2 --instance 0.3
 "$T/venv/bin/python" -I scripts/embedding/train.py classify "$T/work"
 "$T/venv/bin/python" -I scripts/embedding/train.py export "$T/work" Resources/LetterEmbedding.mlpackage
 ```

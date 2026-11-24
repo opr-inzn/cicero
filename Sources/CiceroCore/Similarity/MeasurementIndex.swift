@@ -10,7 +10,7 @@ public final class MeasurementIndex: Sendable {
     private let loadLock = Mutex(())
     private let saveQueue = DispatchQueue(label: "Cicero.MeasurementIndex.save", qos: .utility)
 
-    public static let version = 9
+    public static let version = 11
 
     public struct Snapshot: Sendable {
         fileprivate let entries: [FaceID: Entry]
@@ -21,6 +21,10 @@ public final class MeasurementIndex: Sendable {
 
         public func embedding(of face: FaceID) -> [Float]? {
             entries[face]?.embedding
+        }
+
+        public func tags(of face: FaceID) -> [Float]? {
+            entries[face]?.tags
         }
 
         public func classification(of face: FaceID) -> (classification: Classification, likelihood: Float)? {
@@ -35,6 +39,7 @@ public final class MeasurementIndex: Sendable {
         var measurements: LetterMeasurements?
         var embedding: [Float]?
         var classification: [Float]?
+        var tags: [Float]?
         var undrawable = false
     }
 
@@ -95,7 +100,7 @@ public final class MeasurementIndex: Sendable {
                         let descriptors = FontFiles.descriptors(at: fileWork[0].0.path)
                         return fileWork.map { face, stamp in
                             let font = Self.font(face, in: descriptors)
-                            return (face.id, stamp, font.flatMap(LetterMeasurements.measure), font.flatMap { embedder?.outcome($0) })
+                            return (face.id, stamp, font.flatMap { LetterMeasurements.measure($0) }, font.flatMap { embedder?.outcome($0) })
                         }
                     }
                 }
@@ -108,7 +113,7 @@ public final class MeasurementIndex: Sendable {
                             let reading: LetterEmbedding.Reading? = if case .read(let reading) = outcome { reading } else { nil }
                             let undrawable = if case .undrawable = outcome { true } else { false }
                             state.entries[id] = Entry(stamp: stamp, measurements: measurements, embedding: reading?.embedding,
-                                                      classification: reading?.classification, undrawable: undrawable)
+                                                      classification: reading?.classification, tags: reading?.tags, undrawable: undrawable)
                             state.dirty = true
                             done += 1
                             if done % 200 == 0 { hit = true }
@@ -156,6 +161,18 @@ public final class MeasurementIndex: Sendable {
         state.withLock { $0.entries[face]?.embedding }
     }
 
+    public func tags(of face: FaceID) -> [Float]? {
+        state.withLock { $0.entries[face]?.tags }
+    }
+
+    public var tagNames: [String] {
+        embedder?.tagNames ?? []
+    }
+
+    public func inspect(_ font: CTFont, glyphMap: ((Character) -> CGGlyph?)? = nil) -> (measurements: LetterMeasurements?, reading: LetterEmbedding.Reading?) {
+        (LetterMeasurements.measure(font, glyphMap: glyphMap), embedder?.read(font, glyphMap: glyphMap))
+    }
+
     public func classification(of face: FaceID) -> (classification: Classification, likelihood: Float)? {
         guard let chances = state.withLock({ $0.entries[face]?.classification }),
               let best = chances.indices.max(by: { chances[$0] < chances[$1] }) else { return nil }
@@ -190,7 +207,7 @@ public final class MeasurementIndex: Sendable {
     }
 
     static func measure(_ face: FontFace) -> LetterMeasurements? {
-        font(face).flatMap(LetterMeasurements.measure)
+        font(face).flatMap { LetterMeasurements.measure($0) }
     }
 
     static func font(_ face: FontFace, in descriptors: [CTFontDescriptor]? = nil) -> CTFont? {
@@ -219,6 +236,7 @@ public final class MeasurementIndex: Sendable {
                 for entry in cache.entries {
                     let values = entry.values.array(of: Float.self), embedding = entry.embedding.array(of: Float.self)
                     let classification = entry.classification.array(of: Float.self)
+                    let tags = (entry.tags ?? Data()).array(of: Float.self)
                     guard values.isEmpty || values.count == count, embedding.isEmpty || embedding.count == LetterEmbedding.dimensions,
                           classification.isEmpty || classification.count == LetterEmbedding.classifications.count else { continue }
                     decoded[FaceID(path: entry.path, index: entry.index)] = Entry(
@@ -226,6 +244,7 @@ public final class MeasurementIndex: Sendable {
                         measurements: values.isEmpty ? nil : LetterMeasurements(values: values),
                         embedding: embedding.isEmpty ? nil : embedding,
                         classification: classification.isEmpty ? nil : classification,
+                        tags: tags.isEmpty ? nil : tags,
                         undrawable: entry.undrawable ?? false
                     )
                 }
@@ -281,7 +300,8 @@ public final class MeasurementIndex: Sendable {
         let cache = CacheFile(version: Self.version, entries: entries.map { id, entry in
             CacheEntry(path: id.path, index: id.index, modified: entry.stamp.modified, size: entry.stamp.size,
                        values: Data(array: entry.measurements?.values ?? []), embedding: Data(array: entry.embedding ?? []),
-                       classification: Data(array: entry.classification ?? []), undrawable: entry.undrawable ? true : nil)
+                       classification: Data(array: entry.classification ?? []), tags: entry.tags.map { Data(array: $0) },
+                       undrawable: entry.undrawable ? true : nil)
         })
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
@@ -303,6 +323,7 @@ public final class MeasurementIndex: Sendable {
         var values: Data
         var embedding: Data
         var classification: Data
+        var tags: Data?
         var undrawable: Bool?
     }
 }

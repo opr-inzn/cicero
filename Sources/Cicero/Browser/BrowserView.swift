@@ -36,6 +36,10 @@ struct BrowserView: View {
         .topBar {
             if let id = model.similarFamilyID {
                 SimilarBar(familyID: id)
+            } else if let list = model.externalSimilar {
+                ListBar(symbol: "sparkle.magnifyingglass", message: "The families that look most like \(list.name), the closest first.") {
+                    model.endExternalSimilar()
+                }
             } else if let list = model.documentList {
                 ListBar(symbol: "doc.text.magnifyingglass", message: "The fonts “\(list.name)” uses that are in your library.") {
                     model.endDocumentList()
@@ -289,6 +293,9 @@ private struct EmptyBrowser: View {
         if model.similarFamilyID != nil {
             EmptyState("Font Not Available", systemImage: "textformat",
                        description: Text("This font is no longer in your library."))
+        } else if let list = model.externalSimilar {
+            EmptyState("No Similar Fonts", systemImage: "sparkle.magnifyingglass",
+                       description: Text("None of the families similar to \(list.name) are in your library."))
         } else if let list = model.documentList {
             EmptyState("No Fonts in Your Library", systemImage: "doc.text.magnifyingglass",
                        description: Text("None of the fonts “\(list.name)” uses are in your library."))
