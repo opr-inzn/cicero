@@ -84,7 +84,6 @@ private struct EmbeddedCollector {
                 return true
             }, nil)
             for (key, candidate) in pairs {
-                // Keep the richer subset when a font appears on multiple pages.
                 if let existing = extracted[key], existing.fontData.count >= candidate.fontData.count && existing.glyphMap.count >= candidate.glyphMap.count {
                     continue
                 }
@@ -198,7 +197,6 @@ private struct EmbeddedCollector {
               let data = copyStream(stream, limit: maxMapBytes),
               let text = String(data: data, encoding: .isoLatin1) else { return [:] }
         var map: [UInt32: Character] = [:]
-        // Parse beginbfchar ... endbfchar pairs: <src> <dst>
         let bfchar = #/beginbfchar([\s\S]*?)endbfchar/#
         for match in text.matches(of: bfchar) {
             let hexes = hexTokens(String(match.1))
@@ -210,7 +208,6 @@ private struct EmbeddedCollector {
                 i += 2
             }
         }
-        // Parse beginbfrange ... endbfrange triples: <lo> <hi> <start> or <lo> <hi> [<u1> <u2> ...]
         let bfrange = #/beginbfrange([\s\S]*?)endbfrange/#
         for match in text.matches(of: bfrange) {
             let body = String(match.1)
@@ -413,8 +410,7 @@ private enum SFNTWrapper {
             pos = offsetsEnd + last - 1
             return pos <= cff.count
         }
-        guard skipIndex() else { return nil } // Name INDEX
-        // Top DICT INDEX: read first dict to find CharStrings operator (17)
+        guard skipIndex() else { return nil }
         guard pos + 2 <= cff.count else { return nil }
         let dictCount = Int(cff[pos]) << 8 | Int(cff[pos + 1])
         pos += 2
