@@ -3,7 +3,7 @@ import CoreText
 import Foundation
 
 enum LetterImages {
-    static let letters: [Character] = ["H", "O", "R", "A", "a", "e", "g", "n", "o", "s", "t", "y", "f", "k", "2", "5"]
+    static let letters: [Character] = ["H", "O", "R", "A", "M", "G", "Q", "a", "e", "g", "n", "o", "s", "t", "y", "f", "k", "2", "5"]
     static let size = 64
     static let baseline: CGFloat = 18
     static let xHeight: CGFloat = 20
@@ -24,24 +24,26 @@ enum LetterImages {
         var details: [UInt8] = []
     }
 
-    static func draw(_ font: CTFont, strips withStrips: Bool = false, details withDetails: Bool = false) -> Drawn? {
+    static func draw(_ font: CTFont, strips withStrips: Bool = false, details withDetails: Bool = false,
+                     glyphMap: ((Character) -> CGGlyph?)? = nil) -> Drawn? {
         let font = inThousandths(font)
-        let glyphs = letters.map { font.glyph(for: $0) }
+        let lookup: (Character) -> CGGlyph? = glyphMap ?? { font.glyph(for: $0) }
+        let glyphs = letters.map(lookup)
         let paths = glyphs.map { glyph -> CGPath? in
             guard let glyph, let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isEmpty else { return nil }
             return path
         }
         guard paths.count(where: { $0 != nil }) >= fewest else { return nil }
         func height(_ character: Character) -> CGFloat? {
-            guard let path = paths[letters.firstIndex(of: character)!] else { return nil }
+            guard let index = letters.firstIndex(of: character), let path = paths[index] else { return nil }
             let top = path.boundingBoxOfPath.maxY
             return top > 0 ? top : nil
         }
         // An empty path's box is the null rectangle, whose maxY is infinite.
-        let x = font.glyph(for: Character("x")).flatMap { CTFontCreatePathForGlyph(font, $0, nil) }.map(\.boundingBoxOfPath)
+        let x = lookup(Character("x")).flatMap { CTFontCreatePathForGlyph(font, $0, nil) }.map(\.boundingBoxOfPath)
             .flatMap { $0.isNull || $0.isEmpty ? nil : $0.maxY }
-        guard let xHeight = [x, CTFontGetXHeight(font), height("n"), height("o")].compactMap({ $0 }).first(where: { $0 > 0 && $0.isFinite }),
-              let capHeight = [height("H"), CTFontGetCapHeight(font), xHeight / 0.7].compactMap({ $0 }).first(where: { $0 > 0 && $0.isFinite })
+        guard let xHeight = [x, CTFontGetXHeight(font), height("n"), height("o"), height("a"), height("e")].compactMap({ $0 }).first(where: { $0 > 0 && $0.isFinite }),
+              let capHeight = [height("H"), CTFontGetCapHeight(font), height("O"), height("A"), height("M"), xHeight / 0.7].compactMap({ $0 }).first(where: { $0 > 0 && $0.isFinite })
         else { return nil }
         let scale = min(Self.xHeight / xHeight, largestCapHeight / capHeight)
         guard scale > 0, scale.isFinite else { return nil }
@@ -71,12 +73,12 @@ enum LetterImages {
             context.flush()
             pixels.withUnsafeMutableBytes { $0.baseAddress!.advanced(by: position * area).copyMemory(from: data, byteCount: area) }
         }
-        guard let strips = withStrips ? strips(font, scale: scale) : [],
-              let details = withDetails ? details(font, scale: scale * detailScale) : [] else { return nil }
+        guard let strips = withStrips ? strips(font, scale: scale, lookup: lookup) : [],
+              let details = withDetails ? details(font, scale: scale * detailScale, lookup: lookup) : [] else { return nil }
         return Drawn(pixels: pixels, advances: advances, strips: strips, details: details)
     }
 
-    private static func details(_ font: CTFont, scale: CGFloat) -> [UInt8]? {
+    private static func details(_ font: CTFont, scale: CGFloat, lookup: (Character) -> CGGlyph?) -> [UInt8]? {
         let area = detailSize * detailSize
         var pixels = [UInt8](repeating: 0, count: area * detailLetters.count)
         guard let context = CGContext(data: nil, width: detailSize, height: detailSize, bitsPerComponent: 8, bytesPerRow: detailSize,
@@ -86,7 +88,7 @@ enum LetterImages {
         context.setAllowsAntialiasing(true)
         context.setShouldAntialias(true)
         for (position, character) in detailLetters.enumerated() {
-            guard let glyph = font.glyph(for: character), let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isEmpty
+            guard let glyph = lookup(character), let path = CTFontCreatePathForGlyph(font, glyph, nil), !path.boundingBoxOfPath.isEmpty
             else { continue }
             context.setFillColor(gray: 0, alpha: 1)
             context.fill(CGRect(x: 0, y: 0, width: detailSize, height: detailSize))
@@ -102,7 +104,7 @@ enum LetterImages {
         return pixels
     }
 
-    private static func strips(_ font: CTFont, scale: CGFloat) -> [UInt8]? {
+    private static func strips(_ font: CTFont, scale: CGFloat, lookup: (Character) -> CGGlyph?) -> [UInt8]? {
         let area = size * stripWidth
         var pixels = [UInt8](repeating: 0, count: area * words.count)
         guard let context = CGContext(data: nil, width: stripWidth, height: size, bitsPerComponent: 8, bytesPerRow: stripWidth,
@@ -117,7 +119,7 @@ enum LetterImages {
             let line = CGMutablePath()
             var pen = stripMargin
             for character in word {
-                guard var glyph = font.glyph(for: character) else { continue }
+                guard var glyph = lookup(character) else { continue }
                 var placed = CGAffineTransform(translationX: pen, y: baseline).scaledBy(x: scale, y: scale)
                 if let path = CTFontCreatePathForGlyph(font, glyph, &placed) { line.addPath(path) }
                 var advance = CGSize.zero

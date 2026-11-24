@@ -110,6 +110,12 @@ struct DocumentFontsSheet: View {
                     model.activate([face], title: match.font.displayName)
                 }
             }
+        } else if !match.isInstalled, let embedded = model.embeddedFont(for: match.font, in: report) {
+            Button("Show Similar") {
+                model.showSimilar(to: match.font, embedded: embedded)
+                dismiss()
+            }
+            .help("Shows the families in your library that look most like \(match.font.displayName)")
         }
     }
 

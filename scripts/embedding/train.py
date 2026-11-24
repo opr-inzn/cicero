@@ -42,7 +42,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-LETTERS, SIZE, DIMENSIONS = 16, 64, 128
+LETTERS, SIZE, DIMENSIONS = 19, 64, 128
 # The words LetterImages sets in strips, as many as there are, each SIZE tall and STRIP_WIDTH wide, the line starting
 # STRIP_MARGIN pixels from the left.
 STRIPS, STRIP_WIDTH, STRIP_MARGIN = 2, 384, 4
@@ -52,14 +52,16 @@ DETAILS, DETAIL_SIZE, DETAIL_SCALE, DETAIL_BASELINE = 2, 128, 3, 8
 # The baseline, in pixels from the top (LetterImages.baseline is from the bottom).
 BASELINE = SIZE - 18
 CATEGORIES = ["SANS_SERIF", "SERIF", "DISPLAY", "HANDWRITING", "MONOSPACE"]
-MEASURES = 18
+MEASURES = 22
 KINDS = ("/Sans/", "/Serif/", "/Slab/", "/Script/", "/Theme/", "/Monospace/")
 # Cicero's classifications the model tells, in the order of its answer (Classification's raw values).
 CLASSES = ["Serif", "Sans Serif", "Script", "Ornamental"]
 # Google's themes of decorative lettering, which Cicero calls ornamental.
 ORNAMENTAL = {"Blackletter", "Stencil", "Inline", "Shaded", "Distressed", "Pixel", "Blobby", "Wacky", "Art Deco",
               "Art Nouveau", "Tuscan", "Medieval"}
-# The lowercase's width among the measures, and SimilarFonts' step of it; the capitals' and the o's width.
+# Key measures used for soft-target similarity and evaluation.
+X_HEIGHT, X_HEIGHT_STEP = 0, 0.04
+CONTRAST, CONTRAST_STEP = 4, 0.10
 WIDTH, WIDTH_STEP = 6, 0.08
 # The monospaced measure, 1 for a monospaced style.
 MONOSPACED = 17
@@ -70,9 +72,95 @@ def block(inputs, outputs, stride=1):
     return [nn.Conv2d(inputs, outputs, 3, stride, 1, bias=False), nn.BatchNorm2d(outputs), nn.ReLU(inplace=True)]
 
 
-class Embedder(nn.Module):
-    def __init__(self, tags, together="dense", strips=False, details=False):
+class ResBlock(nn.Module):
+    def __init__(self, inputs, outputs, stride=1):
         super().__init__()
+        self.conv1 = nn.Conv2d(inputs, outputs, 3, stride, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(outputs)
+        self.conv2 = nn.Conv2d(outputs, outputs, 3, 1, 1, bias=False)
+        self.bn2 = nn.BatchNorm2d(outputs)
+        self.skip = (
+            nn.Sequential(nn.Conv2d(inputs, outputs, 1, stride, bias=False), nn.BatchNorm2d(outputs))
+            if stride != 1 or inputs != outputs else nn.Identity()
+        )
+
+    def forward(self, x):
+        out = F.silu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        return F.silu(out + self.skip(x))
+
+
+class LetterBlock(nn.Module):
+    """Pre-norm multi-head self-attention + FFN over letters using basic tensor ops for Core ML tracing."""
+
+    def __init__(self, dim=128, heads=4, ff=256):
+        super().__init__()
+        self.heads = heads
+        self.head_dim = dim // heads
+        self.scale = self.head_dim ** -0.5
+        self.norm1 = nn.LayerNorm(dim)
+        self.qkv = nn.Linear(dim, dim * 3, bias=False)
+        self.proj = nn.Linear(dim, dim)
+        self.norm2 = nn.LayerNorm(dim)
+        self.ffn = nn.Sequential(nn.Linear(dim, ff), nn.SiLU(), nn.Linear(ff, dim))
+
+    def forward(self, x, mask_bias):
+        b, n, c = x.shape
+        qkv = self.qkv(self.norm1(x)).reshape(b, n, 3, self.heads, self.head_dim)
+        q, k, v = qkv[:, :, 0].transpose(1, 2), qkv[:, :, 1].transpose(1, 2), qkv[:, :, 2].transpose(1, 2)
+        attn = torch.matmul(q, k.transpose(-2, -1)) * self.scale + mask_bias
+        attn = F.softmax(attn, dim=-1)
+        out = torch.matmul(attn, v).transpose(1, 2).reshape(b, n, c)
+        x = x + self.proj(out)
+        return x + self.ffn(self.norm2(x))
+
+
+class ResAttnEmbedder(nn.Module):
+    def __init__(self, tags, letters=LETTERS, measures=MEASURES):
+        super().__init__()
+        self.num_letters = letters
+        self.sees_strips = False
+        self.sees_details = False
+        self.letter = nn.Sequential(
+            nn.Conv2d(1, 24, 3, 2, 1, bias=False), nn.BatchNorm2d(24), nn.SiLU(),
+            ResBlock(24, 48, 2),
+            ResBlock(48, 96, 2),
+            ResBlock(96, 128, 2),
+        )
+        self.letter_proj = nn.Sequential(nn.Linear(128 * 8, 128), nn.LayerNorm(128), nn.SiLU())
+        self.letter_pos = nn.Parameter(torch.randn(1, letters, 128) * 0.02)
+        self.meta_proj = nn.Linear(2, 128)
+        self.blocks = nn.ModuleList([LetterBlock(128, 4, 256), LetterBlock(128, 4, 256)])
+        self.slot_proj = nn.Sequential(nn.Linear(128, 32), nn.SiLU())
+        self.head = nn.Sequential(nn.Linear(256 + letters * 32, 512), nn.LayerNorm(512), nn.SiLU(), nn.Linear(512, DIMENSIONS))
+        self.tags = nn.Linear(DIMENSIONS, tags)
+        self.measures = nn.Linear(DIMENSIONS, measures)
+
+    def combine(self, each, advances, present):
+        tok = each + self.letter_pos + self.meta_proj(torch.stack([advances, present], dim=-1))
+        mask_bias = (1.0 - present).unsqueeze(1).unsqueeze(2) * -1e4
+        for blk in self.blocks:
+            tok = blk(tok, mask_bias)
+        present_3d = present.unsqueeze(-1)
+        denom = present.sum(dim=1, keepdim=True).clamp_min(1.0)
+        mean_pool = (tok * present_3d).sum(dim=1) / denom
+        max_pool = (tok + (1.0 - present_3d) * -1e4).amax(dim=1)
+        slots = (self.slot_proj(tok) * present_3d).reshape(-1, self.num_letters * 32)
+        return F.normalize(self.head(torch.cat([mean_pool, max_pool, slots], dim=1)), dim=1)
+
+    def forward(self, letters, advances, strips=None, details=None):
+        count = letters.shape[0]
+        present = (letters.amax(dim=(2, 3)) > 0.05).float()
+        feat = self.letter(letters.reshape(count * self.num_letters, 1, SIZE, SIZE))
+        pooled = torch.cat([F.adaptive_avg_pool2d(feat, 2), F.adaptive_max_pool2d(feat, 2)], dim=1).flatten(1)
+        each = self.letter_proj(pooled).reshape(count, self.num_letters, 128)
+        return self.combine(each, advances, present)
+
+
+class Embedder(nn.Module):
+    def __init__(self, tags, together="dense", strips=False, details=False, letters=16, measures=18):
+        super().__init__()
+        self.num_letters = letters
         assert not ((strips or details) and together == "small"), "the strips and large letters are seen with the dense layer only"
         self.letter = nn.Sequential(
             *block(1, 24, 2), *block(24, 48), *block(48, 48, 2), *block(48, 96), *block(96, 96, 2), *block(96, 128),
@@ -100,21 +188,21 @@ class Embedder(nn.Module):
                 nn.AdaptiveAvgPool2d(4), nn.Flatten(), nn.Linear(128 * 16, 128), nn.ReLU(inplace=True),
             )
         extra = (STRIPS * 128 if strips else 0) + (DETAILS * 128 if details else 0)
-        inputs, middle = (LETTERS * 32, 256) if together == "small" else (LETTERS * 129 + extra, 512)
+        inputs, middle = (letters * 32, 256) if together == "small" else (letters * 129 + extra, 512)
         self.together = nn.Sequential(
             nn.Linear(inputs, middle), nn.BatchNorm1d(middle), nn.ReLU(inplace=True), nn.Linear(middle, DIMENSIONS),
         )
         self.tags = nn.Linear(DIMENSIONS, tags)
-        self.measures = nn.Linear(DIMENSIONS, MEASURES)
+        self.measures = nn.Linear(DIMENSIONS, measures)
 
     def combine(self, each, advances, strips=None, details=None):
-        """What it sees in each letter, (n, 16, 128), the advances, (n, 16), the strips, (n, 2, 64, 384), and the
+        """What it sees in each letter, (n, L, 128), the advances, (n, L), the strips, (n, 2, 64, 384), and the
         large letters, (n, 2, 128, 128), when it sees them → (n, 128) of length 1. No shape is taken from the input,
         for `Exported`."""
         if self.kind == "small":
-            letters = self.each(torch.cat([each, advances[:, :, None]], 2)).reshape(-1, LETTERS * 32)
+            letters = self.each(torch.cat([each, advances[:, :, None]], 2)).reshape(-1, self.num_letters * 32)
             return F.normalize(self.together(letters), dim=1)
-        seen = [each.reshape(-1, LETTERS * 128), advances]
+        seen = [each.reshape(-1, self.num_letters * 128), advances]
         if self.sees_strips:
             seen.append(self.strip(strips.reshape(-1, 1, SIZE, STRIP_WIDTH)).reshape(-1, STRIPS * 128))
         if self.sees_details:
@@ -122,17 +210,22 @@ class Embedder(nn.Module):
         return F.normalize(self.together(torch.cat(seen, 1)), dim=1)
 
     def forward(self, letters, advances, strips=None, details=None):
-        """(n, 16, 64, 64), 0 to 1, (n, 16), in squares, and (n, 2, 64, 384) and (n, 2, 128, 128), 0 to 1, when it
+        """(n, L, 64, 64), 0 to 1, (n, L), in squares, and (n, 2, 64, 384) and (n, 2, 128, 128), 0 to 1, when it
         sees the strips and the large letters → (n, 128) of length 1."""
         count = letters.shape[0]
-        each = self.letter(letters.reshape(count * LETTERS, 1, SIZE, SIZE)).reshape(count, LETTERS, 128)
+        each = self.letter(letters.reshape(count * self.num_letters, 1, SIZE, SIZE)).reshape(count, self.num_letters, 128)
         return self.combine(each, advances, strips, details)
 
 
 def embedder(saved):
     """The model a checkpoint saved, as it was made."""
+    arch = saved.get("arch", "vgg")
+    num_letters = saved.get("letters", 16)
+    num_measures = saved.get("measures", 18)
+    if arch == "resnet":
+        return ResAttnEmbedder(len(saved["tags"]) + len(CATEGORIES), letters=num_letters, measures=num_measures)
     return Embedder(len(saved["tags"]) + len(CATEGORIES), saved.get("together", "dense"), saved.get("strips", False),
-                    saved.get("details", False))
+                    saved.get("details", False), letters=num_letters, measures=num_measures)
 
 
 def classifier():
@@ -141,31 +234,48 @@ def classifier():
 
 
 class Exported(nn.Module):
-    """One style at a time, as Cicero asks, with no shape taken from the input: its embedding, and how likely each
-    classification is when there's a classifier."""
+    """One style at a time, as Cicero asks, with no shape taken from the input: its embedding, how likely each
+    classification is when there's a classifier, and its Google kind-tag scores."""
 
-    def __init__(self, model, classify=None):
+    def __init__(self, model, classify=None, kind_indices=None):
         super().__init__()
         self.model = model
         self.classify = classify
+        if kind_indices is not None:
+            self.register_buffer("kind_indices", torch.tensor(kind_indices, dtype=torch.long))
+        else:
+            self.kind_indices = None
 
     def forward(self, letters, advances, *more):
         """The strips and the large letters after the advances, those the model sees."""
-        strips = more[0] if self.model.sees_strips else None
-        details = more[-1] if self.model.sees_details else None
-        each = self.model.letter(letters.reshape(LETTERS, 1, SIZE, SIZE)).reshape(1, LETTERS, 128)
-        embedding = self.model.combine(each, advances, strips, details)
-        if self.classify is None:
-            return embedding
-        return embedding, F.softmax(self.classify(embedding), dim=1)
+        if isinstance(self.model, ResAttnEmbedder):
+            present = (letters.amax(dim=(2, 3)) > 0.05).float()
+            feat = self.model.letter(letters.reshape(self.model.num_letters, 1, SIZE, SIZE))
+            pooled = torch.cat([F.adaptive_avg_pool2d(feat, 2), F.adaptive_max_pool2d(feat, 2)], dim=1).flatten(1)
+            each = self.model.letter_proj(pooled).reshape(1, self.model.num_letters, 128)
+            embedding = self.model.combine(each, advances, present)
+        else:
+            strips = more[0] if self.model.sees_strips else None
+            details = more[-1] if self.model.sees_details else None
+            each = self.model.letter(letters.reshape(self.model.num_letters, 1, SIZE, SIZE)).reshape(1, self.model.num_letters, 128)
+            embedding = self.model.combine(each, advances, strips, details)
+        outputs = [embedding]
+        if self.classify is not None:
+            outputs.append(F.softmax(self.classify(embedding), dim=1))
+        if self.kind_indices is not None:
+            tag_logits = self.model.tags(embedding * 8).index_select(1, self.kind_indices)
+            outputs.append(torch.sigmoid(tag_logits))
+        return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
 
 def read_measurements(path, rows):
-    """Each row's measures, NaN where there's none to say."""
-    values = np.full((rows, MEASURES), np.nan, dtype=np.float32)
-    for line in Path(path).expanduser().read_text().splitlines():
+    """Each row's measures, NaN where there's none to say; infers the column count from the file."""
+    lines = Path(path).expanduser().read_text().splitlines()
+    cols = max((len(line.split("\t")) - 1 for line in lines if "\t" in line), default=MEASURES)
+    values = np.full((rows, cols), np.nan, dtype=np.float32)
+    for line in lines:
         parts = line.split("\t")
-        if len(parts) == MEASURES + 1:
+        if len(parts) == cols + 1:
             values[int(parts[0])] = [float(value) for value in parts[1:]]
     return values
 
@@ -227,8 +337,12 @@ class Letters:
     words in strips and large letters, 0 to 255, when they were drawn (read when asked)."""
 
     def __init__(self, work):
-        self.pixels = np.fromfile(work / "letters.u8", dtype=np.uint8).reshape(-1, LETTERS, SIZE, SIZE)
-        self.advances = np.fromfile(work / "letters-advances.f32", dtype=np.float32).reshape(-1, LETTERS)
+        raw_adv = np.fromfile(work / "letters-advances.f32", dtype=np.float32)
+        raw_px = np.fromfile(work / "letters.u8", dtype=np.uint8)
+        rows = len(json.loads((work / "letters.json").read_text()))
+        self.letters = raw_adv.size // max(rows, 1)
+        self.pixels = raw_px.reshape(rows, self.letters, SIZE, SIZE)
+        self.advances = raw_adv.reshape(rows, self.letters)
         strips = work / "letters-strips.u8"
         self.strips = np.memmap(strips, dtype=np.uint8, mode="r").reshape(-1, STRIPS, SIZE, STRIP_WIDTH) if strips.exists() else None
         details = work / "letters-details.u8"
@@ -257,6 +371,7 @@ def load(work, fold=0):
         target += [1.0 if family["category"] == category else 0.0 for category in CATEGORIES]
         entries = [entry for entry in family["entries"] if drawn[entry["row"]]]
         kind = lambda entry: (entry["italic"], entry.get("width", 100), entry.get("opsz") or 0)
+        is_extra = bool(family.get("extra"))
         for italic, width, size in sorted({kind(entry) for entry in entries}):
             own = [entry for entry in entries if kind(entry) == (italic, width, size)]
             regular = min(own, key=lambda entry: abs(entry["weight"] - 400))
@@ -267,7 +382,9 @@ def load(work, fold=0):
                 "size": size, "category": family["category"],
                 "regular": regular["row"], "all": [entry["row"] for entry in own],
                 "views": [entry["row"] for entry in own if abs(entry["weight"] - regular["weight"]) <= 100],
-                "target": target, "tagged": bool(family["tags"]), "held_out": held_out(family["name"], fold), "label": label(family),
+                "target": target, "tagged": bool(family["tags"]),
+                "held_out": False if is_extra else held_out(family["name"], fold),
+                "label": None if is_extra else label(family),
             })
     return designs, letters, tag_names
 
@@ -305,7 +422,7 @@ def augment(batch, advances, strips=None, details=None):
     """Each style a little bigger or smaller about its baseline, its advances with it, and moved a pixel or two, and
     a letter or two missing now and then; its strips and large letters, when given, as much bigger or smaller about
     the line's start and the letters' baseline, and moved as much."""
-    count = batch.shape[0]
+    count, num_letters = batch.shape[0], batch.shape[1]
     device = batch.device
     scale = torch.empty(count, device=device).uniform_(0.9, 1.1)
     shift_x = torch.empty(count, device=device).uniform_(-2, 2) / (SIZE / 2)
@@ -319,7 +436,12 @@ def augment(batch, advances, strips=None, details=None):
     theta[:, 1, 2] = base - (base + shift_y) / scale
     grid = F.affine_grid(theta, list(batch.shape), align_corners=False)
     moved = F.grid_sample(batch, grid, align_corners=False, padding_mode="zeros")
-    keep = (torch.rand(count, LETTERS, 1, 1, device=device) > 0.08).float()
+    # Standard 8% missing letters, plus occasional heavier subset dropout (like trial or PDF subset fonts, keeping >= 8).
+    subset_mask = (torch.rand(count, 1, 1, 1, device=device) < 0.10)
+    drop_rate = torch.where(subset_mask, 0.35, 0.08)
+    keep = (torch.rand(count, num_letters, 1, 1, device=device) > drop_rate).float()
+    too_few = keep.sum(dim=1, keepdim=True) < 8
+    keep = torch.where(too_few, torch.ones_like(keep), keep)
     if strips is not None:
         start = STRIP_MARGIN / (STRIP_WIDTH / 2) - 1
         theta = torch.zeros(count, 2, 3, device=device)
@@ -376,15 +498,23 @@ def contrastive(embeddings, temperature):
     return F.cross_entropy(similarities, targets)
 
 
-def soft_contrastive(embeddings, kinds, italic, temperature, target_temperature):
+def soft_contrastive(embeddings, kinds, italic, temperature, target_temperature, raw_measures=None):
     """For --soft, how near each row should be to the others: its other view nearest, then the designs whose Google
     tags of a kind are alike (Didone, geometric…, `kinds` of length 1 or 0), less so when one is italic and the other
-    not, others least; and how far the embeddings are from it (Kullback-Leibler). Rows i and i + n are two views of one
-    design; rows of designs without such tags are left to `contrastive`."""
+    not or when their widths/contrast/x-height differ strongly, others least; and how far the embeddings are from it
+    (Kullback-Leibler). Rows i and i + n are two views of one design; rows without such tags are left to `contrastive`."""
     count = embeddings.shape[0] // 2
     rows = torch.arange(2 * count, device=embeddings.device)
     partners = torch.cat([rows[count:], rows[:count]])
     alike = 0.8 * (kinds @ kinds.T) * torch.where(italic[:, None] == italic[None, :], 1.0, 0.5)
+    if raw_measures is not None:
+        v = raw_measures[:, WIDTH]
+        valid = (~v.isnan())[:, None] & (~v.isnan())[None, :]
+        dw = ((v[:, None] - v[None, :]).nan_to_num(0.0).abs() / WIDTH_STEP).clamp(max=6.0)
+        # Only pull apart pairs whose widths visibly diverge (> 2 steps), keeping same-width tag targets intact.
+        excess = (dw - 2.0).clamp(min=0.0)
+        width_factor = torch.where(valid, torch.exp(-0.08 * excess * excess).clamp(min=0.5, max=1.0), torch.ones_like(dw))
+        alike = alike * width_factor
     alike[rows, partners] = 1
     alike.fill_diagonal_(-1e4)
     wanted = F.softmax(alike / target_temperature, dim=1)
@@ -446,18 +576,22 @@ def evaluate(distance, designs, tag_names, measurements=None):
     several = np.array([len(designs[owner]["all"]) > 1 for owner in owners])
     scores = {"own design": float((owners[found.argmin(1).cpu().numpy()] == owners)[several].mean())}
 
-    upright = [index for index, design in enumerate(designs) if not design["italic"] and design["width"] == 100]
+    # Evaluate tags/category on Google Fonts gallery (category != None) so untagged extra fonts aren't scored as 0.
+    upright = [index for index, design in enumerate(designs) if not design["italic"] and design["width"] == 100 and design["category"] is not None]
     queries = [index for index in upright if designs[index]["held_out"]]
-    tags, category, counted = 0.0, 0.0, 0
+    tags, category, counted, categorized = 0.0, 0.0, 0, 0
     by_kind = {}
     for query, near in zip(queries, nearest(queries, upright)):
-        category += sum(designs[other]["category"] == designs[query]["category"] for other in near) / 10
+        # None for a family from another foundry than Google's (prepare-other.py), which no category says.
+        if designs[query]["category"] is not None:
+            category += sum(designs[other]["category"] == designs[query]["category"] for other in near) / 10
+            categorized += 1
         if targets[query].any():
             agreement = float((targets[near] @ targets[query]).mean())
             tags += agreement
             counted += 1
             by_kind.setdefault(designs[query]["category"], []).append(agreement)
-    scores["tags"], scores["category"] = tags / max(counted, 1), category / len(queries)
+    scores["tags"], scores["category"] = tags / max(counted, 1), category / max(categorized, 1)
     # Tags by the query's category, as a library of text faces cares most about serifs and sans serifs.
     for name, kind in (("serif", "SERIF"), ("sans", "SANS_SERIF"), ("display", "DISPLAY"), ("script", "HANDWRITING")):
         if by_kind.get(kind):
@@ -524,7 +658,7 @@ def train(arguments):
     # How often each family comes in an epoch (--mix): text faces more than display and handwriting ones, as a
     # library has more of them than Google.
     MIX = {"SERIF": 2.0, "SANS_SERIF": 1.5, "DISPLAY": 0.6, "HANDWRITING": 0.5, "MONOSPACE": 1.0}
-    often = {root: MIX[designs[classes[min(by_root[root])][0]]["category"]] if arguments.mix else 1.0 for root in roots}
+    often = {root: MIX.get(designs[classes[min(by_root[root])][0]]["category"], 1.0) if arguments.mix else 1.0 for root in roots}
     kind_mask = torch.tensor([1.0 if name.startswith(KINDS) else 0.0 for name in tag_names] + [0.0] * len(CATEGORIES), device=device)
 
     everything = torch.tensor(drawn.pixels, device=device)
@@ -538,13 +672,19 @@ def train(arguments):
     # Tags of a kind count for more than the expressive ones (calm, playful…), the category most.
     tag_weights = torch.tensor([1.0 if name.startswith(KINDS) else 0.3 for name in tag_names] + [1.0] * len(CATEGORIES), device=device)
     measurements = read_measurements(arguments.measurements, len(drawn)) if arguments.measurements else None
+    num_measures = measurements.shape[1] if measurements is not None else MEASURES
+    raw_measures = torch.tensor(measurements, device=device) if measurements is not None else None
     measures = torch.tensor(standard_scores(measurements), device=device) if measurements is not None else None
-    measure_weights = torch.ones(MEASURES, device=device)
+    measure_weights = torch.ones(num_measures, device=device)
     measure_weights[WIDTHS] = arguments.widths
 
     assert not ((arguments.strips or arguments.details) and (arguments.invariant or arguments.stretch)), \
         "--strips and --details aren't drawn wider or narrower yet"
-    model = Embedder(len(tag_names) + len(CATEGORIES), arguments.together, arguments.strips, arguments.details).to(device)
+    if arguments.arch == "resnet":
+        model = ResAttnEmbedder(len(tag_names) + len(CATEGORIES), letters=drawn.letters, measures=num_measures).to(device)
+    else:
+        model = Embedder(len(tag_names) + len(CATEGORIES), arguments.together, arguments.strips, arguments.details,
+                         letters=drawn.letters, measures=num_measures).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=arguments.rate, weight_decay=arguments.decay)
     # The model's weights as they were over the last steps, which it is judged by and saved as (--ema).
     average = None
@@ -616,7 +756,8 @@ def train(arguments):
             loss = arguments.instance * contrastive(embeddings, arguments.temperature)
             if arguments.soft:
                 loss = loss + arguments.soft * soft_contrastive(embeddings, kinds[owners], italics[owners], arguments.temperature,
-                                                                arguments.soft_temperature)
+                                                                arguments.soft_temperature,
+                                                                raw_measures[rows] if raw_measures is not None else None)
             known = tagged[owners]
             if known.any():
                 logits = model.tags(embeddings[known] * 8)
@@ -646,6 +787,7 @@ def train(arguments):
                 if any(design["held_out"] for design in designs) else {}
             print(f"epoch {epoch + 1}: loss {np.mean(losses):.3f}  " + "  ".join(f"{key} {value:.3f}" for key, value in scores.items()), flush=True)
             torch.save({"model": judged.state_dict(), "tags": tag_names, "epoch": epoch + 1, "scores": scores, "fold": arguments.fold,
+                        "arch": arguments.arch, "letters": drawn.letters, "measures": num_measures,
                         "together": arguments.together, "strips": arguments.strips, "details": arguments.details}, out)
     print(f"saved {out}")
 
@@ -718,26 +860,33 @@ def export(arguments):
         head = classifier()
         head.load_state_dict(saved["classifier"])
         head.eval()
-    exported = Exported(model, head).eval()
-    shapes = {"letters": (1, LETTERS, SIZE, SIZE), "advances": (1, LETTERS)}
+    kind_indices = [i for i, name in enumerate(saved["tags"]) if name.startswith(KINDS)]
+    kind_tags = [saved["tags"][i] for i in kind_indices]
+    exported = Exported(model, head, kind_indices=kind_indices).eval()
+    num_letters = model.num_letters
+    shapes = {"letters": (1, num_letters, SIZE, SIZE), "advances": (1, num_letters)}
     if model.sees_strips:
         shapes["strips"] = (1, STRIPS, SIZE, STRIP_WIDTH)
     if model.sees_details:
         shapes["details"] = (1, DETAILS, DETAIL_SIZE, DETAIL_SIZE)
     traced = torch.jit.trace(exported, tuple(torch.rand(shape) for shape in shapes.values()))
+    outputs = [ct.TensorType(name="embedding", dtype=np.float32)]
+    if head is not None:
+        outputs.append(ct.TensorType(name="classification", dtype=np.float32))
+    outputs.append(ct.TensorType(name="tags", dtype=np.float32))
     converted = ct.convert(
         traced,
         inputs=[ct.TensorType(name=name, shape=shape) for name, shape in shapes.items()],
-        outputs=[ct.TensorType(name="embedding", dtype=np.float32)]
-        + ([ct.TensorType(name="classification", dtype=np.float32)] if head is not None else []),
+        outputs=outputs,
         minimum_deployment_target=ct.target.macOS15,
         compute_precision=ct.precision.FLOAT16,
     )
     converted.short_description = ("A font's letters (see LetterImages.swift), 0 to 1, and their advances, in squares, "
                                    + ("and its words in strips, 0 to 1, " if model.sees_strips else "")
                                    + ("and its large letters, 0 to 1, " if model.sees_details else "") + "as 128 numbers of "
-                                   "length 1, alike fonts close, and how likely it is to be " + ", ".join(CLASSES) + ". Learned from "
-                                   "Google Fonts families under the OFL, Apache and UFL licenses.")
+                                   "length 1, alike fonts close, how likely it is to be " + ", ".join(CLASSES)
+                                   + ", and Google style tag scores. Learned from open-license fonts (OFL, Apache, MIT, UFL).")
+    converted.user_defined_metadata["tags"] = ",".join(kind_tags)
     converted.version = f"epoch {saved['epoch']}"
     converted.save(arguments.output)
     drawn = Letters(work)
@@ -747,9 +896,9 @@ def export(arguments):
     if model.sees_details:
         inputs["details"] = np.asarray(drawn.details[:1]).astype(np.float32) / 255
     expected = exported(*(torch.tensor(value) for value in inputs.values()))
-    expected = (expected[0] if head is not None else expected).detach().numpy()
+    expected = (expected[0] if isinstance(expected, tuple) else expected).detach().numpy()
     found = converted.predict(inputs)["embedding"]
-    print(f"saved {arguments.output}; Core ML and PyTorch differ by {np.abs(found - expected).max():.4f} at most")
+    print(f"saved {arguments.output}; {len(kind_tags)} kind tags; Core ML and PyTorch differ by {np.abs(found - expected).max():.4f} at most")
 
 
 def main():
@@ -778,6 +927,7 @@ def main():
     training.add_argument("--soft", type=float, default=0.0, help="how much learning that designs of a kind are alike counts (see soft_contrastive)")
     training.add_argument("--soft-temperature", type=float, default=0.2)
     training.add_argument("--instance", type=float, default=1.0, help="how much telling each design from the others counts")
+    training.add_argument("--arch", choices=["resnet", "vgg"], default="resnet", help="backbone architecture")
     training.add_argument("--together", choices=["dense", "small"], default="dense", help="how the letters are seen together (see Embedder)")
     training.add_argument("--strips", action="store_true", help="see the words LetterImages sets in strips too (letters-strips.u8)")
     training.add_argument("--details", action="store_true", help="see the letters LetterImages draws large too (letters-details.u8)")

@@ -18,7 +18,11 @@ extension AppModel {
                                  embeddings: { measurements.embedding(of: $0.regular.face.id) },
                                  styleMeasurements: { measurements.measurements(of: $0.id) },
                                  styleEmbeddings: { measurements.embedding(of: $0.id) },
-                                 classification: similarClassifier())
+                                 tags: { measurements.tags(of: $0.regular.face.id) },
+                                 styleTags: { measurements.tags(of: $0.id) },
+                                 tagNames: measurements.tagNames,
+                                 classification: similarClassifier(),
+                                 decorativeClassifications: [data.name(of: .script), data.name(of: .ornamental)])
         similarCache = (key, table)
         return table
     }
@@ -76,18 +80,24 @@ extension AppModel {
     }
 
     func showSimilar(to family: Family, style: LibraryFace?) {
-        if similarFamilyID == nil, documentList == nil {
+        if similarFamilyID == nil, documentList == nil, externalSimilar == nil {
             listReturn = selectedItems
             listReturnPage = openFamilyID
         }
         clearSearch()
         selection = nil
         documentList = nil
+        externalSimilar = nil
         similarFamilyID = family.id
         similarStyleID = style?.id
         openFamilyID = nil
         selectedIDs = [family.id]
         jumpTargets = [family.id]
+    }
+
+    func endExternalSimilar() {
+        guard externalSimilar != nil else { return }
+        returnFromList()
     }
 
     func endSimilar() {
@@ -112,6 +122,7 @@ extension AppModel {
         if selection == nil { selection = .all }
         similarFamilyID = nil
         documentList = nil
+        externalSimilar = nil
         if let page, library.family(page) != nil { openFamilyID = page }
     }
 }

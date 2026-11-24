@@ -20,11 +20,22 @@ public final class LetterEmbedding: Sendable {
     public struct Reading: Equatable, Sendable {
         public var embedding: [Float]
         public var classification: [Float]?
+        public var tags: [Float]?
     }
 
     public init?(contentsOf url: URL?) {
         guard let url, FileManager.default.fileExists(atPath: url.path) else { return nil }
         self.url = url
+    }
+
+    public var tagNames: [String] {
+        model.withLock { state in
+            if case .unloaded = state { state = (try? MLModel(contentsOf: url)).map(Model.loaded) ?? .failed }
+            guard case .loaded(let model) = state,
+                  let meta = model.modelDescription.metadata[.creatorDefinedKey] as? [String: String],
+                  let raw = meta["tags"], !raw.isEmpty else { return [] }
+            return raw.split(separator: ",").map(String.init)
+        }
     }
 
     public func embedding(of font: CTFont) -> [Float]? {
@@ -41,22 +52,25 @@ public final class LetterEmbedding: Sendable {
         model.withLock { if case .failed = $0 { true } else { false } }
     }
 
-    public func read(_ font: CTFont) -> Reading? {
-        if case .read(let reading) = outcome(font) { return reading }
+    public func read(_ font: CTFont, glyphMap: ((Character) -> CGGlyph?)? = nil) -> Reading? {
+        if case .read(let reading) = outcome(font, glyphMap: glyphMap) { return reading }
         return nil
     }
 
-    func outcome(_ font: CTFont) -> Outcome {
-        let inputs = model.withLock { state -> (strips: Bool, details: Bool)? in
+    func outcome(_ font: CTFont, glyphMap: ((Character) -> CGGlyph?)? = nil) -> Outcome {
+        let inputs = model.withLock { state -> (strips: Bool, details: Bool, letterCount: Int)? in
             if case .unloaded = state { state = (try? MLModel(contentsOf: url)).map(Model.loaded) ?? .failed }
             guard case .loaded(let model) = state else { return nil }
             let inputs = model.modelDescription.inputDescriptionsByName
-            return (inputs["strips"] != nil, inputs["details"] != nil)
+            let count = inputs["letters"]?.multiArrayConstraint?.shape[1].intValue ?? LetterImages.letters.count
+            return (inputs["strips"] != nil, inputs["details"] != nil, count)
         }
-        guard let (takesStrips, takesDetails) = inputs else { return .failed }
-        guard let drawn = LetterImages.draw(font, strips: takesStrips, details: takesDetails) else { return .undrawable }
-        var letters = [Float](repeating: 0, count: drawn.pixels.count)
-        vDSP.convertElements(of: drawn.pixels, to: &letters)
+        guard let (takesStrips, takesDetails, expectedLetters) = inputs else { return .failed }
+        guard let drawn = LetterImages.draw(font, strips: takesStrips, details: takesDetails, glyphMap: glyphMap) else { return .undrawable }
+        let usableLetters = min(expectedLetters, LetterImages.letters.count)
+        let pixelCount = usableLetters * LetterImages.size * LetterImages.size
+        var letters = [Float](repeating: 0, count: pixelCount)
+        vDSP.convertElements(of: drawn.pixels.prefix(pixelCount), to: &letters)
         letters = vDSP.divide(letters, 255)
         var lines = [Float](repeating: 0, count: drawn.strips.count)
         vDSP.convertElements(of: drawn.strips, to: &lines)
@@ -66,12 +80,12 @@ public final class LetterEmbedding: Sendable {
         large = vDSP.divide(large, 255)
         let found = model.withLock { state -> Reading? in
             guard case .loaded(let model) = state else { return nil }
-            let shape = [1, LetterImages.letters.count, LetterImages.size, LetterImages.size] as [NSNumber]
+            let shape = [1, usableLetters, LetterImages.size, LetterImages.size] as [NSNumber]
             guard let input = try? MLMultiArray(shape: shape, dataType: .float32),
-                  let advances = try? MLMultiArray(shape: [1, LetterImages.letters.count] as [NSNumber], dataType: .float32)
+                  let advances = try? MLMultiArray(shape: [1, usableLetters] as [NSNumber], dataType: .float32)
             else { return nil }
             input.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: letters) }
-            advances.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: drawn.advances) }
+            advances.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: drawn.advances.prefix(usableLetters)) }
             var inputs: [String: Any] = ["letters": input]
             if model.modelDescription.inputDescriptionsByName["advances"] != nil { inputs["advances"] = advances }
             if takesStrips {
@@ -90,11 +104,18 @@ public final class LetterEmbedding: Sendable {
                   let output = try? model.prediction(from: features),
                   let embedding = output.featureValue(for: "embedding")?.multiArrayValue.map(Self.values)
             else { return nil }
-            return Reading(embedding: embedding, classification: output.featureValue(for: "classification")?.multiArrayValue.map(Self.values))
+            return Reading(
+                embedding: embedding,
+                classification: output.featureValue(for: "classification")?.multiArrayValue.map(Self.values),
+                tags: output.featureValue(for: "tags")?.multiArrayValue.map(Self.values)
+            )
         }
         guard var reading = found, reading.embedding.count == Self.dimensions, reading.embedding.allSatisfy(\.isFinite) else { return .failed }
         if let classification = reading.classification, classification.count != Self.classifications.count || !classification.allSatisfy(\.isFinite) {
             reading.classification = nil
+        }
+        if let tags = reading.tags, tags.isEmpty || !tags.allSatisfy(\.isFinite) {
+            reading.tags = nil
         }
         return .read(reading)
     }

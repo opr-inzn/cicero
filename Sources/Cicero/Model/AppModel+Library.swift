@@ -64,6 +64,7 @@ struct VisibleKey: Equatable {
     var similar: String?
     var similarStyle: FaceID?
     var document: DocumentList?
+    var externalSimilar: DocumentList?
     var measurementRevision: Int
 }
 
@@ -94,7 +95,7 @@ extension AppModel {
     func family(_ id: String) -> Family? { library.family(id).map(shown) }
 
     var shownLocation: UUID? {
-        guard documentList == nil, similarFamilyID == nil, selectedItems.count == 1, case .folder(let id) = selectedItems.first else { return nil }
+        guard documentList == nil, similarFamilyID == nil, externalSimilar == nil, selectedItems.count == 1, case .folder(let id) = selectedItems.first else { return nil }
         return id
     }
 
@@ -217,7 +218,8 @@ extension AppModel {
         VisibleKey(
             fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch, tokens: searchTokens,
             dataRevision: dataRevision, coverageRevision: listDependsOnCoverage ? coverageRevision : 0, guessRevision: guessRevision,
-            similar: similarFamilyID, similarStyle: similarStyleID, document: documentList, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
+            similar: similarFamilyID, similarStyle: similarStyleID, document: documentList, externalSimilar: externalSimilar,
+            measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
         )
     }
 
@@ -265,6 +267,9 @@ extension AppModel {
         if let list = documentList {
             return list.families.compactMap { library.family($0) }.filter { data.lists($0) && matches($0) }
         }
+        if let list = externalSimilar {
+            return list.families.compactMap { library.family($0) }.filter { data.lists($0) && matches($0) }
+        }
         if let id = similarFamilyID {
             guard let family = library.family(id), data.lists(family) else { return [] }
             let kind = similarStyle.map(family.kind(of:))
@@ -283,7 +288,7 @@ extension AppModel {
         return selectedItems == [.recent] ? Family.latestFirst(listed) : listed
     }
 
-    var hasOwnOrder: Bool { similarFamilyID != nil || selectedItems == [.recent] }
+    var hasOwnOrder: Bool { similarFamilyID != nil || externalSimilar != nil || selectedItems == [.recent] }
 
     func searchSuggestions(for typed: String) -> [Family] {
         let query = SearchQuery(typed)

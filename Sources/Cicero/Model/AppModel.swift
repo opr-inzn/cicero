@@ -135,6 +135,7 @@ final class AppModel {
         didSet {
             if selection != nil, similarFamilyID != nil { similarFamilyID = nil }
             if selection != nil, documentList != nil { documentList = nil }
+            if selection != nil, externalSimilar != nil { externalSimilar = nil }
             let items: Set<SidebarItem> = selection.map { [$0] } ?? []
             if selectedItems != items { selectedItems = items }
             guard oldValue != selection else { return }
@@ -176,6 +177,9 @@ final class AppModel {
     static let sortColumnKey = "fontList.sortColumn"
     static let sortsAscendingKey = "fontList.sortAscending"
     var documentList: DocumentList?
+    var externalSimilar: DocumentList? {
+        didSet { if externalSimilar != oldValue { keepsOwnOrder = true } }
+    }
     var jumpTargets: Set<String>?
     var searchText = "" {
         didSet {
