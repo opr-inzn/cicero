@@ -117,17 +117,21 @@ private struct DuplicatesSection: View {
             Text(ProblemKind.duplicates.title).font(.title2.bold())
             Text(ProblemKind.duplicates.explanation).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 12) {
+                HStack(spacing: 0) {
                     Text("Name").frame(maxWidth: .infinity, alignment: .leading)
+                    separator
                     Text("Folder").frame(width: DuplicateColumn.folder, alignment: .leading)
+                    separator
                     Text("Version").frame(width: DuplicateColumn.version, alignment: .leading)
+                    separator
                     Text("Modified").frame(width: DuplicateColumn.modified, alignment: .leading)
                 }
-                .font(.caption)
+                .lineLimit(1)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
-                .padding(.bottom, 5)
-                Divider()
+                .frame(height: 28)
+                .overlay(alignment: .bottom) { Divider() }
                 ForEach(problems) { problem in
                     let marked = problem.marked(marks)
                     HStack(spacing: 6) {
@@ -143,6 +147,12 @@ private struct DuplicatesSection: View {
                 }
             }
         }
+    }
+}
+
+private extension DuplicatesSection {
+    var separator: some View {
+        Rectangle().fill(.separator).frame(width: 1, height: 16).frame(width: 12)
     }
 }
 
