@@ -146,7 +146,7 @@ private struct FamilyInfo: View {
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding([.horizontal, .top], 16)
-            Picker("Tab", selection: tab) {
+            Picker("Info Section", selection: tab) {
                 ForEach(tabs, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .tabsPickerStyle()
@@ -272,7 +272,7 @@ private struct TagsRow: View {
                     .fixedSize()
             }
             if tags.isEmpty {
-                Text("No Tags").font(.callout).foregroundStyle(.secondary)
+                Text("None").font(.callout).foregroundStyle(.secondary)
             } else {
                 FlowLayout(spacing: 10, lineSpacing: 4) {
                     ForEach(tags, id: \.self) { tag in
@@ -305,7 +305,7 @@ private struct RatingRow: View {
                             .contentShape(.rect)
                     }
                     .buttonStyle(.borderless)
-                    .help(stars == rating ? "Remove Rating" : Rating.description(stars))
+                    .help(stars == rating ? "Remove rating" : Rating.description(stars))
                 }
             }
             .font(.callout)
@@ -334,7 +334,7 @@ private struct NoteRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Note").font(.caption).foregroundStyle(.secondary)
-            TextField("Note", text: $text, prompt: Text("Add a Note"), axis: .vertical)
+            TextField("Note", text: $text, prompt: Text("Add a note"), axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.callout)
                 .lineLimit(1...12)
@@ -388,7 +388,7 @@ private struct FeatureControls: View {
         Group {
             if let groups, groups.isEmpty {
                 EmptyState("No Features", systemImage: "textformat.abc",
-                           description: Text("This font has no optional OpenType features to switch on or off."))
+                           description: Text("This font has no optional OpenType features."))
             } else if let groups {
                 Form {
                     ForEach(groups) { group in

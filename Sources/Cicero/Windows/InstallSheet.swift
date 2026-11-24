@@ -27,17 +27,17 @@ struct InstallSheet: View {
                     }
                 } else {
                     option(model.data.installsIntoFontLibrary ? "Copy Into Cicero’s Library" : "Copy Into Fonts Folder", icon: "doc.on.doc",
-                           detail: one ? "Copies the file into \(model.installPlace) and turns it on. The original stays where it is."
-                               : "Copies the files into \(model.installPlace) and turns them on. The originals stay where they are.") { choose(.copy) }
+                           detail: one ? "Copies the file into \(model.installPlace) and activates it. The original stays where it is."
+                               : "Copies the files into \(model.installPlace) and activates them. The originals stay where they are.") { choose(.copy) }
                     if prompt.offersMove {
                         option(model.data.installsIntoFontLibrary ? "Move Into Cicero’s Library" : "Move Into Fonts Folder", icon: "folder",
-                               detail: one ? "Moves the file into \(model.installPlace) and turns it on. The folder it was in stays."
-                                   : "Moves the files into \(model.installPlace) and turns them on. The folders they were in stay.") { choose(.move) }
+                               detail: one ? "Moves the file into \(model.installPlace) and activates it. The folder it was in stays."
+                                   : "Moves the files into \(model.installPlace) and activates them. The folders they were in stay.") { choose(.move) }
                     }
                 }
-                option("Leave Files Where They Are", icon: "link",
-                       detail: one ? "Lists the file under Added Fonts, where it is, without turning it on."
-                           : "Lists the files under Added Fonts, where they are, without turning them on.") { choose(.inPlace) }
+                option(one ? "Leave File Where It Is" : "Leave Files Where They Are", icon: "link",
+                       detail: one ? "Lists the file under Added Fonts, where it is, without activating it."
+                           : "Lists the files under Added Fonts, where they are, without activating them.") { choose(.inPlace) }
             }
             .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline) {
@@ -58,13 +58,13 @@ struct InstallSheet: View {
 
     private static func effect(of location: DropLocation, one: Bool) -> String {
         let it = one ? "it" : "them"
-        if location.isActive { return " and turns \(it) on" }
-        guard let app = location.app else { return " without turning \(it) on" }
+        if location.isActive { return " and activates \(it)" }
+        guard let app = location.app else { return " without activating \(it)" }
         return app == "Adobe" ? ", where Adobe apps use \(it)" : ", where \(app) uses \(it)"
     }
 
     private var title: String {
-        prompt.files.count == 1 ? "Add “\(URL(fileURLWithPath: prompt.files[0]).lastPathComponent)”" : "Add \(prompt.files.count) Font Files"
+        prompt.files.count == 1 ? "Add “\(URL(fileURLWithPath: prompt.files[0]).lastPathComponent)”" : "Add \(prompt.files.count.plain) Font Files"
     }
 
     private func option(_ title: String, icon: String, detail: String, action: @escaping () -> Void) -> some View {
@@ -154,7 +154,7 @@ private struct ManyActivationConfirmation: ViewModifier {
                     Button(prompt.temporarily ? "Activate Temporarily" : "Activate") { model.confirm(prompt) }
                     Button("Cancel", role: .cancel) {}
                 } message: { _ in
-                    Text("Apps load every font that’s on as they open, so this many at once can slow them down.")
+                    Text("Apps load every active font as they open, so activating this many at once can slow them down.")
                 }
                 .dialogSuppressionToggle("Don’t ask again", isSuppressed: Binding(
                     get: { !model.data.asksBeforeActivatingMany },

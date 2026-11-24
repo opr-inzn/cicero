@@ -659,7 +659,7 @@ public struct ActivationEngine: Sendable {
         }
         let done = Set(inFontsFolder + persistent + session + leaving).subtracting(failed)
         let message = failed.isEmpty && succeeded == 0 && !locked.isEmpty
-            ? "These fonts are managed by macOS or another app"
+            ? (locked.count == 1 ? "This font is managed by macOS or another app" : "These fonts are managed by macOS or another app")
             : Self.message("Deactivated", "deactivate", succeeded: succeeded, failed: failed.count + locked.count,
                            done: Self.names(of: faces, in: done), undone: Self.names(of: faces, in: Set(failed + locked)))
         return ActivationResult(records: records, succeeded: succeeded, failed: failed + locked, message: message)
@@ -701,8 +701,8 @@ public struct ActivationEngine: Sendable {
         let succeeded = Set(persistent + session + returning).subtracting(failed).count
         let app = faces.lazy.compactMap(\.app).first.map(FaceState.appDescription) ?? "the app"
         let message = failed.isEmpty
-            ? "On in \(app) only"
-            : Self.message("Done", "move", succeeded: succeeded, failed: failed.count)
+            ? "Active in \(app) only"
+            : Self.message("Updated", "update", succeeded: succeeded, failed: failed.count)
         return ActivationResult(records: records, succeeded: succeeded, failed: failed, message: message)
     }
 
@@ -867,7 +867,7 @@ public struct ActivationEngine: Sendable {
         var records = records
         let path = face.face.path
         let name = FontNames.describe([face])
-        guard !isInFontLibrary(path) else { return ActivationResult(records: records, succeeded: 0, failed: [], message: "\(name ?? "The font") is in Cicero’s Library") }
+        guard !isInFontLibrary(path) else { return ActivationResult(records: records, succeeded: 0, failed: [], message: "\(name ?? "The font") is already in Cicero’s Library") }
         let place = installsIntoFontLibrary && fontLibrary != nil ? "Cicero’s Library" : "your Fonts folder"
         let failure = ActivationResult(records: records, succeeded: 0, failed: [path], message: "Couldn’t copy \(name ?? "the font") into \(place)")
         guard let copy = try? placeCopy(of: path, family: face.face.familyName) else { return failure }

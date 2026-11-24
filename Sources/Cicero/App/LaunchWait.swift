@@ -63,11 +63,11 @@ enum LaunchWait {
     private static func message(_ holder: AppLock.Holder) -> (String, String) {
         switch holder {
         case .command:
-            ("Waiting for the Cicero CLI", "The Cicero CLI is making a change. Cicero opens as soon as it’s done.")
+            ("Waiting for the Cicero CLI", "The Cicero CLI is making a change. Cicero will open as soon as it’s done.")
         case .app(let name):
-            ("Another Cicero Is Open", "“\(name)” uses the same fonts and data. Quit it, and this Cicero opens.")
+            ("Another Copy of Cicero Is Open", "“\(name)” uses the same fonts and data. Quit it to open this copy of Cicero.")
         case .unknown:
-            ("Waiting for Cicero’s Data", "Another Cicero or the Cicero CLI is using the same fonts and data. Cicero opens as soon as it’s done.")
+            ("Waiting for Cicero’s Data", "Another copy of Cicero or the Cicero CLI is using the same fonts and data. Cicero will open as soon as it’s done.")
         }
     }
 }

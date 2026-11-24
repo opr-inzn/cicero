@@ -50,7 +50,7 @@ struct CompareWindow: View {
                 // In a scroll view, as the samples are: a window draws a line under its toolbar while nothing scrolls under it.
                 ScrollView {
                     EmptyState("Nothing to Compare", systemImage: "square.on.square",
-                               description: Text("Add families from anywhere in your library, choose Fonts → Compare with families selected, or drop families here.")) {
+                               description: Text("Add families from anywhere in your library, choose Fonts\u{00A0}→\u{00A0}Compare with families selected, or drop families here.")) {
                         Button("Add Families") { isAdding = true }
                     }
                     .containerRelativeFrame([.horizontal, .vertical])
@@ -92,7 +92,7 @@ struct CompareWindow: View {
             ToolbarCapsule { AddFamiliesButton(isPresented: $isAdding) }
             ToolbarCapsule(spaced: true) {
                 ToolbarPicker("Layout", values: CompareLayout.allCases, selection: $layout, title: \.title,
-                              help: "One row per font, or every font over each other")
+                              help: "Show styles in separate rows or layered on top of each other")
             }
             ToolbarCapsule(spaced: true) {
                 PreviewOptionsButton(own: OwnPreviewOptions(text: $savedText.value, placeholder: Self.placeholder, size: $size, sizeRange: Self.sizes))
@@ -173,7 +173,7 @@ private struct AddFamilies: View {
             }
             if isFull {
                 Divider()
-                Text("Compare holds up to \(AppModel.compareLimit.plain) styles. Take one out to add another.")
+                Text("Compare holds up to \(AppModel.compareLimit.plain) styles. Remove one to add another.")
                     .font(.callout)
                     .foregroundStyle(Color(Color.secondary.resolve(in: environment)))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -475,7 +475,7 @@ private struct SampleCaption: View {
             .labelsHidden()
             if sample.family.faces.count > 1 {
                 Divider()
-                Button("Another Style", systemImage: "plus") {
+                Button("Add Another Style", systemImage: "plus") {
                     let shown = model.compareEntries.filter { $0.familyID == sample.family.id }.map { $0.style ?? automatic }
                     model.compareAnotherStyle(of: sample.id, besides: Set(shown))
                 }

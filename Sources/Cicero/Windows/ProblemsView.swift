@@ -17,7 +17,7 @@ struct ProblemsView: View {
                     EmptyState("No Conflicts", systemImage: "checkmark.circle",
                                description: Text("Fonts installed twice, duplicates, and missing or damaged files show up here."))
                 } else {
-                    EmptyState("Checking Fonts", systemImage: "checkmark.circle",
+                    EmptyState("Checking Fonts…", systemImage: "checkmark.circle",
                                description: Text("Fonts installed twice, duplicates, and missing or damaged files will show up here."))
                 }
             } else {
@@ -58,7 +58,7 @@ struct ProblemsView: View {
         switch model.problems.count(where: { !$0.kind.isMinor }) {
         case 0: ""
         case 1: "1 conflict"
-        case let count: "\(count) conflicts"
+        case let count: "\(count.plain) conflicts"
         }
     }
 }
@@ -75,17 +75,17 @@ private struct ProblemGroup: View {
                 Spacer(minLength: 0)
                 let extras = problems.filter { !$0.extraCopies.isEmpty }
                 if extras.count > 1 {
-                    Button(kind == .installedTwice ? "Remove All Extra Copies" : "Move All Extra Copies to Trash", role: .destructive) {
+                    Button("Move All Extra Copies to Trash", role: .destructive) {
                         model.trashExtraCopies(of: extras)
                     }
                     .help(kind == .installedTwice
-                        ? "Keeps the newest copy of each font and moves the others to the Trash."
-                        : "Keeps the newest copy of each font in each folder and moves the others to the Trash.")
+                        ? "Keep the newest copy of each font and move the others to the Trash"
+                        : "Keep the newest copy of each font in each folder and move the others to the Trash")
                 }
                 let forgettable = problems.filter { $0.fixes.contains(where: \.isForget) }
                 if kind == .missing && forgettable.count > 1 {
                     Button("Forget All") { model.forgetAll(of: forgettable) }
-                        .help("Cicero stops looking for these files and forgets them.")
+                        .help("Stop looking for these missing files and remove them from your library")
                 }
             }
             Text(kind.explanation).foregroundStyle(.secondary)
@@ -222,7 +222,7 @@ private struct DuplicatesBar: View {
             } else if problems.contains(where: { !$0.extraCopies.isEmpty }) {
                 Button("Select Extra Copies") { marks = [:] }
             }
-            Button(paths.count == 1 ? "Move 1 File to Trash" : "Move \(paths.count.plain) Files to Trash") {
+            Button(paths.isEmpty ? "Move to Trash" : paths.count == 1 ? "Move 1 File to Trash" : "Move \(paths.count.plain) Files to Trash") {
                 model.trashExtraCopies(of: problems.filter { !$0.marked(marks).isEmpty }, paths: paths)
             }
             .buttonStyle(.borderedProminent)
@@ -417,7 +417,7 @@ private struct FolderRow: View {
         case 0: break
         case 1: parts.append("Version \(versions[0])")
         case 2: parts.append("Versions \(versions[0]) and \(versions[1])")
-        default: parts.append("\(versions.count) versions")
+        default: parts.append("\(versions.count.plain) versions")
         }
         let dates = folder.files.compactMap(\.modified)
         if let first = dates.min(), let last = dates.max() {
@@ -473,13 +473,13 @@ private struct FixButtons: View {
     }
 
     private func title(_ fix: ProblemFix) -> String {
-        if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Remove Copy" : "Remove Copies" }
+        if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Move Copy to Trash" : "Move Copies to Trash" }
         return fix.title
     }
 
     private func help(_ fix: ProblemFix) -> String {
         guard case .removeFromAdobeFonts = fix else { return "" }
-        return "Opens the family’s page on Adobe Fonts, where you remove it. Creative Cloud then takes its copy away."
+        return "Open this family’s page on Adobe Fonts to remove it; Creative Cloud will then remove its copy"
     }
 
     private func isDestructive(_ fix: ProblemFix) -> Bool {

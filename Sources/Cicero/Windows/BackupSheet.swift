@@ -31,10 +31,10 @@ struct BackupSheet: View {
                     switch progress {
                     case .copying(let done, let total):
                         ProgressView(value: Double(done), total: Double(max(total, 1)))
-                        Text("Copying fonts, \(done.plain) of \(total.plain)")
+                        Text("Copying fonts, \(done.plain) of \(total.plain)…")
                     case .compressing:
                         ProgressView()
-                        Text("Compressing")
+                        Text("Compressing…")
                     }
                 }
                 .progressViewStyle(.linear)
@@ -60,7 +60,7 @@ struct BackupSheet: View {
     }
 
     private var fontsDetail: String {
-        guard let fonts else { return "Counting" }
+        guard let fonts else { return "Counting…" }
         if fonts.isEmpty { return "There are no font files in your library." }
         let size = fonts.reduce(Int64(0)) { $0 + $1.size }
         return "\(fonts.count == 1 ? "1 file" : "\(fonts.count.plain) files"), \(size.formatted(.byteCount(style: .file)))"

@@ -114,11 +114,12 @@ extension ActivationEngine {
             let trashed = done.count - keptAside
             message = "Replaced \(names). " + (keptAside == 0 ? (done.count == 1 ? "The old file is in the Trash" : "The old files are in the Trash")
                 : trashed == 0 ? (done.count == 1 ? "The old file is in Cicero’s Inactive folder" : "The old files are in Cicero’s Inactive folder")
-                : "\(trashed) old \(trashed == 1 ? "file is" : "files are") in the Trash, \(keptAside) in Cicero’s Inactive folder")
+                : "\(trashed.plain) old \(trashed == 1 ? "file is" : "files are") in the Trash and \(keptAside.plain) \(keptAside == 1 ? "is" : "are") in Cicero’s Inactive folder")
             if !failed.isEmpty {
                 let undone = FontNames.describe(FontNames.fonts(inFiles: failed.filter { fm.fileExists(atPath: $0) }))
-                message += ". Couldn’t replace " + (undone ?? (failed.count == 1 ? "1 file" : "\(failed.count) files"))
+                message += ". Couldn’t replace " + (undone ?? (failed.count == 1 ? "1 file" : "\(failed.count.plain) files"))
             }
+            message += "."
         }
         var result = ActivationResult(records: records, succeeded: done.count, failed: failed, message: message)
         result.placed = placed

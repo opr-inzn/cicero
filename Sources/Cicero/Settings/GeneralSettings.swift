@@ -69,16 +69,16 @@ struct GeneralSettings: View {
                 )) {
                     Text("Open at login")
                     Text(loginItem == .requiresApproval
-                        ? "Allow Cicero in System Settings → General → Login Items."
+                        ? "Allow Cicero in System Settings → General → Login Items & Extensions."
                         : "App folders activate fonts only while Cicero is open.")
                 }
                 Toggle(isOn: $model.data.asksBeforeActivatingMany) {
                     Text("Ask before activating more than \(UserData.manyFamilies.plain) families at once")
-                    Text("Apps load every font that’s on as they open, so turning on many at once can slow them down.")
+                    Text("Apps load every active font as they open, so activating many at once can slow them down.")
                 }
                 Toggle(isOn: $model.data.asksBeforeMovingOutOfSharedFolders) {
                     Text("Ask before moving fonts out of shared folders")
-                    Text("To turn off a font that an app like InDesign loads from its own folder, Cicero moves the file out. When the folder syncs with a cloud service or is on a server, the file goes away for everyone who shares it.")
+                    Text("To deactivate a font that an app like InDesign loads from its own folder, Cicero moves the file out. When the folder syncs with a cloud service or is on a server, the file is removed for everyone who shares it.")
                 }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
                     Text("Auto-activate fonts in Adobe apps")
@@ -93,7 +93,7 @@ struct GeneralSettings: View {
                 }
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
                     Text("Show fonts installed for proofing in Adobe apps")
-                    Text("Lists the fonts in the folders Adobe apps load by themselves, where type designers put fonts to test them. [How to test fonts in Adobe apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps)")
+                    Text("Lists the fonts in folders that Adobe apps load automatically for font testing. [Learn how to test fonts in Adobe apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps).")
                 }
                 Toggle(isOn: $model.guessesClassifications) {
                     Text("Classify fonts automatically")
@@ -166,9 +166,9 @@ struct GeneralSettings: View {
         let place = model.data.installsIntoFontLibrary ? "Cicero’s Library" : "your Fonts folder"
         return switch model.data.installMethod {
         case .ask: "Cicero asks whether to copy them into \(place), move them there or leave them where they are. Microsoft Office can’t use fonts left where they are."
-        case .copy: "They’re copied into \(place) and turned on. The originals stay where they are."
-        case .move: "They’re moved into \(place) and turned on. Fonts in your locations stay where they are."
-        case .inPlace: "They’re listed under Added Fonts where they are, but not turned on. Microsoft Office can’t use them."
+        case .copy: "They’re copied into \(place) and activated. The originals stay where they are."
+        case .move: "They’re moved into \(place) and activated. Fonts in your locations stay where they are."
+        case .inPlace: "They’re listed under Added Fonts where they are, without being activated. Microsoft Office can’t use them."
         }
     }
 }
@@ -176,10 +176,10 @@ struct GeneralSettings: View {
 private extension DuplicateHandling {
     var title: String {
         switch self {
-        case .ask: "Ask each time"
-        case .addCopy: "Add as a copy"
-        case .skip: "Skip it"
-        case .replace: "Replace your copy"
+        case .ask: "Ask Each Time"
+        case .addCopy: "Add as a Copy"
+        case .skip: "Skip"
+        case .replace: "Replace Existing Copy"
         }
     }
 }
@@ -187,10 +187,10 @@ private extension DuplicateHandling {
 private extension InstallMethod {
     func title(intoFontLibrary: Bool) -> String {
         switch self {
-        case .ask: "Ask each time"
-        case .copy: intoFontLibrary ? "Copy into Cicero’s Library" : "Copy into ~/Library/Fonts"
-        case .move: intoFontLibrary ? "Move into Cicero’s Library" : "Move into ~/Library/Fonts"
-        case .inPlace: "Leave files where they are"
+        case .ask: "Ask Each Time"
+        case .copy: intoFontLibrary ? "Copy to Cicero’s Library" : "Copy to ~/Library/Fonts"
+        case .move: intoFontLibrary ? "Move to Cicero’s Library" : "Move to ~/Library/Fonts"
+        case .inPlace: "Leave Files in Place"
         }
     }
 }

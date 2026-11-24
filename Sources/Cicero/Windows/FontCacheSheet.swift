@@ -28,7 +28,7 @@ private struct FontCacheSheetModifier: ViewModifier {
             }
             .alert("Font Caches Cleared", isPresented: $isOfferingRestart) {
                 Button("Restart Now") {
-                    if !Self.restart() { model.showToast("Couldn’t restart. Choose Apple menu → Restart") }
+                    if !Self.restart() { model.showToast("Couldn’t restart. Choose Apple menu\u{00A0}→\u{00A0}Restart") }
                 }
                 Button("Later", role: .cancel) {}
             } message: {
@@ -58,7 +58,7 @@ struct FontCacheSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Clear Font Caches").font(.title2.bold())
-                Text("macOS and some apps keep lists of fonts that can go stale after fonts change. Clearing them makes the lists get rebuilt. You may need to restart your Mac afterwards.")
+                Text("macOS and some apps cache font lists that can become stale after fonts change. Clearing them forces the lists to rebuild. You may need to restart your Mac afterward.")
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 10) {
@@ -74,7 +74,7 @@ struct FontCacheSheet: View {
             HStack {
                 if isClearing {
                     ProgressView().controlSize(.small)
-                    Text("Clearing").foregroundStyle(.secondary)
+                    Text("Clearing…").foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
@@ -104,7 +104,7 @@ struct FontCacheSheet: View {
 
     private var adobeDetail: String {
         if let name = runningApps[.adobe] { return "Quit \(name) first." }
-        guard let found = adobeCaches else { return "Looking for caches" }
+        guard let found = adobeCaches else { return "Looking for caches…" }
         if found.isEmpty { return "No caches found." }
         return "Moves \(found.size.formatted(.byteCount(style: .file))) of cache files to the Trash."
     }

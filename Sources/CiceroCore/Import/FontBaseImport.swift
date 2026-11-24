@@ -93,7 +93,7 @@ public enum FontBaseImport {
                 library.fontFolderCount = count
                 library.fontFolderFiles = inFolder.sorted()
             } else if !(values["fontbase_pathsAll"]?.properties ?? []).isEmpty {
-                library.notes.append("its folder, \((root as NSString).abbreviatingWithTildeInPath), which isn’t on this Mac")
+                library.notes.append("FontBase’s folder, \((root as NSString).abbreviatingWithTildeInPath), which isn’t on this Mac")
             }
             library.otherFiles = other.sorted()
 
@@ -159,14 +159,14 @@ public enum FontBaseImport {
                     + otherCollections.map { "“\($0)”" }.listed())
             }
             let automatic = ["fontbase_fontsTagsSystem", "fontbase_fontsTagsCrowd"].contains { !(values[$0]?.properties ?? []).isEmpty }
-            if automatic { library.notes.append("the tags FontBase gives fonts itself, like Sans and Script") }
+            if automatic { library.notes.append("automatic FontBase tags, like Sans and Script") }
             let edited = values["fontbase_fontsOverrides"]?.properties?.count ?? 0
             if edited > 0 { library.notes.append(edited == 1 ? "your changes to 1 font’s details" : "your changes to \(edited.plain) fonts’ details") }
             let licenses = values["fontbase_licensesAll"]?.properties?.count ?? 0
             if licenses > 0 { library.notes.append(licenses == 1 ? "1 license you added" : "\(licenses.plain) licenses you added") }
             let activeFolders = (values["fontbase_foldersAll"]?.properties ?? []).filter { $0.value["status"]?.string == "active" && $0.value["virtual"]?.bool != true }
             if !activeFolders.isEmpty {
-                library.notes.append("turning on new fonts in \(activeFolders.count == 1 ? "the active folder" : "active folders") by themselves")
+                library.notes.append("automatically activating new fonts in \(activeFolders.count == 1 ? "the active folder" : "active folders")")
             }
             library.notes.append("sample texts and preview settings")
             for kind in FontExplorerImport.UnreadableKind.allCases {

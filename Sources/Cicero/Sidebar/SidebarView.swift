@@ -216,14 +216,15 @@ private struct SidebarContent: View {
     private func addButton(_ section: SidebarSection) -> some View {
         switch section {
         case .folders:
-            plus("Add a folder of fonts") { model.presentAddFolderPanel() }
+            plus("Add a location") { model.presentAddFolderPanel() }
         case .sets:
             Menu {
                 Button("New Folder", systemImage: "folder") { model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0) } }
                 Button("New Smart Folder", systemImage: "gearshape") { model.ask { $0.editingSmartSet = SmartSet(name: "") } }
                 Button("New App Folder", systemImage: "app.badge.checkmark") { model.newApplicationSet() }
             } label: {
-                Image(systemName: "plus")
+                Label("New folder, smart folder or app folder", systemImage: "plus")
+                    .labelStyle(.iconOnly)
             }
             .menuStyle(.button)
             .menuIndicator(.hidden)
@@ -243,7 +244,10 @@ private struct SidebarContent: View {
     }
 
     private func plus(_ help: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: "plus") }
+        Button(action: action) {
+            Label(help, systemImage: "plus")
+                .labelStyle(.iconOnly)
+        }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .help(help)
@@ -527,7 +531,7 @@ private struct OrganizeRow: View {
 
     var body: some View {
         Button { model.ask { $0.showsGuessingQuestion = true } } label: {
-            Label { Text("Organize").fontWeight(.semibold).foregroundStyle(Color.solar) } icon: {
+            Label { Text("Classify Fonts").fontWeight(.semibold).foregroundStyle(Color.solar) } icon: {
                 Image(systemName: "character.magnify").foregroundStyle(Color.solar)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -535,7 +539,7 @@ private struct OrganizeRow: View {
         }
         .buttonStyle(.plain)
         .selectionDisabled()
-        .help("Let Cicero classify fonts that don’t say what they are")
+        .help("Let Cicero classify fonts without a classification")
     }
 }
 

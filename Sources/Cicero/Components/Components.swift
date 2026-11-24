@@ -268,12 +268,12 @@ struct ActivationSwitch: View {
 
     private var help: String {
         if family.state == .system { return "Installed with macOS" }
-        if family.isAdobeFonts { return "From Adobe Fonts, which Creative Cloud turns on and off" }
+        if family.isAdobeFonts { return "From Adobe Fonts, managed in Creative Cloud" }
         guard let app = family.app.map(FaceState.appDescription) else { return family.hasActive ? "Deactivate" : "Activate" }
         return switch model.position(of: family) {
-        case .app: "On in \(app) only. Click to turn on in every app."
-        case .on: "On in every app. Click to turn off, \(app) included."
-        case .off: "Off. Click to turn on in \(app) only."
+        case .app: "Active in \(app) only. Click to activate in all apps."
+        case .on: "Active in all apps. Click to deactivate everywhere, including \(app)."
+        case .off: "Inactive. Click to activate in \(app) only."
         }
     }
 
@@ -354,11 +354,11 @@ struct StatusTag: View {
     private var help: String {
         switch (family.temporaryScope, family.state) {
         case (.untilQuit, _): "Active until Cicero quits"
-        case (.whileAppsRun, _): "Active while its app is open"
+        case (.whileAppsRun, _): "Active while its apps are open"
         case (nil, .appOnly) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud. Active in Adobe apps only."
         case (nil, _) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud"
-        case (nil, .appOnly("Adobe")): "Active in Adobe apps only, from a folder they load fonts from by themselves"
-        case (nil, .appOnly(let app)): "Active in \(app) only, from a folder it loads fonts from by itself"
+        case (nil, .appOnly("Adobe")): "Active in Adobe apps only, from a folder they load automatically"
+        case (nil, .appOnly(let app)): "Active in \(app) only, from a folder it loads automatically"
         case (nil, _): ""
         }
     }
@@ -1018,7 +1018,7 @@ private struct PreviewOptions: View {
         let text = own?.text ?? $preview.sampleText
         Form {
             Section {
-                TextField("Preview Text", text: text, prompt: Text(own?.placeholder ?? "Preview Text"))
+                TextField("Preview Text", text: text, prompt: Text(own?.placeholder ?? "Preview text"))
                     .labelsHidden()
                     .noAutoFill()
                 HStack {
@@ -1039,11 +1039,11 @@ private struct PreviewOptions: View {
                     Spacer()
                     if preview.isSavedPreset(text.wrappedValue) {
                         Button("Remove Preset") { preview.savedPresets.removeAll { $0 == text.wrappedValue } }
-                            .help("Takes the preview text out of Presets")
+                            .help("Remove the current preview text from Presets")
                     } else {
                         Button("Save as Preset") { preview.savedPresets.append(text.wrappedValue) }
                             .disabled(!preview.canSavePreset(text.wrappedValue))
-                            .help("Adds the preview text to Presets")
+                            .help("Save the current preview text as a preset")
                     }
                 }
                 // ß in capitals is SS, as the text is set in every font, not all of which have ẞ.
@@ -1123,6 +1123,6 @@ struct InfoButton: View {
             Label("Info", systemImage: "info.circle")
         }
         .toggleStyle(.toolbar)
-        .help("Info")
+        .help(model.isInfoShown ? "Hide Info" : "Show Info")
     }
 }

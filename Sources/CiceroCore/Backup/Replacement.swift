@@ -7,9 +7,9 @@ public struct KeptItemError: Error, Sendable {
 
     public var message: String {
         if noTrash {
-            return "“\(name)” \(isFolder ? "isn’t empty" : "is a font") and that disk has no Trash, so it wasn’t replaced. Choose another name or place"
+            return "“\(name)” \(isFolder ? "isn’t empty" : "is a font") and that disk has no Trash, so it wasn’t replaced. Choose another name or location."
         }
-        return "“\(name)” \(isFolder ? "holds fonts Cicero uses" : "is a font Cicero uses"), so it wasn’t replaced. Choose another name or place"
+        return "“\(name)” \(isFolder ? "contains fonts Cicero uses" : "is a font Cicero uses"), so it wasn’t replaced. Choose another name or location."
     }
 }
 

@@ -72,11 +72,14 @@ private struct TextTab: View {
         ZStack {
             table
             if query.text.isEmpty {
-                EmptyState("Find Fonts for a Text", systemImage: "character.cursor.ibeam",
+                EmptyState("Find Fonts for Text", systemImage: "character.cursor.ibeam",
                            description: Text("Type or paste text, and Cicero lists the fonts that have every character in it."))
             } else if matches.isEmpty && !isSearching {
-                EmptyState("No Fonts Have Every Character", systemImage: "character.textbox",
-                           description: Text(unindexed > 0 ? "Some fonts are still being checked." : "Allow a few missing characters to see the closest fonts."))
+                EmptyState(maxMissing == 0 ? "No Fonts Have Every Character" : "No Matching Fonts", systemImage: "character.textbox",
+                           description: Text(unindexed > 0 ? "Some fonts are still being checked."
+                               : maxMissing == 0 ? "Allow a few missing characters to see the closest fonts."
+                               : maxMissing < 20 ? "Allow more missing characters to see closer matches."
+                               : "No fonts in your library match this text."))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -110,7 +113,7 @@ private struct TextTab: View {
         guard !query.text.isEmpty else { return "" }
         let count = matches.count == 1 ? "1 family" : "\(matches.count.plain) families"
         if let progress = model.coverageProgress {
-            return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)"
+            return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)…"
         }
         return count
     }
@@ -337,7 +340,7 @@ private struct LanguagesTab: View {
     private func facts(_ language: Language) -> String {
         var parts = ["\(language.scripts.joined(separator: ", ")) · \(language.speakers.formatted(.number.notation(.compactName))) speakers"]
         if let progress = model.coverageProgress, support.unindexed > 0 {
-            parts.append("checking characters, \(progress.done.plain) of \(progress.total.plain)")
+            parts.append("checking characters, \(progress.done.plain) of \(progress.total.plain)…")
         }
         return parts.joined(separator: " · ")
     }

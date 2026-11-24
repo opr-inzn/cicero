@@ -83,7 +83,7 @@ extension AppModel {
         defer { releaseScans() }
         let installed = await importEngine.installOff(files, on: onFiles) { done, total in stage(.copying(done: done, total: total)) }
         if Task.isCancelled {
-            if !installed.new.isEmpty { showToast(Self.stoppedCopying(installed.new.count, again: "Cicero offers the rest at the next launch")) }
+            if !installed.new.isEmpty { showToast(Self.stoppedCopying(installed.new.count, again: "Cicero will offer the rest on the next launch")) }
             return nil
         }
         // Every file has to be in: a location whose fonts aren't all copied would lose some as it goes.
@@ -91,7 +91,7 @@ extension AppModel {
         guard missing.isEmpty else {
             for path in installed.new { try? FileManager.default.removeItem(atPath: path) }
             showToast(missing.count == 1 ? "Couldn’t copy “\((missing[0] as NSString).lastPathComponent)”, so nothing changed"
-                : "Couldn’t copy \(missing.count) font files, so nothing changed")
+                : "Couldn’t copy \(missing.count.plain) font files, so nothing changed")
             return nil
         }
         stage(.starting)

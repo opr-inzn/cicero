@@ -85,7 +85,7 @@ struct DuplicatesSheet: View {
             Spacer(minLength: 12)
             Picker("Choice", selection: Binding(get: { choices[duplicate.id] ?? duplicate.startingChoice(for: prompt.handling) }, set: { choices[duplicate.id] = $0 })) {
                 ForEach(DuplicateChoice.allCases.filter { $0 != .replace || duplicate.canReplace }, id: \.self) { choice in
-                    Text(choice == .replace && duplicate.replacements.count > 1 ? "Replace your copies" : choice.title).tag(choice)
+                    Text(choice == .replace && duplicate.replacements.count > 1 ? "Replace Existing Copies" : choice.title).tag(choice)
                 }
             }
             .labelsHidden()
@@ -100,7 +100,7 @@ struct DuplicatesSheet: View {
     }
 
     private func detail(_ duplicate: AddedDuplicate) -> String {
-        let styles = duplicate.styles.count == 1 ? "1 style" : "\(duplicate.styles.count) styles"
+        let styles = duplicate.styles.count == 1 ? "1 style" : "\(duplicate.styles.count.plain) styles"
         let places = duplicate.styles.map(place).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
         let library = "In your library: \(Self.versions(duplicate.libraryVersions)), \(places.joined(separator: "; "))"
         return [styles, library, "Added: \(Self.versions(duplicate.addedVersions))"].joined(separator: " · ")
@@ -113,23 +113,23 @@ struct DuplicatesSheet: View {
     private func place(_ style: LibraryFace) -> String {
         let path = style.face.path
         switch style.state {
-        case .active(.macOS): return "on, with macOS"
-        case .active(.allUsers): return "on for all users"
-        case .active(.app): return "on, with an app"
-        case .active(.adobeFonts): return "on from Adobe Fonts"
-        case .appOnly(let app): return "on in \(FaceState.appDescription(app))"
+        case .active(.macOS): return "active, with macOS"
+        case .active(.allUsers): return "active for all users"
+        case .active(.app): return "active, with an app"
+        case .active(.adobeFonts): return "active from Adobe Fonts"
+        case .appOnly(let app): return "active in \(FaceState.appDescription(app))"
         default: break
         }
-        return (style.state.isActive ? "on " : "off ") + model.placeName(of: path)
+        return (style.state.isActive ? "active " : "inactive ") + model.placeName(of: path)
     }
 }
 
 extension DuplicateChoice {
     var title: String {
         switch self {
-        case .skip: "Skip it"
-        case .addCopy: "Add as a copy"
-        case .replace: "Replace your copy"
+        case .skip: "Skip"
+        case .addCopy: "Add as Copy"
+        case .replace: "Replace Existing"
         }
     }
 }
@@ -137,8 +137,8 @@ extension DuplicateChoice {
 private extension ReplaceBlock {
     var explanation: String {
         switch self {
-        case .differentFiles: "Can’t be replaced: your copy’s files and the added ones hold the fonts differently."
-        case .unchangeable: "Can’t be replaced: macOS, an app or Adobe Fonts keeps your copy."
+        case .differentFiles: "Can’t be replaced: your existing files and the added files organize the fonts differently."
+        case .unchangeable: "Can’t be replaced: your existing copy is managed by macOS, another app or Adobe Fonts."
         }
     }
 }

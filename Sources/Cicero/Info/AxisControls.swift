@@ -37,7 +37,7 @@ struct AxisControls: View {
                         Button("Reset All") { model.familyAxes[family.id] = nil }
                             .buttonStyle(.borderless)
                             .disabled(moved.isEmpty)
-                            .help("Back to the style’s own place on every axis")
+                            .help("Reset all axes to the style’s default values")
                     }
                 }
             }
@@ -52,7 +52,7 @@ struct AxisControls: View {
                         .disabled(shown.isEmpty)
                 } footer: {
                     if isOpen {
-                        Text("The font asks apps not to show these, but they change its letters too.")
+                        Text("These axes are marked hidden by the font, but they still affect its glyphs.")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -72,14 +72,14 @@ struct AxisControls: View {
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(isOpen ? 90 : 0))
                 Text("Hidden Axes")
-                Text(moved > 0 ? "\(count.plain) · \(moved.plain) moved" : count.plain).foregroundStyle(.secondary)
+                Text(moved > 0 ? "\(count.plain) · \(moved.plain) adjusted" : count.plain).foregroundStyle(.secondary)
                 Spacer()
             }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
-        .help(isOpen ? "Hide the axes the font hides" : "Show the axes the font hides")
+        .help(isOpen ? "Collapse hidden axes" : "Show hidden axes")
     }
 
     private func row(_ axis: AxisRange, axes: [AxisRange], style: LibraryFace, weight: Double, moved: [String: Double],

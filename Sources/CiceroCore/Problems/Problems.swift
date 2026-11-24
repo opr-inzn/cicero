@@ -24,15 +24,15 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .installedTwice:
             "The same font is active from more than one file. macOS uses only one of them, so apps may get an older version. Keep one and remove the other copies."
         case .sharedNames:
-            "Some fonts, often variable ones, give each style a short name of its own, like “Bold”. When two fonts that are on use the same name, macOS gives it to only one of them, and a document can open in the wrong font. Usually there’s nothing to do. If it happens, turn off the font you don’t need, or get a newer version."
+            "Some fonts, often variable ones, give each style a short name of its own, like “Bold”. When two active fonts use the same name, macOS gives it to only one of them, and a document can open in the wrong font. Usually there’s nothing to do. If it happens, deactivate the font you don’t need, or get a newer version."
         case .missing:
-            "Cicero remembers these files, but they’re gone. Fonts used where they were stop working when their files move or their disk is unplugged."
+            "Cicero remembers these files, but they’re gone. Fonts activated in place stop working when their files move or their disk is disconnected."
         case .unreadable:
             "Cicero couldn’t read these files. They may be damaged, or not font files at all."
         case .external:
-            "These fonts are used from a disk that can be unplugged, or a server. They turn off while it’s gone."
+            "These fonts are used from an external disk or a server. They become inactive when it’s disconnected."
         case .duplicates:
-            "The same font file is more than once in the same folder. Selected files go to the Trash. Each font keeps at least one file."
+            "The same font file appears more than once in the same folder. Selected files go to the Trash. Each font keeps at least one file."
         }
     }
 }
@@ -593,10 +593,11 @@ public enum ProblemDetector {
             ))
         }
         for (path, origin) in context.data.records.installedCopies.sorted(by: { $0.key < $1.key }) where !fm.fileExists(atPath: path) {
+            let inLibrary = context.data.fontLibrary.map { path.hasPrefix($0.path + "/") } ?? false
             problems.append(Problem(
                 id: "missing.copy.\(path)", kind: .missing, title: (path as NSString).lastPathComponent,
                 summary: "Installed from “\((origin as NSString).lastPathComponent)”.",
-                files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Was in your Fonts folder")],
+                files: [ProblemFile(path: path, version: nil, modified: nil, detail: inLibrary ? "Was in Cicero’s Library" : "Was in your Fonts folder")],
                 fixes: [.forgetInstalledCopy(path)], fileFixes: [:]
             ))
         }
@@ -640,7 +641,7 @@ public enum ProblemDetector {
                 problems.append(Problem(
                     id: "external.\(path)", kind: .external, title: (path as NSString).lastPathComponent,
                     summary: "Used where it is, \(place).",
-                    files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Out of reach for now")],
+                    files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Currently unavailable")],
                     fixes: [.forgetInPlace(path)], fileFixes: [:]
                 ))
                 continue
@@ -658,7 +659,7 @@ public enum ProblemDetector {
             let family = families?[path]
             problems.append(Problem(
                 id: "external.\(path)", kind: .external, title: family?.name ?? (path as NSString).lastPathComponent,
-                summary: "Used where it is, on “\(volume)”.",
+                summary: "Used where it is, on \(volume).",
                 files: [context.file(path)], fixes: [.installCopy(path), .reveal([path])], fileFixes: [:]
             ))
         }
@@ -669,7 +670,7 @@ public enum ProblemDetector {
         let keys: Set<URLResourceKey> = [.volumeIsRemovableKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsEjectableKey, .volumeLocalizedNameKey]
         guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: keys) else { return nil }
         let external = values.volumeIsRemovable == true || values.volumeIsEjectable == true || values.volumeIsInternal == false || values.volumeIsLocal == false
-        return external ? values.volumeLocalizedName ?? "an external disk" : nil
+        return external ? values.volumeLocalizedName.map { "“\($0)”" } ?? "an external disk" : nil
     }
 }
 

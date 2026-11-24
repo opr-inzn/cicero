@@ -83,10 +83,10 @@ struct LigaturesSection: View {
             }
             VStack {
                 Button("Copy Characters", systemImage: "doc.on.doc") { copyCharacters(ligature, in: group) }
-                    .help("Copies “\(ligature.text)”, which shows as this ligature when pasted into the text above, and elsewhere with \(group.name) on")
+                    .help("Copy “\(ligature.text)” (appears as this ligature in the preview above, and in other apps with \(group.name) on)")
                 Button("Copy as Vector", systemImage: "doc.on.doc") { copyVector(ligature, in: group) }
                     .disabled(outline(ligature) == nil)
-                    .help("Copies the ligature’s outline, to paste into a design app as a shape you can edit, or as SVG code")
+                    .help("Copy the ligature’s outline as an editable vector shape or SVG code")
             }
             .buttonStyle(StillPushButtonStyle())
         }

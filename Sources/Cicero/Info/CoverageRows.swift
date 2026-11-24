@@ -61,7 +61,7 @@ struct LanguagesRow: View {
 
     private func summary(_ languages: [Language]) -> String {
         let sample = languages.prefix(5).map(\.name).listed()
-        return languages.count <= 5 ? sample : "\(languages.count) languages, including \(sample)"
+        return languages.count <= 5 ? sample : "\(languages.count.plain) languages, including \(sample)"
     }
 }
 
@@ -98,9 +98,13 @@ private struct LanguageList: View {
                             }
                             Spacer()
                             if coverage.support(for: language.id) == .full {
-                                Image(systemName: "checkmark").foregroundStyle(.green).help("Fully supported, including less common characters")
+                                Image(systemName: "checkmark").foregroundStyle(.green)
+                                    .accessibilityLabel("Fully supported")
+                                    .help("Fully supported, including less common characters")
                             } else {
-                                Image(systemName: "checkmark").foregroundStyle(.secondary).help("Supported, without some less common characters")
+                                Image(systemName: "checkmark").foregroundStyle(.secondary)
+                                    .accessibilityLabel("Partially supported")
+                                    .help("Supported, without some less common characters")
                             }
                         }
                     }
@@ -175,6 +179,8 @@ private struct LanguageList: View {
         }
         .contentShape(.rect)
         .onTapGesture { showsMissing = language.id }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { showsMissing = language.id }
         .help("Show the characters the font needs for \(language.name)")
         .popover(isPresented: shows, arrowEdge: .trailing) {
             MissingCharacterList(missing: model.languages.missing(language.id, in: coverage.scalars))
@@ -227,6 +233,7 @@ struct CharacterSetsRow: View {
                     } label: {
                         // One text, as a menu's label puts an image of its own first.
                         Text("Show Missing \(Image(systemName: "chevron.down"))")
+                            .accessibilityLabel("Show Missing")
                     }
                     .menuStyle(.button)
                     .menuIndicator(.hidden)
@@ -311,10 +318,10 @@ private struct MissingCharacterList: View {
         .popoverListInsets(top: 2, bottom: 14)
         .bottomBar {
             // StillPushButtonStyle on the list's background, as the default button's fill is see-through and the rows showed through its label.
-            Button("Copy Characters", systemImage: "doc.on.doc", action: copy)
+            Button(missing.count == 1 ? "Copy Character" : "Copy Characters", systemImage: "doc.on.doc", action: copy)
                 .buttonStyle(StillPushButtonStyle())
                 .background(Self.background, in: .rect(cornerRadius: 6))
-                .help("Copies the \(missing.count == 1 ? "character" : "\(missing.count.plain) characters"), with a space between each")
+                .help(missing.count == 1 ? "Copy the missing character" : "Copy the \(missing.count.plain) missing characters, separated by spaces")
                 .padding(.bottom, Self.barBottom)
                 .frame(maxWidth: .infinity)
                 .background {
@@ -382,7 +389,8 @@ struct UnicodeBlocksRow: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 if partial > 0 {
-                    Text(partial == 1 ? "1 more block partly covered" : "\(partial.plain) more blocks partly covered")
+                    let word = partial == 1 ? "block" : "blocks"
+                    Text(complete.isEmpty ? "\(partial.plain) \(word) partly covered" : "\(partial.plain) more \(word) partly covered")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

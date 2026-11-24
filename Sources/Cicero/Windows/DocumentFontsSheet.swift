@@ -37,11 +37,11 @@ struct DocumentFontsSheet: View {
                         model.showInLibrary(report)
                         dismiss()
                     }
-                    .help("Shows the document’s fonts from your library in the main window")
+                    .help("Show this document’s library fonts in the main window")
                 }
                 Button("Activate All") { model.activateAll(in: report) }
                     .disabled(off.isEmpty)
-                    .help("Turns on every font of the document that’s in your library")
+                    .help("Activate all of this document’s fonts that are in your library")
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.defaultAction)
             }
@@ -64,7 +64,7 @@ struct DocumentFontsSheet: View {
                     Text(title(match)).lineLimit(1).truncationMode(.middle)
                     if match.font.isEmbedded == true {
                         Tag(text: "Embedded", tint: .secondary)
-                            .help("The PDF carries the font, so it shows as it should even where the font is missing.")
+                            .help("Embedded in the PDF, so the document displays correctly even if the font isn’t installed")
                     }
                 }
                 if let postScriptName = match.font.postScriptName, postScriptName != title(match) {
@@ -115,7 +115,7 @@ struct DocumentFontsSheet: View {
                 model.showSimilar(to: match.font, embedded: embedded)
                 dismiss()
             }
-            .help("Shows the families in your library that look most like \(match.font.displayName)")
+            .help("Show families in your library that look most like \(match.font.displayName)")
         }
     }
 
@@ -147,12 +147,12 @@ struct DocumentFontsSheet: View {
     }
 
     private func summary(_ total: Int, active: Int, inApps: [String], inactive: Int, missing: Int) -> String {
-        var parts = [total == 1 ? "1 style" : "\(total) styles", "\(active) active"]
+        var parts = [total == 1 ? "1 style" : "\(total.plain) styles", "\(active.plain) active"]
         var apps: [String] = []
         for app in inApps where !apps.contains(app) { apps.append(app) }
-        parts += apps.map { app in "\(inApps.count { $0 == app }) in \(app)" }
-        if inactive > 0 { parts.append("\(inactive) inactive") }
-        if missing > 0 { parts.append("\(missing) missing") }
+        parts += apps.map { app in "\(inApps.count { $0 == app }.plain) in \(app)" }
+        if inactive > 0 { parts.append("\(inactive.plain) inactive") }
+        if missing > 0 { parts.append("\(missing.plain) missing") }
         return parts.joined(separator: " · ")
     }
 }

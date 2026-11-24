@@ -66,7 +66,7 @@ struct NewTagSheet: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help(option?.title ?? "None")
+        .help(option?.title ?? "No Color")
         .accessibilityLabel(option?.title ?? "No Color")
         .accessibilityAddTraits(picked ? .isSelected : [])
     }

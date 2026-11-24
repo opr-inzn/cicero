@@ -17,7 +17,7 @@ public struct DocumentFont: Hashable, Sendable {
 
     public var displayName: String {
         if let family, let style { return "\(family) \(style)" }
-        return family ?? postScriptName ?? "Unnamed font"
+        return family ?? postScriptName ?? "Unnamed Font"
     }
 }
 

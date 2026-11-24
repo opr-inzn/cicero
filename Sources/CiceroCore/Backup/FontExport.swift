@@ -52,8 +52,8 @@ public struct FontExportPlan: Sendable {
         var message = "Exported " + (FontNames.describe(families: exportedFamilies) ?? "the fonts")
         if protectedCount > 0 {
             message += protectedCount == 1
-                ? ". Left out 1 font file that comes with macOS or an app"
-                : ". Left out \(protectedCount) font files that come with macOS or an app"
+                ? ". Skipped 1 font file that comes with macOS or an app."
+                : ". Skipped \(protectedCount.plain) font files that come with macOS or an app."
         }
         return message
     }

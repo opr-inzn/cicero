@@ -99,9 +99,9 @@ public struct LibraryBackup: Sendable {
             switch self {
             case .notABackup: "This file isn’t a Cicero backup"
             case .newerFormat: "This backup was made by a newer version of Cicero"
-            case .archive: "Couldn’t read or write the archive"
+            case .archive: "Couldn’t read or write the backup"
             case .noSpace(let needed, let disk):
-                "Not enough free space on \(disk.map { "“\($0)”" } ?? "the disk"). This needs \(ByteCountFormatter.string(fromByteCount: needed, countStyle: .file))"
+                "Not enough free space on \(disk.map { "“\($0)”" } ?? "the disk"). At least \(ByteCountFormatter.string(fromByteCount: needed, countStyle: .file)) is required."
             }
         }
     }

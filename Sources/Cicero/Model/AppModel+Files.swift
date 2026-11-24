@@ -27,8 +27,8 @@ extension AppModel {
         panel.allowedContentTypes = Self.fontTypes
         panel.prompt = installsAddedFiles ? "Install" : "Add"
         panel.message = switch data.installMethod {
-        case .copy: "Choose font files. They’re copied into \(installPlace) and turned on. The originals stay where they are."
-        case .move: "Choose font files. They’re moved into \(installPlace) and turned on."
+        case .copy: "Choose font files. They’re copied into \(installPlace) and activated. The originals stay where they are."
+        case .move: "Choose font files. They’re moved into \(installPlace) and activated."
         case .inPlace: "Choose font files. They’re listed in your library where they are, without being activated."
         case .ask: "Choose font files. Cicero asks whether to copy them into \(installPlace), move them there or leave them where they are."
         }
@@ -151,7 +151,7 @@ extension AppModel {
             if let document = documents.first { findFonts(in: document) }
             guard !folders.isEmpty || !files.isEmpty else {
                 guard documents.isEmpty, imports.isEmpty else { return }
-                if !webFonts.isEmpty { return showToast("Cicero doesn’t use web fonts like \(webFonts.sorted().listed())") }
+                if !webFonts.isEmpty { return showToast("Cicero doesn’t support web fonts like \(webFonts.sorted().listed())") }
                 return showToast(totalCount == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
             }
             var method: InstallMethod?
@@ -435,9 +435,12 @@ extension AppModel {
         }
         let families = found.filter(data.lists)
         guard !families.isEmpty else {
+            let singular = found.count == 1
             return say(found[0].state == .system
-                ? "That font comes with macOS, and system fonts are hidden (Preferences → General)"
-                : "That font is from Adobe Fonts, which are hidden (Preferences → General)")
+                ? (singular ? "That font comes with macOS, and system fonts are hidden (Preferences → General)"
+                            : "Those fonts come with macOS, and system fonts are hidden (Preferences → General)")
+                : (singular ? "That font is from Adobe Fonts, which are hidden (Preferences → General)"
+                            : "Those fonts are from Adobe Fonts, which are hidden (Preferences → General)"))
         }
         let names = FontNames.describe(families: families.map(\.name)) ?? ""
         let joins = { (place: String) in

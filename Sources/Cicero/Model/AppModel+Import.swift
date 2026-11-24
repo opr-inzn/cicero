@@ -94,7 +94,7 @@ extension AppModel {
                 showToast(job?.waitMessage ?? "")
             case .success(let library) where library.isEmpty:
                 library.discard()
-                showToast(source == .fontBook ? "No collections Cicero can import" : "Nothing in it Cicero can import")
+                showToast(source == .fontBook ? "No collections Cicero can import" : "Nothing found to import")
             case .success(let library):
                 let waits = source == .fontBase && urls.count == 1 && FontBaseImport.isThisMacs(urls[0])
                 let prompt = ImportPrompt(library: library, origin: origin, urls: urls, waitsForQuit: waits)
@@ -130,9 +130,12 @@ extension AppModel {
     // MARK: Importing
 
     static func stoppedCopying(_ count: Int, on: Int = 0, appName: String = "", again: String) -> String {
-        let files = count == 1 ? "font file" : "\(count.plain) font files"
-        guard on > 0 else { return "Stopped. The \(files) copied in so far stay, off: \(again)" }
-        return "Stopped. The \(files) copied in so far stay, \(on.plain) of them on, as in \(appName): \(again)"
+        if count == 1 {
+            guard on > 0 else { return "Stopped. The font file copied so far stays inactive. \(again)" }
+            return "Stopped. The font file copied so far stays active, as in \(appName). \(again)"
+        }
+        guard on > 0 else { return "Stopped. The \(count.plain) font files copied so far stay inactive. \(again)" }
+        return "Stopped. The \(count.plain) font files copied so far stay in your library (\(on.plain) active, as in \(appName)). \(again)"
     }
 
     func performImport(_ prompt: ImportPrompt, choices: ImportChoices, stage: @escaping @Sendable (ImportStage) -> Void) async -> ImportSummary? {
@@ -158,7 +161,7 @@ extension AppModel {
         if Task.isCancelled {
             let onCount = keepOn ? Set(on.compactMap { installed.placed[$0] }).intersection(installed.new).count { importEngine.isOn($0) } : 0
             if !installed.new.isEmpty {
-                showToast(Self.stoppedCopying(installed.new.count, on: onCount, appName: imported.source.appName, again: "import again to finish"))
+                showToast(Self.stoppedCopying(installed.new.count, on: onCount, appName: imported.source.appName, again: "Import again to finish"))
             }
             return nil
         }

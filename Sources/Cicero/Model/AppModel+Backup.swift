@@ -98,6 +98,7 @@ extension AppModel {
         panel.allowedContentTypes = [.ciceroBackup] + [UTType(filenameExtension: LibraryBackup.fileExtension)].compactMap { $0 }
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
         panel.message = "Choose a Cicero backup to restore."
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
         do {
@@ -124,7 +125,7 @@ extension AppModel {
         if let fontResult, fontResult.cancelled {
             if let fallbackFolder { addFallbackFolder(fallbackFolder) }
             rescan()
-            return showToast("Stopped restoring")
+            return showToast("Restore canceled")
         }
 
         var restored = backup.userData(from: contents, fontLibrary: fontLibrary)
@@ -214,7 +215,9 @@ extension AppModel {
             notes.append(fonts.skipped == 1 ? "1 was already there" : "\(fonts.skipped.plain) were already there")
         }
         if let fonts, fonts.fallback > 0 {
-            notes.append("\(fonts.fallback.plain) couldn’t go back and are in ~/\(LibraryBackup.fallbackFolderPath)")
+            notes.append(fonts.fallback == 1
+                ? "1 couldn’t be restored to its original location and is in ~/\(LibraryBackup.fallbackFolderPath)"
+                : "\(fonts.fallback.plain) couldn’t be restored to their original locations and are in ~/\(LibraryBackup.fallbackFolderPath)")
         }
         if let fonts, fonts.failed > 0 {
             notes.append("\(fonts.failed.plain) couldn’t be written")

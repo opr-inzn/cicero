@@ -156,7 +156,7 @@ private struct Header: View {
                 if hasAdobeFonts {
                     if let page = CreativeCloud.page(for: family) {
                         Button("Manage in Adobe Fonts") { NSWorkspace.shared.open(page) }
-                            .help("Opens the family’s page on Adobe Fonts, where you turn it on and off")
+                            .help("Open the family’s page on Adobe Fonts to activate or deactivate it")
                     } else {
                         Button("Manage in Creative Cloud") { CreativeCloud.open() }
                     }
@@ -189,9 +189,9 @@ private struct Header: View {
 
     private var lockedReason: String {
         switch family.faces.first?.state.source {
-        case .macOS: "Installed with macOS, so it can’t be turned off"
-        case .allUsers: "Installed for all users; an administrator has to remove it"
-        case .app: "Comes with an app, which manages it"
+        case .macOS: "Installed with macOS, so it can’t be deactivated"
+        case .allUsers: "Installed for all users; only an administrator can deactivate or remove it"
+        case .app: "Installed and managed by another app"
         default: "Managed outside Cicero"
         }
     }
@@ -298,7 +298,7 @@ private struct TypeTester: View {
             }
             .frame(maxWidth: 220, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
-            .help("Which style to show; until you pick one, it is the regular style, or a style the search names, like Italic")
+            .help("Choose which style to preview (defaults to Regular, or a style matched by your search)")
             .layoutValue(key: TesterControls.RoleKey.self, value: .menu)
         }
     }
@@ -319,11 +319,12 @@ private struct TypeTester: View {
     @ViewBuilder
     private var sliders: some View {
         slider("Size", symbol: "textformat", $size, range: 12...240, unit: " pt")
+            .help("Font size in points")
         slider("Tracking", symbol: "arrow.left.and.right.text.vertical", $tracking, range: -10...40, step: 0.5, unit: "%")
-            .help("The space added between letters, in percent of the em, on top of the font’s kerning")
+            .help("Extra space between letters, as a percentage of the em, added to the font’s kerning")
         slider("Leading", symbol: "arrow.up.and.down.text.horizontal",
                Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: PreviewSettings.lineSpacings, step: 5, unit: "%")
-            .help("The distance between lines, in percent of the size")
+            .help("Line spacing, as a percentage of the font size")
     }
 
     private func slider(_ title: String, symbol: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1,
@@ -335,7 +336,9 @@ private struct TypeTester: View {
                 .foregroundStyle(.secondary)
                 .fixedSize()
                 .layoutValue(key: TesterControls.RoleKey.self, value: .label)
-            ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 80, maxWidth: .infinity)
+            ValueSlider(value: value, range: range, step: step)
+                .accessibilityLabel(title)
+                .frame(minWidth: 80, idealWidth: 80, maxWidth: .infinity)
                 .layoutValue(key: TesterControls.RoleKey.self, value: .slider)
             ValueField(title, value: value, range: range, step: step, unit: unit, alignment: .leading)
                 .layoutValue(key: TesterControls.RoleKey.self, value: .value)
@@ -379,7 +382,7 @@ private struct AxesButton: View {
         } label: {
             Label("Axes", systemImage: "slider.horizontal.3")
         }
-        .help("Move the style’s axes, in the Info panel")
+        .help("Adjust the style’s variable axes in the Info panel")
     }
 }
 

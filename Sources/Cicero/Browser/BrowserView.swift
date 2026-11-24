@@ -37,11 +37,11 @@ struct BrowserView: View {
             if let id = model.similarFamilyID {
                 SimilarBar(familyID: id)
             } else if let list = model.externalSimilar {
-                ListBar(symbol: "sparkle.magnifyingglass", message: "The families that look most like \(list.name), the closest first.") {
+                ListBar(symbol: "sparkle.magnifyingglass", message: "Families most similar to \(list.name), closest first.") {
                     model.endExternalSimilar()
                 }
             } else if let list = model.documentList {
-                ListBar(symbol: "doc.text.magnifyingglass", message: "The fonts “\(list.name)” uses that are in your library.") {
+                ListBar(symbol: "doc.text.magnifyingglass", message: "Fonts used in “\(list.name)” that are in your library.") {
                     model.endDocumentList()
                 }
             }
@@ -56,13 +56,13 @@ struct BrowserView: View {
     private func subtitle(_ families: [Family]) -> String {
         let count = families.count == 1 ? "1 family" : "\(families.count.plain) families"
         if let progress = model.coverageProgress, dependsOnCoverage {
-            return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)"
+            return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)…"
         }
         let counts = model.visibleCounts
         var parts = [count, "\(counts.active.plain) active"]
         let apps = counts.appOnly
         if !apps.isEmpty {
-            let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "one app only"
+            let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "specific apps only"
             parts.append("\(apps.count.plain) in \(place)")
         }
         return parts.joined(separator: " · ")
@@ -141,9 +141,9 @@ private struct ScanCapsule: View {
 
     private func text(for progress: ScanProgress) -> String {
         switch progress {
-        case .finding: "Finding fonts"
-        case .identifying(let done, let total): "Identifying fonts, \(done.plain) of \(total.plain)"
-        case .updating(let done, let total): "Updating font details, \(done.plain) of \(total.plain)"
+        case .finding: "Finding fonts…"
+        case .identifying(let done, let total): "Identifying fonts, \(done.plain) of \(total.plain)…"
+        case .updating(let done, let total): "Updating font details, \(done.plain) of \(total.plain)…"
         }
     }
 }
@@ -159,7 +159,7 @@ private struct OnlineOnlyBar: View {
                 Image(systemName: "icloud.and.arrow.down")
                     .foregroundStyle(.secondary)
                 if let progress = model.downloads[folderID] {
-                    Text("Downloading \(progress.done.plain) of \(progress.total.plain)")
+                    Text("Downloading \(progress.done.plain) of \(progress.total.plain)…")
                     Spacer()
                     ProgressView().controlSize(.small)
                 } else {
@@ -167,7 +167,9 @@ private struct OnlineOnlyBar: View {
                     Spacer()
                     Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folderID) }
                         .controlSize(.small)
-                        .help("Download them from the cloud service so they’re listed. To keep them on this Mac, make the folder available offline in the Finder.")
+                        .help(count == 1
+                            ? "Download it from the cloud service so it’s listed. To keep it on this Mac, make the folder available offline in the Finder."
+                            : "Download them from the cloud service so they’re listed. To keep them on this Mac, make the folder available offline in the Finder.")
                 }
             }
             .font(.callout)
@@ -192,12 +194,12 @@ private struct SimilarBar: View {
     private var message: String {
         let name = model.similarName ?? familyID
         if let family = model.family(familyID), model.canShowSimilar(family, style: model.similarStyle) {
-            return "The families that look most like \(name), the closest first."
+            return "Families most similar to \(name), closest first."
         }
         if let progress = model.measurementProgress {
-            return "Measuring letters, \(progress.done.plain) of \(progress.total.plain)"
+            return "Measuring letters, \(progress.done.plain) of \(progress.total.plain)…"
         }
-        return "Cicero can’t compare \(name) with other fonts: it hasn’t got the Latin letters Cicero measures."
+        return "Cicero can’t compare \(name) with other fonts because it doesn’t have the Latin letters Cicero measures."
     }
 }
 
@@ -221,7 +223,7 @@ private struct ListBar: View {
                 Button("Done", action: done)
                     .buttonStyle(.plain)
                     .foregroundStyle(.tint)
-                    .help("Go back to what the sidebar showed")
+                    .help("Return to the selected sidebar view")
             }
             .font(.callout)
             .padding(.horizontal, 14)
@@ -238,17 +240,17 @@ private struct FolderOutOfReach: View {
 
     var body: some View {
         let folder = model.folder(folderID)
-        let name = folder?.displayName ?? "This folder"
+        let name = folder?.displayName ?? "This location"
         switch model.availability(ofFolder: folderID) {
         case .noAccess:
             EmptyState("Cicero Can’t Read “\(name)”", systemImage: "lock",
-                       description: Text("macOS hasn’t let Cicero into this folder. Allow it in System Settings → Privacy & Security → Files and Folders, then try again.")) {
+                       description: Text("macOS hasn’t granted Cicero access to this folder. Allow access in System Settings → Privacy & Security → Files & Folders, then try again.")) {
                 Button("Open Privacy & Security") { model.openFilesAndFoldersSettings() }
                 Button("Try Again") { model.rescan() }
             }
         case .disconnected(let volume):
             EmptyState("“\(volume)” Isn’t Connected", systemImage: "externaldrive.badge.questionmark",
-                       description: Text("The fonts in “\(name)” are back as soon as you connect it. Their folders and tags stay as they are.")) {
+                       description: Text("The fonts in “\(name)” will reappear as soon as you connect it. Their folders and tags will stay as they are.")) {
                 Button("Try Again") { model.rescan() }
             }
         case .notFound:
@@ -264,7 +266,7 @@ private struct FolderOutOfReach: View {
                            ? "The font file here is online only: the cloud service keeps it off this Mac. Download it to see it. To keep it on this Mac, make the folder available offline in the Finder."
                            : "The \(count.plain) font files here are online only: the cloud service keeps them off this Mac. Download them to see them. To keep them on this Mac, make the folder available offline in the Finder.")) {
                 if let progress = model.downloads[folderID] {
-                    ProgressView("Downloading \(progress.done.plain) of \(progress.total.plain)")
+                    ProgressView("Downloading \(progress.done.plain) of \(progress.total.plain)…")
                         .controlSize(.small)
                 } else {
                     Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folderID) }
@@ -298,7 +300,7 @@ private struct EmptyBrowser: View {
                        description: Text("None of the families similar to \(list.name) are in your library."))
         } else if let list = model.documentList {
             EmptyState("No Fonts in Your Library", systemImage: "doc.text.magnifyingglass",
-                       description: Text("None of the fonts “\(list.name)” uses are in your library."))
+                       description: Text("None of the fonts used in “\(list.name)” are in your library."))
         } else {
             sidebarItemContent
         }
@@ -311,18 +313,18 @@ private struct EmptyBrowser: View {
             FolderOutOfReach(folderID: id)
         case .inactive:
             EmptyState("Everything Is Active", systemImage: "checkmark.seal",
-                       description: Text("Every font in your library is turned on. Add a folder of fonts to keep more here without activating them.")) {
+                       description: Text("Every font in your library is active. Add a location to keep more fonts here without activating them.")) {
                 Button("Add Location") { model.presentAddFolderPanel() }
             }
         case .active:
             EmptyState("Nothing Active", systemImage: "xmark.seal",
-                       description: Text("Turn a font on and it shows up here."))
+                       description: Text("Activate a font to see it here."))
         case .temporary:
             EmptyState("No Temporary Fonts", systemImage: "clock",
-                       description: Text("Fonts you activate temporarily show up here until Cicero quits."))
+                       description: Text("Fonts you activate temporarily appear here until Cicero quits."))
         case .recent:
             EmptyState("No Recent Fonts", systemImage: "tray.and.arrow.down",
-                       description: Text("Fonts that arrive on your Mac show up here for a week."))
+                       description: Text("Fonts added to your Mac appear here for a week."))
         case .set:
             EmptyState("Empty Folder", systemImage: "folder",
                        description: Text("Drag fonts onto the folder in the sidebar, or right-click a font and choose Add to Folder."))
@@ -334,11 +336,11 @@ private struct EmptyBrowser: View {
                 }
             }
         case .characterSet(let id) where model.coverageProgress != nil:
-            EmptyState("Checking Characters", systemImage: "character.textbox",
-                       description: Text("Fonts that have every character of \(model.characterSet(id)?.name ?? "this set") will show up here."))
+            EmptyState("Checking Characters…", systemImage: "character.textbox",
+                       description: Text("Fonts that include every character in \(model.characterSet(id)?.name ?? "this coverage set") will appear here."))
         case .characterSet(let id):
             EmptyState("No Fonts with Every Character", systemImage: "character.textbox",
-                       description: Text("None of these fonts have all the characters in \(model.characterSet(id)?.name ?? "this set")."))
+                       description: Text("None of the fonts in your library include every character in \(model.characterSet(id)?.name ?? "this coverage set")."))
         default:
             EmptyState("No Fonts", systemImage: "textformat")
         }

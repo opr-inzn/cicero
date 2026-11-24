@@ -14,7 +14,7 @@ struct AppSetEditor: View {
         let set = model.data.sets.first { $0.id == setID }
         VStack(alignment: .leading, spacing: 14) {
             Text("Activate “\(set?.name ?? "")” with Apps").font(.title2.bold())
-            Text("When one of these apps opens, Cicero activates the folder’s fonts that are off, and deactivates them when the app quits. Fonts you turned on yourself stay on. This works while Cicero is open.")
+            Text("When one of these apps opens, Cicero activates this folder’s inactive fonts and deactivates them when the app quits. Fonts you activated yourself stay active. This works while Cicero is open.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             List(selection: $selection) {
@@ -85,7 +85,7 @@ enum LoginItem {
         do {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
         } catch {
-            model.showToast(enabled ? "Couldn’t add Cicero to your login items" : "Couldn’t remove Cicero from your login items")
+            model.showToast(enabled ? "Couldn’t add Cicero to Login Items" : "Couldn’t remove Cicero from Login Items")
         }
         return status
     }

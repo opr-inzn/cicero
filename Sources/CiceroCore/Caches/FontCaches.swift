@@ -25,7 +25,7 @@ public enum SystemFontCaches {
                 DispatchQueue.global(qos: .userInitiated).async {
                     var error: NSDictionary?
                     guard let compiled = NSAppleScript(source: script) else {
-                        continuation.resume(returning: (nil, "Couldn’t compile the script"))
+                        continuation.resume(returning: (nil, "Couldn’t prepare the cache-clearing command."))
                         return
                     }
                     _ = compiled.executeAndReturnError(&error)

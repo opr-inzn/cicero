@@ -38,10 +38,10 @@ struct RestoreSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if let progress {
                         ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
-                        Text("Putting fonts back, \(progress.done.plain) of \(progress.total.plain)")
+                        Text("Restoring fonts, \(progress.done.plain) of \(progress.total.plain)…")
                     } else {
                         ProgressView()
-                        Text("Restoring")
+                        Text("Restoring…")
                     }
                 }
                 .progressViewStyle(.linear)
@@ -73,13 +73,13 @@ struct RestoreSheet: View {
             (data.folders.count, "location", "locations"), (data.fontFiles.count, "added font", "added fonts"),
             (data.customCharacterSets.count, "coverage set", "coverage sets"),
         ]
-        let parts = counts.filter { $0.0 > 0 }.map { "\($0.0) \($0.0 == 1 ? $0.1 : $0.2)" }
+        let parts = counts.filter { $0.0 > 0 }.map { "\($0.0.plain) \($0.0 == 1 ? $0.1 : $0.2)" }
         let inside = parts.isEmpty ? "No folders or locations, just settings." : parts.listed() + "."
         return inside + " Replaces what’s set up now; the current setup is saved first, in ~/Library/Application Support/Cicero/Backups."
     }
 
     private var fontsDetail: String {
-        "\(contents.fontCount == 1 ? "1 file" : "\(contents.fontCount.plain) files"). Puts each file back where it was, unless one is already there."
+        "\(contents.fontCount == 1 ? "1 file" : "\(contents.fontCount.plain) files"). Restores each file to its original location unless a file is already there."
     }
 
     private func restore() {

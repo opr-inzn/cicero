@@ -34,7 +34,7 @@ struct FamilyMenu: View {
             Button(titles.activate, systemImage: "checkmark.seal") { model.activate(families) }
         }
         if let app, families.contains(where: { $0.position != .app }) {
-            Button("Use in \(app) Only", systemImage: "circle.lefthalf.filled") { model.useInAppOnly(families.flatMap(\.faces)) }
+            Button("Activate in \(app) Only", systemImage: "circle.lefthalf.filled") { model.useInAppOnly(families.flatMap(\.faces)) }
         }
         if families.contains(where: \.hasTemporarilyActivatable) {
             Button(app != nil ? "Activate Temporarily in All Apps" : "Activate Temporarily", systemImage: "clock") {
@@ -195,7 +195,7 @@ struct CopySourcesMenu: View {
                     ))
                 }
             } label: {
-                Label("Use Copy From", systemImage: "doc.on.doc")
+                Label("Use Copy from", systemImage: "doc.on.doc")
             }
         }
     }

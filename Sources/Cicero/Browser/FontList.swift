@@ -635,7 +635,8 @@ private struct HeaderCell: View {
             .onEnded { _ in endMove() }, isEnabled: isMovable)
         .onChange(of: isMoving) { _, now in if !now { endMove() } }
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(column.comparator != nil ? .isButton : [])
+        .accessibilityValue(column == sortColumn ? (ascending ? "Ascending" : "Descending") : "")
         .accessibilityAction { if column.comparator != nil { sort() } }
     }
 }
@@ -766,7 +767,7 @@ private struct FontListRow: View {
                 Image(systemName: "checkmark").foregroundStyle(.secondary).accessibilityLabel("Has all of \(column.title(model))")
             case .missing(let missing, _):
                 Text("\(missing.plain) missing").foregroundStyle(.secondary).lineLimit(1)
-                    .accessibilityLabel("\(missing.plain) missing from \(column.title(model))")
+                    .accessibilityLabel("\(missing.plain) \(missing == 1 ? "character" : "characters") missing from \(column.title(model))")
             default:
                 EmptyView()
             }

@@ -67,7 +67,7 @@ struct CharacterSetsSettings: View {
                 }
             }
             if model.data.customCharacterSets.isEmpty {
-                Text("Make a set from the characters you need, like a client’s name or a language’s alphabet.")
+                Text("Create a set from the characters you need, like a client’s name or a language’s alphabet.")
                     .foregroundStyle(.secondary)
             }
         } header: {
@@ -75,7 +75,7 @@ struct CharacterSetsSettings: View {
                 Text("Your Coverage Sets")
                 Spacer()
                 ListEditButton("New Coverage Set", systemImage: "plus") { editing = CustomCharacterSet(name: "", characters: "") }
-                    .help("Make a coverage set")
+                    .help("Create a coverage set")
             }
         }
     }

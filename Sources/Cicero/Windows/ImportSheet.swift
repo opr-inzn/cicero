@@ -215,11 +215,11 @@ struct ImportSheet: View {
                              isOn: $choices.history)
                 }
                 if !library.active.isEmpty {
-                    checkbox("Activate the fonts that were active", detail: activateDetail, isOn: $choices.activate)
+                    checkbox("Activate previously active fonts", detail: activateDetail, isOn: $choices.activate)
                 }
                 if !library.leftoverCopies.isEmpty, !isWaiting {
-                    checkbox("Remove \(appName)’s copies", detail: "\(count(library.leftoverCopies.count, "copy", "copies")) it left in "
-                        + "\(commonFolder(library.leftoverCopies)), to the Trash, so those fonts aren’t on twice.",
+                    checkbox("Remove \(appName)’s copies", detail: "Moves \(count(library.leftoverCopies.count, "copy", "copies")) left in "
+                        + "\(commonFolder(library.leftoverCopies)) to the Trash so those fonts aren’t active twice.",
                              isOn: $choices.removeCopies)
                 }
             }
@@ -244,13 +244,13 @@ struct ImportSheet: View {
     private var footer: some View {
         HStack(spacing: 12) {
             if let stage {
-                ImportProgress(stage: stage, starting: "Importing", estimate: estimate, stacked: false)
+                ImportProgress(stage: stage, starting: "Importing…", estimate: estimate, stacked: false)
             } else if isRereading {
                 ProgressView().controlSize(.small)
-                Text("Reading \(appName)’s library").font(.callout).foregroundStyle(.secondary)
+                Text("Reading \(appName)’s library…").font(.callout).foregroundStyle(.secondary)
             } else if isLooking, !candidates.isEmpty {
                 ProgressView().controlSize(.small)
-                Text("Looking for fonts in your library already").font(.callout).foregroundStyle(.secondary)
+                Text("Checking for fonts already in your library…").font(.callout).foregroundStyle(.secondary)
             } else {
                 Text("Your current setup is saved first, in ~/Library/Application Support/Cicero/Backups.")
                     .font(.callout)
@@ -348,7 +348,7 @@ struct ImportSheet: View {
 
     private var activateDetail: String {
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
-        let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first, so they aren’t on twice."
+        let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first so they aren’t active twice."
         return "\(count(library.active.count, "style")), \(toCopy.isEmpty ? "activated" : "activated once they’re copied")." + office + quit
     }
 
@@ -434,7 +434,7 @@ struct ImportSheet: View {
         let folders = Dictionary(grouping: library.otherFiles) { ($0 as NSString).deletingLastPathComponent }
             .sorted { $0.value.count != $1.value.count ? $0.value.count > $1.value.count : $0.key < $1.key }
             .map { ($0.key as NSString).abbreviatingWithTildeInPath }
-        let named = folders.count > 3 ? folders.prefix(2) + ["\(folders.count - 2) other folders"] : folders
+        let named = folders.count > 3 ? folders.prefix(2) + ["\((folders.count - 2).plain) other folders"] : folders
         let copying = library.otherFiles.count(where: toCopy.contains)
         let same = library.otherFiles.count { copies?.sameAs[$0] != nil }
         return "\(named.listed()) (\(count(library.otherFiles.count, "font file"))\(alreadyNote(total: library.otherFiles.count, copying: copying, same: same)))"
@@ -454,7 +454,7 @@ struct ImportSheet: View {
         switch smart.rules.count {
         case 0: "No rules"
         case 1: "1 rule"
-        default: "\(smart.rules.count) rules, \(smart.matchAll ? "all" : "any") of them"
+        default: "\(smart.rules.count.plain) rules, \(smart.matchAll ? "all" : "any") of them"
         }
     }
 
@@ -507,8 +507,8 @@ struct ImportSheet: View {
             lines.append("\(count(summary.activated, "style")) activated, as \(one ? "it was" : "they were") in \(appName).")
             if prompt.source == .fontBase {
                 lines.append(one
-                    ? "When FontBase opens, it activates it again, from a copy of its own, so it’s on twice. Deactivate it in FontBase to stop that."
-                    : "When FontBase opens, it activates them again, from copies of its own, so they’re on twice. Deactivate them in FontBase to stop that.")
+                    ? "When FontBase opens, it activates it again from its own copy, so it’s active twice. Deactivate it in FontBase to prevent this."
+                    : "When FontBase opens, it activates them again from its own copies, so they’re active twice. Deactivate them in FontBase to prevent this.")
             }
         }
         if summary.removedCopies > 0 {

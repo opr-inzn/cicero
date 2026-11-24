@@ -517,9 +517,9 @@ private struct Reader {
             library.notes.append(missing == 1 ? "1 \(other)font file that isn’t on this Mac" : "\(missing.plain) \(other)font files that aren’t on this Mac")
         }
         let licensed = containers.values.count(where: \.hasLicense)
-        if licensed > 0 { library.notes.append("license details of \(licensed == 1 ? "1 font" : "\(licensed.plain) fonts")") }
+        if licensed > 0 { library.notes.append("license details for \(licensed == 1 ? "1 font" : "\(licensed.plain) fonts")") }
         if deactivating > 0 {
-            library.notes.append("the fonts \(deactivating == 1 ? "an application set turns" : "\(deactivating) application sets turn") off (Autodeactivate)")
+            library.notes.append("the fonts \(deactivating == 1 ? "an application set deactivates" : "\(deactivating.plain) application sets deactivate") (Autodeactivate)")
         }
         return library
     }

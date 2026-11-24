@@ -461,7 +461,7 @@ private struct FamilyQuickLook: View {
     private var status: String {
         let labels = Set(family.faces.map(\.state.label))
         if labels.count == 1, let label = labels.first { return label }
-        return family.activeCount == family.faces.count ? "Active" : "\(family.activeCount) of \(family.faces.count) active"
+        return family.activeCount == family.faces.count ? "Active" : "\(family.activeCount.plain) of \(family.faces.count.plain) active"
     }
 }
 

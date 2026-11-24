@@ -215,7 +215,7 @@ private struct RuleRow: View {
         case .embedding:
             options(Embedding.allCases.map { ($0.rawValue, $0.title) })
         case .added, .lastActivated:
-            number(unit: "days", in: 1...3650)
+            number(unit: Int(rule.value) == 1 ? "day" : "days", in: 1...3650)
         case .timesActivated:
             number(in: 0...99_999)
         case .language:
@@ -397,17 +397,15 @@ private extension SmartRule.Comparison {
         switch (field, self) {
         case (.set, .is), (.folder, .is): "is in"
         case (.set, .isNot), (.folder, .isNot): "isn’t in"
-        case (.language, .is), (.feature, .is): "is supported"
-        case (.language, .isNot), (.feature, .isNot): "isn’t supported"
-        case (.characterSet, .is): "includes"
-        case (.characterSet, .isNot): "doesn’t include"
+        case (.language, .is), (.feature, .is), (.characterSet, .is): "includes"
+        case (.language, .isNot), (.feature, .isNot), (.characterSet, .isNot): "doesn’t include"
         case (.hasNote, .is): "Yes"
         case (.hasNote, .isNot): "No"
         case (_, .contains): "contains"
         case (_, .doesNotContain): "doesn’t contain"
         case (_, .beginsWith): "begins with"
         case (_, .is): "is"
-        case (_, .isNot): "is not"
+        case (_, .isNot): "isn’t"
         case (_, .greaterThan): "is more than"
         case (_, .lessThan): "is less than"
         case (_, .inLast): "is in the last"

@@ -85,7 +85,7 @@ extension ActivationEngine {
         }
         if let fontLibrary, !Self.diskIsThere(fontLibrary.path) {
             return ActivationResult(records: records, succeeded: 0, failed: [fontLibrary.path],
-                                    message: "Couldn’t move Cicero’s Library: the disk it’s on isn’t connected")
+                                    message: "Couldn’t move Cicero’s Library: its disk isn’t connected")
         }
         guard let fontLibrary, fm.fileExists(atPath: fontLibrary.path) else {
             return ActivationResult(records: records, succeeded: 0, failed: [], message: "Cicero’s Library moved to \(place)")
@@ -314,28 +314,28 @@ extension ActivationEngine {
         var isDirectory: ObjCBool = false
         guard fm.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else { return "Choose a folder." }
         if ([locations.userFonts, locations.allUsersFonts] + locations.systemFonts).contains(where: { isIn($0.path) }) {
-            return "macOS turns on every font in a Fonts folder by itself, so Cicero couldn’t turn the library’s fonts off."
+            return "macOS automatically activates every font in a Fonts folder, so Cicero wouldn’t be able to deactivate fonts in your library."
         }
         if [locations.support, locations.caches, locations.inactiveFolder].contains(where: { isIn($0.path) }) {
-            return "Cicero keeps that folder for itself."
+            return "Cicero uses that folder for its own files."
         }
         let inactive = [locations.inactiveFolder.standardizedFileURL.path, locations.inactiveFolder.resolvingSymlinksInPath().path]
         if inactive.contains(where: { $0.hasPrefix(path + "/") || $0.hasPrefix(resolved + "/") }),
            (try? fm.contentsOfDirectory(atPath: path))?.allSatisfy({ $0 == ".DS_Store" }) == true {
-            return "Cicero keeps its Inactive folder in “\(folder.lastPathComponent)”. Choose another folder, or make a new one in it."
+            return "Cicero keeps its Inactive folder in “\(folder.lastPathComponent)”. Choose another folder, or create a new folder inside it."
         }
         if isProtected(path + "/") {
-            return "macOS or an app keeps that folder for itself."
+            return "That folder is reserved for macOS or another app."
         }
         if let current {
             let places = [current.standardizedFileURL, current.resolvingSymlinksInPath()]
             if places.contains(where: { [path, resolved].contains($0.path) || [path, resolved].contains($0.deletingLastPathComponent().path) }) {
-                return "Cicero’s Library is there already."
+                return "Cicero’s Library is already in that folder."
             }
             if places.contains(where: { isIn($0.path) }) { return "That folder is in Cicero’s Library." }
         }
         if let watched = folders.first(where: { $0.id != WatchedFolder.fontLibraryID && isIn($0.path) }) {
-            return "That folder is in \(watched.displayName), which your library reads already. Choose one outside your locations."
+            return "That folder is in “\(watched.displayName)”, which is already in your locations. Choose a folder outside your locations."
         }
         guard (try? fm.contentsOfDirectory(atPath: path)) != nil else { return "Cicero can’t read that folder." }
         guard fm.isWritableFile(atPath: path) else { return "Cicero can’t make changes in that folder." }

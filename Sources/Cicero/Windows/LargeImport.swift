@@ -80,7 +80,7 @@ struct CopyingProgressLine: View {
     var stacked = false
 
     var body: some View {
-        let count = Text("Copying fonts, \(done.plain) of \(total.plain)").fixedSize()
+        let count = Text("Copying fonts, \(done.plain) of \(total.plain)…").fixedSize()
         let left = estimate.remaining(total: total).map { $0 < 60 ? "Less than a minute left" : "About \(CopyTimeEstimate.phrase($0)) left" }
         if stacked {
             VStack(alignment: .leading, spacing: 4) {
@@ -111,7 +111,7 @@ struct ImportProgress: View {
                 CopyingProgressLine(done: done, total: total, estimate: estimate, stacked: stacked)
             case .reading(let done, let total):
                 ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Reading fonts, \(done.plain) of \(total.plain)")
+                Text("Reading fonts, \(done.plain) of \(total.plain)…")
             case .starting:
                 ProgressView()
                 Text(starting)
@@ -120,7 +120,7 @@ struct ImportProgress: View {
                 Text("Stopping…")
             case .waiting:
                 ProgressView()
-                Text("Waiting for other changes to finish")
+                Text("Waiting for other changes to finish…")
             }
         }
         .progressViewStyle(.linear)

@@ -183,10 +183,10 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         }
         var lines = forApps.compactMap { app, faces -> String? in
             guard let name = appName(app), let fonts = FontNames.describe(faces) else { return nil }
-            return "\(fonts) on for \(name)"
+            return "\(fonts) active for \(name)"
         }
         .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-        if let fonts = FontNames.describe(untilQuit) { lines.append("\(fonts) on until Cicero quits") }
+        if let fonts = FontNames.describe(untilQuit) { lines.append("\(fonts) active until Cicero quits") }
         return lines
     }
 
@@ -228,7 +228,7 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
         guard let app = NSWorkspace.shared.frontmostApplication, app.processIdentifier != getpid(),
               let bundleID = app.bundleIdentifier
         else { return findFontsInChosenDocument() }
-        let pid = app.processIdentifier, name = app.localizedName ?? "the app in front"
+        let pid = app.processIdentifier, name = app.localizedName ?? "the frontmost app"
         Task {
             do {
                 switch try await DocumentFontWatcher.frontDocument(ofApp: bundleID, pid: pid) {

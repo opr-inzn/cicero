@@ -36,7 +36,7 @@ enum ApplicationsFolder {
         alert.messageText = "Move Cicero to the Applications Folder?"
         alert.informativeText = "App folders, opening at login and updates work only when Cicero is in the Applications folder."
         alert.addButton(withTitle: "Move to Applications Folder")
-        alert.addButton(withTitle: "Do Not Move")
+        alert.addButton(withTitle: "Don’t Move")
         if !forOpenAtLogin {
             alert.showsSuppressionButton = true
             alert.suppressionButton?.title = "Don’t ask again"

@@ -109,8 +109,8 @@ struct GlyphsSection: View {
         .padding(.top, Self.titleGap)
         .padding(.bottom, prepared.lifted.contains(0) ? 4 - GlyphHeader.labelLift : 4)
         if prepared.isEmpty {
-            EmptyState(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
-                       description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
+            EmptyState(query.isEmpty ? "No Glyphs" : "No Matching Glyphs", systemImage: "character",
+                       description: Text(query.isEmpty ? "Cicero couldn’t read the glyphs in this font." : "Try a character, part of its name or a code like U+00E9."))
                 .padding(.vertical, 40)
         } else if prepared.isShort {
             // In one stack: as rows of the page's lazy stack under the tall title, a few rows made it lay the page out again and again at full CPU.
@@ -292,7 +292,7 @@ struct GlyphsSection: View {
                 CharacterCodesGrid(scalar: scalar)
                 VStack {
                     Button("Copy Character", systemImage: "doc.on.doc") { copy(Self.text(scalar), shown: Self.shown(scalar)) }
-                        .help("Copies “\(Self.text(scalar))”")
+                        .help("Copy \(Self.shown(scalar))")
                     copyVectorButton(cell, style: style)
                 }
                 .buttonStyle(StillPushButtonStyle())
@@ -312,7 +312,7 @@ struct GlyphsSection: View {
                 VStack {
                     let drawn = glyph.feature == "locl" ? "in \(glyph.featureName) text" : "with \(glyph.featureNames.listed()) on"
                     Button("Copy Character", systemImage: "doc.on.doc") { copyCharacter(cell, style: style) }
-                        .help("Copies “\(Self.text(glyph.character))”, which shows like this when pasted into the text above, and elsewhere \(drawn)")
+                        .help("Copy \(Self.shown(glyph.character)) (keeps this form in the preview above, and in other apps \(drawn))")
                     copyVectorButton(cell, style: style)
                 }
                 .buttonStyle(StillPushButtonStyle())
@@ -332,7 +332,7 @@ struct GlyphsSection: View {
                 CharacterCodesGrid(scalar: alternate.character)
                 VStack {
                     Button("Copy Character", systemImage: "doc.on.doc") { copyCharacter(cell, style: style) }
-                        .help("Copies “\(Self.text(alternate.character))”, which shows like this when pasted into the text above, and elsewhere with \(names) on")
+                        .help("Copy \(Self.shown(alternate.character)) (keeps this form in the preview above, and in other apps with \(names) on)")
                     copyVectorButton(cell, style: style)
                 }
                 .buttonStyle(StillPushButtonStyle())
@@ -355,7 +355,7 @@ struct GlyphsSection: View {
     private func copyVectorButton(_ cell: Cell, style: Style) -> some View {
         Button("Copy as Vector", systemImage: "doc.on.doc") { copyVector(cell, style: style) }
             .disabled(outline(cell, style: style) == nil)
-            .help("Copies the glyph’s outline, to paste into a design app as a shape you can edit, or as SVG code")
+            .help("Copy the glyph’s outline as an editable vector shape or SVG code")
     }
 
     private func copy(_ text: String, shown: String) {
@@ -447,13 +447,26 @@ struct GlyphsSection: View {
         Unicode.Scalar(scalar).map { String(Character($0)) } ?? ""
     }
 
+    private static func accessibleLabel(_ scalar: UInt32) -> String {
+        if let character = Unicode.Scalar(scalar) {
+            switch character.properties.generalCategory {
+            case .spaceSeparator, .lineSeparator, .paragraphSeparator, .control, .format,
+                 .nonspacingMark, .enclosingMark, .spacingMark:
+                return GlyphSection.shownName(of: scalar) ?? CharacterCodes.unicode(scalar)
+            default: break
+            }
+        }
+        return text(scalar)
+    }
+
     private func gridCell(_ cell: Cell, in font: CTFont) -> GridCell {
         switch cell {
         case .character(let scalar):
+            let label = Self.accessibleLabel(scalar)
             if let glyph = GlyphVectors.glyph(of: scalar, in: font), Self.isCombining(scalar) || Self.takesNoRoom(glyph, in: font) {
-                return GridCell(content: .glyph(glyph), label: Self.text(scalar))
+                return GridCell(content: .glyph(glyph), label: label)
             }
-            return GridCell(content: .text(Self.text(scalar)), label: Self.text(scalar))
+            return GridCell(content: .text(Self.text(scalar)), label: label)
         case .feature(let glyph):
             return GridCell(content: .glyph(glyph.glyph), isAlternate: cell.isAlternate,
                             label: "\(Self.text(glyph.character)), \(glyph.featureNames.listed())")

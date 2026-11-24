@@ -55,7 +55,7 @@ enum CommandLineTool {
 
     static func install(model: AppModel) {
         guard !State.shared.isInstalling else { return }
-        guard let tool, let links else { return model.showToast("This build of Cicero has no Cicero CLI") }
+        guard let tool, let links else { return model.showToast("This build of Cicero doesn’t include the CLI") }
         guard ApplicationsFolder.isInApplicationsFolder else {
             return ApplicationsFolder.offerToMove(forOpenAtLogin: false)
         }
@@ -66,7 +66,7 @@ enum CommandLineTool {
         if linked != tool.path, FileManager.default.fileExists(atPath: link.path) || linked != nil {
             let alert = NSAlert()
             alert.messageText = "Replace the Cicero CLI?"
-            alert.informativeText = "\(link.path) is there already\(linked.map { ", a link to \($0)" } ?? ""). Replace it with this Cicero’s CLI?"
+            alert.informativeText = "\(link.path) already exists\(linked.map { " (linked to \($0))" } ?? ""). Replace it with this copy of Cicero’s CLI?"
             alert.addButton(withTitle: "Replace")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -82,8 +82,8 @@ enum CommandLineTool {
             case .failed:
                 let alert = NSAlert()
                 alert.alertStyle = .warning
-                alert.messageText = "Couldn’t install the Cicero CLI"
-                alert.informativeText = "Cicero couldn’t put links to it in \(prefix.path)."
+                alert.messageText = "Couldn’t Install the Cicero CLI"
+                alert.informativeText = "Cicero couldn’t create links for it in \(prefix.path)."
                 NSApp.activate()
                 alert.runModal()
             }
@@ -95,10 +95,10 @@ enum CommandLineTool {
         let offers = tab.map { !$0.isOn && !TabCompletion.hasLine($0.file) } ?? false
         let place = tab.map { $0.file.deletingLastPathComponent().path == NSHomeDirectory() ? "the file .zshrc in your home folder" : $0.file.path } ?? ""
         let alert = NSAlert()
-        alert.messageText = "The Cicero CLI is installed"
+        alert.messageText = "The Cicero CLI Is Installed"
         alert.informativeText = "In Terminal, type cicero --help."
         if offers {
-            alert.informativeText += "\n\nTab completion is off in Terminal. To turn it on, Cicero adds a line to \(place). It works in new Terminal windows."
+            alert.informativeText += "\n\nTab completion is off in Terminal. To turn it on, Cicero will add a line to \(place). It will take effect in new Terminal windows."
             alert.addButton(withTitle: "Turn On Tab Completion")
             alert.addButton(withTitle: "Not Now")
         }
@@ -107,7 +107,7 @@ enum CommandLineTool {
         if await TabCompletion.turnOn(file) { return }
         let failed = NSAlert()
         failed.alertStyle = .warning
-        failed.messageText = "Couldn’t turn on Tab completion"
+        failed.messageText = "Couldn’t Turn On Tab Completion"
         failed.informativeText = "Add this line to \(place):\n\n\(TabCompletion.line)"
         NSApp.activate()
         failed.runModal()

@@ -10,7 +10,7 @@ extension AppModel {
 
     func activate(_ faces: [LibraryFace], title: String, confirmed: Bool = false) {
         let targets = faces.filter(\.canActivate)
-        guard !targets.isEmpty else { return showToast("Already on") }
+        guard !targets.isEmpty else { return showToast("Already active") }
         if !confirmed, let prompt = manyActivationPrompt(for: targets, title: title, temporarily: false) {
             return ask(overActivationSheets: true) { $0.manyActivationPrompt = prompt }
         }
@@ -32,7 +32,7 @@ extension AppModel {
 
     func activateTemporarily(_ faces: [LibraryFace], confirmed: Bool = false) {
         let targets = faces.filter(\.canActivateTemporarily)
-        guard !targets.isEmpty else { return showToast("Already on") }
+        guard !targets.isEmpty else { return showToast("Already active") }
         if !confirmed, let prompt = manyActivationPrompt(for: targets, title: "", temporarily: true) {
             return ask(overActivationSheets: true) { $0.manyActivationPrompt = prompt }
         }
@@ -217,7 +217,7 @@ extension AppModel {
                 face.state.isActive ? LibraryFace(face: face.face, state: face.app.map(FaceState.appOnly) ?? .inactive, copies: face.copies, app: face.app) : face
             }
             if !temporary.isEmpty { take(await model.engine.activateTemporarily(temporary, records: records)) }
-            let message = failure ?? "\(FontNames.describe(named) ?? "Fonts") back as before"
+            let message = failure ?? "\(FontNames.describe(named) ?? "Fonts") restored"
             model.finish(ActivationResult(records: records, succeeded: 0, failed: failed, message: message), operations: operations)
             model.appSets.allow(forApps)
         }
@@ -242,7 +242,7 @@ extension AppModel {
     }
 
     static func title(for families: [Family]) -> String {
-        families.count == 1 ? families[0].name : "\(families.count) families"
+        families.count == 1 ? families[0].name : "\(families.count.plain) families"
     }
 
     // MARK: Copies
@@ -267,8 +267,8 @@ extension AppModel {
         enqueue { model in
             var result = await model.engine.switchCopies(request.plan.switches, method: .inPlace, records: model.data.records)
             if result.failed.isEmpty {
-                result.message = "Using the copies from \(request.source)"
-                    + (request.plan.leavesOtherCopiesOn ? ". Another copy Cicero didn’t turn on is still on, so apps may use that one" : "")
+                result.message = "Using copies from \(request.source)"
+                    + (request.plan.leavesOtherCopiesOn ? ". Another copy is still active outside Cicero, so apps may use it instead" : "")
             }
             model.finish(result, operation: operation)
         }
@@ -444,14 +444,19 @@ extension AppModel {
     }
 
     static func putBackMessage(back: Int, problems: [String: ActivationEngine.PutBackProblem], unknown: Int = 0) -> String {
-        guard !problems.isEmpty || unknown > 0 else { return back == 1 ? "Put back from the Trash" : "Put back \(back) files from the Trash" }
+        guard !problems.isEmpty || unknown > 0 else { return back == 1 ? "Put back from the Trash" : "Put back \(back.plain) files from the Trash" }
         let total = back + problems.count + unknown
-        guard !problems.isEmpty else { return "Put back \(back) of \(total) files" }
+        guard !problems.isEmpty else { return "Put back \(back.plain) of \(total.plain) files" }
         let gone = problems.values.count { $0 == .notInTrash }, taken = problems.values.count { $0 == .pathTaken }
-        let reasons = [gone > 0 ? "\(gone) no longer in the Trash" : nil, taken > 0 ? "\(taken) where another file is now" : nil,
-                       problems.count - gone - taken > 0 ? "\(problems.count - gone - taken) couldn’t be moved" : nil].compactMap { $0 }
-        let lead = back == 0 ? (total == 1 ? "Couldn’t put the file back" : "Couldn’t put the files back")
-            : "Put back \(back) of \(total) files"
+        if back == 0 && total == 1 {
+            if gone > 0 { return "Couldn’t put the file back: it’s no longer in the Trash" }
+            if taken > 0 { return "Couldn’t put the file back: another file is already in that location" }
+            return "Couldn’t put the file back: it couldn’t be moved"
+        }
+        let reasons = [gone > 0 ? "\(gone.plain) no longer in the Trash" : nil, taken > 0 ? "\(taken.plain) blocked by an existing file" : nil,
+                       problems.count - gone - taken > 0 ? "\((problems.count - gone - taken).plain) couldn’t be moved" : nil].compactMap { $0 }
+        let lead = back == 0 ? "Couldn’t put the files back"
+            : "Put back \(back.plain) of \(total.plain) files"
         return lead + ": " + reasons.joined(separator: ", ")
     }
 
@@ -642,7 +647,9 @@ extension AppModel {
             if failed.isEmpty {
                 showToast(paths.count == 1 ? "Downloaded 1 font file" : "Downloaded \(paths.count.plain) font files")
             } else {
-                showToast("Couldn’t download \(failed.count.plain) of \(paths.count.plain) font files. Check the connection and try again")
+                showToast(paths.count == 1
+                    ? "Couldn’t download the font file. Check your connection and try again"
+                    : "Couldn’t download \(failed.count.plain) of \(paths.count.plain) font files. Check your connection and try again")
             }
             rescan()
         }
@@ -1252,12 +1259,12 @@ extension AppModel {
             await enqueued { model in
                 let result = await model.engine.registerAgain(model.data.records)
                 if !result.failed.isEmpty {
-                    model.showToast(result.failed.count == 1 ? "Couldn’t turn 1 file on again" : "Couldn’t turn \(result.failed.count) files on again")
+                    model.showToast(result.failed.count == 1 ? "Couldn’t reactivate 1 font" : "Couldn’t reactivate \(result.failed.count.plain) fonts")
                 }
             }
         }
         if failures > 0 {
-            showToast(failures == 1 ? "Couldn’t move 1 cache item to the Trash" : "Couldn’t move \(failures) cache items to the Trash")
+            showToast(failures == 1 ? "Couldn’t move 1 cache item to the Trash" : "Couldn’t move \(failures.plain) cache items to the Trash")
         } else if !trashed.isEmpty && !clearedSystem {
             showToast("Moved the \(trashed.listed()) font caches to the Trash")
         }
@@ -1331,7 +1338,7 @@ extension AppModel {
         var seen = Set<String>()
         let paths = (chosen ?? problems.flatMap(\.extraCopies)).filter { seen.insert($0).inserted }
         guard var plan = engine.spareCopiesTrashPlan(paths, families: Set(problems.compactMap(\.family)), in: library) else { return }
-        plan.title = plan.paths.count == 1 ? "1 Extra Copy" : "\(plan.paths.count) Extra Copies"
+        plan.title = plan.paths.count == 1 ? "1 Extra Copy" : "\(plan.paths.count.plain) Extra Copies"
         ask { [plan] in $0.trashPlan = plan }
     }
 }
@@ -1347,7 +1354,7 @@ private final class FontLibraryFolderCheck: NSObject, NSOpenSavePanelDelegate {
         let url = url.standardizedFileURL
         if let reason = refusal(url) {
             throw NSError(domain: "Cicero", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Cicero’s Library can’t go into “\(url.lastPathComponent)”.",
+                NSLocalizedDescriptionKey: "Cicero’s Library can’t be placed in “\(url.lastPathComponent)”.",
                 NSLocalizedRecoverySuggestionErrorKey: reason,
             ])
         }
@@ -1357,10 +1364,10 @@ private final class FontLibraryFolderCheck: NSObject, NSOpenSavePanelDelegate {
         switch service {
         case .iCloudDrive:
             alert.messageText = "“\(url.lastPathComponent)” Syncs With iCloud Drive"
-            alert.informativeText = "iCloud Drive can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and choose Keep Downloaded."
+            alert.informativeText = "iCloud Drive can remove fonts from this Mac to save space, which can stop them from working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and choose Keep Downloaded."
         case .other:
             alert.messageText = "“\(url.lastPathComponent)” Syncs With a Cloud Service"
-            alert.informativeText = "The service can remove fonts from this Mac to save space, and then they can stop working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and make it available offline."
+            alert.informativeText = "The service can remove fonts from this Mac to save space, which can stop them from working in your apps. To keep them on this Mac, right-click Cicero’s Library in the Finder and make it available offline."
         }
         alert.addButton(withTitle: "Choose Another Folder")
         alert.addButton(withTitle: "Use Anyway")

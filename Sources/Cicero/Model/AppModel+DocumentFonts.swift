@@ -46,7 +46,7 @@ extension AppModel {
             }.value
             switch read {
             case .success(let (fonts, _)) where fonts.isEmpty:
-                showToast("“\(url.lastPathComponent)” doesn’t name any fonts")
+                showToast("“\(url.lastPathComponent)” doesn’t list any fonts")
             case .success(let (fonts, embedded)):
                 ask { $0.documentFonts = DocumentFontsReport(url: url, fonts: fonts, embedded: embedded) }
             case .failure:
@@ -124,7 +124,7 @@ extension AppModel {
     }
 
     func showFonts(_ fonts: [DocumentFont], ofDocumentNamed name: String) {
-        guard !fonts.isEmpty else { return showToast("“\(name)” doesn’t name any fonts") }
+        guard !fonts.isEmpty else { return showToast("“\(name)” doesn’t list any fonts") }
         ask { $0.documentFonts = DocumentFontsReport(url: URL(fileURLWithPath: name), fonts: fonts) }
     }
 
