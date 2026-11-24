@@ -5,6 +5,9 @@ import SwiftUI
 extension Color {
     static let canvas = Color(nsColor: .textBackgroundColor)
     static let ink = Color(nsColor: .textColor)
+    static let selectionSeparator = Color(nsColor: NSColor(name: nil) { appearance in
+        .white.withAlphaComponent(appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 0.12 : 0.5)
+    })
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
     })

@@ -88,7 +88,7 @@ private struct SidebarContent: View {
                 let rows = section == .characterSets ? [] : model.rows(for: section)
                 Section(isExpanded: expansion(section)) {
                     if section == .classifications && model.asksAboutGuessing && !editing {
-                        OrganizeRow()
+                        OrganizeRow().padding(.leading, -Self.chevronRoom)
                     }
                     if section == .characterSets {
                         characterSetGroups(groups)
@@ -98,6 +98,7 @@ private struct SidebarContent: View {
                     if editing && rows.isEmpty && groups.isEmpty {
                         Text("Nothing here yet")
                             .foregroundStyle(.tertiary)
+                            .padding(.leading, -Self.chevronRoom)
                             .selectionDisabled()
                     }
                 } header: {
@@ -109,7 +110,12 @@ private struct SidebarContent: View {
 
     private func movableRows(_ rows: [SidebarRow], in list: String, section: SidebarSection?) -> some View {
         let shownRows = shown(rows)
-        return ForEach(shownRows) { row($0, section: section) }
+        let items = shownRows.map(\.item)
+        let index = Dictionary(shownRows.enumerated().map { ($1.key, $0) }, uniquingKeysWith: { first, _ in first })
+        return ForEach(shownRows) { shownRow in
+            let i = index[shownRow.key] ?? 0
+            row(shownRow, section: section, previous: i > 0 ? items[i - 1] : nil, next: i + 1 < items.count ? items[i + 1] : nil)
+        }
             .onMove { source, destination in
                 var transaction = Transaction(animation: nil)
                 transaction.disablesAnimations = true
@@ -261,8 +267,11 @@ private struct SidebarContent: View {
 
     // MARK: Rows
 
+    // The list indents every row as far as a disclosure chevron, which only coverage groups have.
+    static let chevronRoom: CGFloat = 14
+
     @ViewBuilder
-    private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
+    private func row(_ row: SidebarRow, section: SidebarSection?, previous: SidebarItem?, next: SidebarItem?) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
         let content = HStack(spacing: 6) {
             if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
@@ -273,7 +282,8 @@ private struct SidebarContent: View {
             }
         }
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
-        .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
+        .padding(.leading, section == .characterSets ? 0 : -Self.chevronRoom)
+        .listRowBackground(SidebarRowBackground(item: row.item, previous: previous, next: next, highlight: highlight))
         .tag(row.item)
         .contextMenu { SidebarRowMenu(row: row, model: model, highlight: highlight) }
         // Asked for as the list starts dragging the row, which tells which rows a drag has.
@@ -567,20 +577,11 @@ private struct SidebarRenameField: View {
     let row: SidebarRow
     let highlight: SidebarHighlight
     @State private var name = ""
-    @FocusState private var isFocused: Bool
 
     var body: some View {
-        TextField(row.title, text: $name)
-            .textFieldStyle(.plain)
-            .labelsHidden()
-            .focused($isFocused)
-            .onSubmit(commit)
-            .onExitCommand { highlight.renaming = nil }
-            .onChange(of: isFocused) { if !isFocused { commit() } }
-            .task {
-                name = row.title
-                isFocused = true
-            }
+        RenameTextField(text: $name, onCommit: commit, onCancel: { highlight.renaming = nil })
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onAppear { name = row.title }
     }
 
     private func commit() {
@@ -595,6 +596,77 @@ private struct SidebarRenameField: View {
     }
 }
 
+private struct RenameTextField: NSViewRepresentable {
+    @Binding var text: String
+    let onCommit: () -> Void
+    let onCancel: () -> Void
+
+    func makeNSView(context: Context) -> FittingTextField {
+        let field = FittingTextField(string: text)
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .exterior
+        field.font = .systemFont(ofSize: NSFont.systemFontSize)
+        field.lineBreakMode = .byClipping
+        field.cell?.isScrollable = true
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ field: FittingTextField, context: Context) {
+        context.coordinator.parent = self
+        if field.currentEditor() == nil, field.stringValue != text { field.stringValue = text }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView field: FittingTextField, context: Context) -> CGSize? {
+        let size = field.fittingSize(for: text)
+        return CGSize(width: min(size.width, proposal.width ?? size.width), height: size.height)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: RenameTextField
+
+        init(parent: RenameTextField) { self.parent = parent }
+
+        func controlTextDidChange(_ note: Notification) {
+            guard let field = note.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            if selector == #selector(NSResponder.cancelOperation(_:)) {
+                parent.onCancel()
+                return true
+            }
+            return false
+        }
+
+        func controlTextDidEndEditing(_ note: Notification) {
+            parent.onCommit()
+        }
+    }
+}
+
+private final class FittingTextField: NSTextField {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window else { return }
+            window.makeFirstResponder(self)
+        }
+    }
+
+    func fittingSize(for text: String) -> CGSize {
+        let measure = NSTextFieldCell(textCell: text.isEmpty ? " " : text)
+        measure.font = font
+        let size = measure.cellSize
+        return CGSize(width: ceil(size.width) + 6, height: ceil(size.height))
+    }
+}
+
 private extension SidebarItem {
     var isRenamable: Bool {
         switch self {
@@ -606,16 +678,36 @@ private extension SidebarItem {
 
 private struct SidebarRowBackground: View {
     let item: SidebarItem
+    let previous: SidebarItem?
+    let next: SidebarItem?
     let highlight: SidebarHighlight
 
     var body: some View {
         let isTarget = highlight.dropTarget == item
         let isSelected = highlight.selected.contains(item)
-        if isTarget || isSelected {
+        if isTarget {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isTarget ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary))
+                .fill(Color.accentColor)
+                .padding(.horizontal, 10)
+        } else if isSelected {
+            let joinsAbove = joins(previous)
+            let joinsBelow = joins(next)
+            UnevenRoundedRectangle(topLeadingRadius: joinsAbove ? 0 : 8, bottomLeadingRadius: joinsBelow ? 0 : 8,
+                                   bottomTrailingRadius: joinsBelow ? 0 : 8, topTrailingRadius: joinsAbove ? 0 : 8,
+                                   style: .continuous)
+                .fill(.quaternary)
+                .overlay(alignment: .top) {
+                    if joinsAbove {
+                        Rectangle().fill(Color.selectionSeparator).frame(height: 1).padding(.horizontal, 10)
+                    }
+                }
                 .padding(.horizontal, 10)
         }
+    }
+
+    private func joins(_ neighbour: SidebarItem?) -> Bool {
+        guard let neighbour else { return false }
+        return highlight.selected.contains(neighbour) && highlight.dropTarget != neighbour
     }
 }
 

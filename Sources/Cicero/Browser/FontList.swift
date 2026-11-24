@@ -251,7 +251,9 @@ struct FontList: View {
                     // The rows themselves, not Array(rows.enumerated()), which copied every row at each update.
                     ForEach(rows) { row in
                         FontListRow(row: row, columns: columns, widths: widths, isStriped: !row.position.isMultiple(of: 2),
-                                    model: model, moving: moved)
+                                    model: model, moving: moved,
+                                    previous: row.position > 0 ? rows[row.position - 1].id : nil,
+                                    next: row.position + 1 < rows.count ? rows[row.position + 1].id : nil)
                             .modifier(FamilyItem(family: row.family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                             .onAppear { ReadAhead.around(row.family, in: families) }
                     }
@@ -697,9 +699,11 @@ private struct FontListRow: View {
     var isSelected: Bool? = nil
     let model: AppModel
     let moving: MovingColumn?
+    var previous: FontRow.ID? = nil
+    var next: FontRow.ID? = nil
 
     static let spacing: CGFloat = 12
-    static let inset: CGFloat = 12
+    static let inset = ListRowBackground.contentInset
 
     var body: some View {
         let selected = isSelected ?? model.selectedIDs.contains(row.id)
@@ -715,11 +719,9 @@ private struct FontListRow: View {
         .padding(.horizontal, Self.inset)
         .frame(height: 30)
         .background {
-            if selected {
-                RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.25)).padding(.horizontal, 4)
-            } else if isStriped {
-                Rectangle().fill(.quaternary.opacity(0.35))
-            }
+            ListRowBackground(isSelected: selected, isStriped: isStriped,
+                              joinsAbove: selected && (previous.map(model.selectedIDs.contains) ?? false),
+                              joinsBelow: selected && (next.map(model.selectedIDs.contains) ?? false))
         }
     }
 

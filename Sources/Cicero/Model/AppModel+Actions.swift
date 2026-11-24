@@ -987,7 +987,7 @@ extension AppModel {
         let item = selection ?? .all
         if selectedItems.count > 1 {
             return rows(inList: sidebarList(of: item))
-                .filter { selectedItems.contains($0.item) && $0.item != .problems }
+                .filter { selectedItems.contains($0.item) }
                 .map(\.title).listed()
         }
         if let row = libraryRows.first(where: { $0.item == item }) { return row.title }
@@ -1068,9 +1068,8 @@ extension AppModel {
         let items = sidebarSelection(items, from: selectedItems)
         guard let any = items.first else { selection = nil; return }
         let list = sidebarList(of: any)
-        let candidates = items.count > 1 ? items.subtracting([.problems]) : items
-        let primary = selection.flatMap { candidates.contains($0) ? $0 : nil }
-            ?? rows(inList: list).first { candidates.contains($0.item) }?.item ?? candidates.first
+        let primary = selection.flatMap { items.contains($0) ? $0 : nil }
+            ?? rows(inList: list).first { items.contains($0.item) }?.item ?? items.first
         if selection != primary { selection = primary }
         if selectedItems != items {
             selectedItems = items
@@ -1084,6 +1083,7 @@ extension AppModel {
         let added = items.subtracting(current)
         let anchor = added.count == 1 ? added.first! : selection.flatMap { items.contains($0) ? $0 : nil } ?? items.first!
         let list = sidebarList(of: anchor)
+        guard list != "library" else { return [anchor] }
         return items.filter { sidebarList(of: $0) == list }
     }
 
@@ -1101,15 +1101,13 @@ extension AppModel {
         case .tag: SidebarSection.tags.rawValue
         case .foundry: SidebarSection.foundries.rawValue
         case .classification: SidebarSection.classifications.rawValue
-        case .characterSet(let id):
-            "charsetgroup.\(id.hasPrefix("custom.") ? CharacterSetDefinition.customGroupID : characterSetCatalog.definition(id)?.groupID ?? "")"
+        case .characterSet: SidebarSection.characterSets.rawValue
         }
     }
 
     private func rows(inList list: String) -> [SidebarRow] {
         if list == "library" { return libraryRows }
-        if let section = SidebarSection(rawValue: list) { return rows(for: section) }
-        return characterSetGroups.first { "charsetgroup.\($0.id)" == list }?.rows ?? []
+        return SidebarSection(rawValue: list).map(rows(for:)) ?? []
     }
 
     var characterSetGroups: [(id: String, title: String, rows: [SidebarRow])] {

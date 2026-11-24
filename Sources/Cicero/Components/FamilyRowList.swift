@@ -26,17 +26,20 @@ struct FamilyRowList<Row: View>: View {
                     ForEach(sections) { section in
                         Section {
                             if section.families.isEmpty, let empty = section.emptyText {
-                                Text(empty).foregroundStyle(.tertiary).padding(.horizontal, 12).frame(height: 30)
+                                Text(empty).foregroundStyle(.tertiary).padding(.horizontal, ListRowBackground.contentInset).frame(height: 30)
                             }
-                            ForEach(Array(section.families.enumerated()), id: \.element.id) { index, family in
-                                item(family, isStriped: !index.isMultiple(of: 2), ids: ids)
+                            let families = section.families
+                            ForEach(Array(families.enumerated()), id: \.element.id) { index, family in
+                                item(family, isStriped: !index.isMultiple(of: 2), ids: ids,
+                                     previous: index > 0 ? families[index - 1].id : nil,
+                                     next: index + 1 < families.count ? families[index + 1].id : nil)
                             }
                         } header: {
                             if let title = section.title {
                                 Text(title)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 12)
+                                    .padding(.horizontal, ListRowBackground.contentInset)
                                     .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
                             }
                         }
@@ -71,17 +74,15 @@ struct FamilyRowList<Row: View>: View {
         openWindow(id: WindowID.main)
     }
 
-    private func item(_ family: Family, isStriped: Bool, ids: [String]) -> some View {
+    private func item(_ family: Family, isStriped: Bool, ids: [String], previous: String?, next: String?) -> some View {
         let isSelected = selection.contains(family.id)
         return row(family)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, ListRowBackground.contentInset)
             .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
             .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.25)).padding(.horizontal, 4)
-                } else if isStriped {
-                    Rectangle().fill(.quaternary.opacity(0.35))
-                }
+                ListRowBackground(isSelected: isSelected, isStriped: isStriped,
+                                  joinsAbove: isSelected && (previous.map(selection.contains) ?? false),
+                                  joinsBelow: isSelected && (next.map(selection.contains) ?? false))
             }
             .id(family.id)
             .contentShape(.rect)
@@ -100,5 +101,31 @@ struct FamilyRowList<Row: View>: View {
 
     private func targets(for id: String, in ids: [String]) -> [String] {
         selection.contains(id) && selection.count > 1 ? ids.filter(selection.contains) : [id]
+    }
+}
+
+struct ListRowBackground: View {
+    let isSelected: Bool
+    let isStriped: Bool
+    let joinsAbove: Bool
+    let joinsBelow: Bool
+
+    static let inset: CGFloat = 10
+    static let contentInset: CGFloat = 20
+
+    var body: some View {
+        if isSelected {
+            UnevenRoundedRectangle(topLeadingRadius: joinsAbove ? 0 : 6, bottomLeadingRadius: joinsBelow ? 0 : 6,
+                                   bottomTrailingRadius: joinsBelow ? 0 : 6, topTrailingRadius: joinsAbove ? 0 : 6)
+                .fill(Color.accentColor.opacity(0.25))
+                .overlay(alignment: .top) {
+                    if joinsAbove {
+                        Rectangle().fill(Color.selectionSeparator).frame(height: 1).padding(.horizontal, Self.contentInset - Self.inset)
+                    }
+                }
+                .padding(.horizontal, Self.inset)
+        } else if isStriped {
+            RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.35)).padding(.horizontal, Self.inset)
+        }
     }
 }
