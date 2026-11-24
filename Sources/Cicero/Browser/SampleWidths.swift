@@ -9,7 +9,7 @@ final class SampleWidths {
 
     private(set) var listRatio: CGFloat?
 
-    @ObservationIgnored private var measuredInputs: Int?
+    @ObservationIgnored private var lists: [List] = []
     @ObservationIgnored private var saved: [String: CGFloat]?
     @ObservationIgnored private var saving: Task<Void, Never>?
     @ObservationIgnored private var clears = 0
@@ -18,10 +18,12 @@ final class SampleWidths {
     static var savedURL: URL { Saved.url }
     #endif
     private static let savedKey = "grid.sampleWidthRatio"
+    private static let savedTextKey = "grid.sampleWidthText"
     nonisolated private static let ratios = Mutex(Ratios())
 
     nonisolated private struct Ratios {
         static let texts = 4
+        static let entries = 4000
         var byText: [String: [String: CGFloat]] = [:]
         var recent: [String] = []
 
@@ -30,13 +32,24 @@ final class SampleWidths {
         mutating func add(_ ratios: [String: CGFloat], text: String) {
             recent.removeAll { $0 == text }
             recent.append(text)
+            if (byText[text]?.count ?? 0) + ratios.count > Self.entries { byText[text] = [:] }
             byText[text, default: [:]].merge(ratios) { first, _ in first }
             while recent.count > Self.texts { byText[recent.removeFirst()] = nil }
         }
     }
 
+    private struct List {
+        var inputs: Int?
+        var text: String
+        var ratio: CGFloat
+    }
+
     private init() {
-        listRatio = (UserDefaults.standard.object(forKey: Self.savedKey) as? Double).map { CGFloat($0) }
+        let defaults = UserDefaults.standard
+        listRatio = (defaults.object(forKey: Self.savedKey) as? Double).map { CGFloat($0) }
+        if let listRatio, let text = defaults.string(forKey: Self.savedTextKey) {
+            lists = [List(text: text, ratio: listRatio)]
+        }
     }
 
     nonisolated struct Sample: Sendable {
@@ -63,7 +76,19 @@ final class SampleWidths {
         }
     }
 
-    func hasMeasured(_ inputs: Int) -> Bool { inputs == measuredInputs }
+    func ratio(for inputs: Int) -> CGFloat? {
+        lists.last { $0.inputs == inputs }?.ratio
+    }
+
+    func ratio(forText text: String) -> CGFloat? {
+        lists.last { $0.text == text }?.ratio
+    }
+
+    private func remember(_ ratio: CGFloat, inputs: Int, text: String) {
+        lists.removeAll { $0.inputs == inputs || $0.text == text }
+        lists.append(List(inputs: inputs, text: text, ratio: ratio))
+        if lists.count > 8 { lists.removeFirst() }
+    }
 
     nonisolated static let mostMeasured = 2000
 
@@ -77,8 +102,8 @@ final class SampleWidths {
         }
     }
 
-    func measure(_ inputs: Int, samples: [Sample], scriptSamples: ScriptSamples) async -> CGFloat? {
-        guard inputs != measuredInputs else { return listRatio }
+    func measure(_ inputs: Int, text: String, samples: [Sample], scriptSamples: ScriptSamples) async -> CGFloat? {
+        if let ratio = ratio(for: inputs) { return ratio }
         let clearsBefore = clears
         if saved == nil {
             let read = await Saved.read() ?? [:]
@@ -86,7 +111,7 @@ final class SampleWidths {
         }
         let known = saved ?? [:]
         guard let measured = await Self.listRatio(samples, known: known, scriptSamples: scriptSamples), !Task.isCancelled,
-              clears == clearsBefore else { return listRatio }
+              clears == clearsBefore else { return ratio(forText: text) ?? listRatio }
         #if CICERO_MEASURE
         Measurements.record("sampleWidths", ms: 0, detail: "\(measured.new) measured, \(measured.used.count) saved")
         measuredLog.append((measured.new, measured.used.count))
@@ -100,17 +125,18 @@ final class SampleWidths {
                 save(kept)
             }
         }
-        guard let ratio = measured.ratio else { return listRatio }
-        measuredInputs = inputs
+        guard let ratio = measured.ratio else { return ratio(forText: text) ?? listRatio }
+        remember(ratio, inputs: inputs, text: text)
         if listRatio != ratio { listRatio = ratio }
         UserDefaults.standard.set(Double(ratio), forKey: Self.savedKey)
+        UserDefaults.standard.set(text, forKey: Self.savedTextKey)
         return ratio
     }
 
     func clearSaved() {
         clears += 1
         saved = [:]
-        measuredInputs = nil
+        for index in lists.indices { lists[index].inputs = nil }
         save([:])
     }
 

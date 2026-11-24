@@ -106,6 +106,7 @@ private struct LanguageList: View {
         .topBar {
             TextField("Search", text: $query, prompt: Text("Search languages"))
                 .textFieldStyle(.roundedBorder)
+                .noAutoFill()
                 .padding([.horizontal, .top], 10)
                 .padding(.bottom, 6)
         }

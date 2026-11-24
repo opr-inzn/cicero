@@ -44,6 +44,7 @@ struct BrowserView: View {
         }
         .overlay(alignment: .bottomTrailing) { ScanCapsule() }
         .background { PagePreloader() }
+        .background { SampleWidthsAhead() }
         .navigationTitle(model.selectionTitle)
         .navigationSubtitle(subtitle(families))
     }
@@ -75,6 +76,26 @@ private struct PagePreloader: View {
             .onChange(of: model.selectedIDs, initial: true) {
                 guard model.selectedIDs.count == 1, let id = model.selectedIDs.first, let family = model.family(id) else { return }
                 model.pageContents.prepare(model.previewStyle(of: family).face.face)
+            }
+    }
+}
+
+private struct SampleWidthsAhead: View {
+    @Environment(AppModel.self) private var model
+    @Environment(PreviewSettings.self) private var preview
+    @AppStorage("browser.mode") private var mode: BrowserMode = .grid
+
+    var body: some View {
+        let inputs = FontGrid.sampleInputs(model: model, preview: preview)
+        Color.clear
+            .task(id: mode == .grid ? nil : inputs, priority: .utility) {
+                guard mode != .grid, SampleWidths.shared.ratio(for: inputs) == nil else { return }
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                let text = FontGrid.sampleText(preview)
+                let samples = await FontGrid.samples(model: model, text: text, priority: .utility)
+                guard !Task.isCancelled else { return }
+                _ = await SampleWidths.shared.measure(inputs, text: text, samples: samples, scriptSamples: model.scriptSamples)
             }
     }
 }

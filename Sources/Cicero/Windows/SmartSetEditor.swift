@@ -325,6 +325,7 @@ private struct LanguagePicker: View {
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             VStack(spacing: 8) {
                 TextField("Search", text: $search, prompt: Text("Search"))
+                    .noAutoFill()
                     .textFieldStyle(.roundedBorder)
                 List(languages, selection: Binding<String?>(
                     get: { selection },

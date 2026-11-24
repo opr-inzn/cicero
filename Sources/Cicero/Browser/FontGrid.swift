@@ -74,7 +74,8 @@ struct FontGrid: View {
     }
 
     var body: some View {
-        let shown = shown ?? Shown(text: sampleText, ratio: SampleWidths.shared.listRatio)
+        let known = shown ?? SampleWidths.shared.ratio(forText: sampleText).map { Shown(text: sampleText, ratio: $0) }
+        let shown = known ?? Shown(text: sampleText, ratio: SampleWidths.shared.listRatio)
         let measure = Measure.of(shown.text, size: preview.size)
         let ratio = shown.ratio
         let (count, tile, restingTile) = layout(minimum: measure.minimumWidth(size: preview.size, ratio: ratio))
@@ -102,6 +103,7 @@ struct FontGrid: View {
                     }
                 }
                 .scrollTargetLayout()
+                .opacity(known == nil ? 0 : 1)
                 .frame(width: rowWidth)
                 // As wide as the scroll view leaves, never the tiles': measured from the tiles, a grid as wide as before the Info panel opened kept its columns and pushed the window's panes aside.
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
@@ -114,6 +116,7 @@ struct FontGrid: View {
                     Tile(family: pinned, sampleText: shown.text, sampleHeight: measure.height(size: preview.size), baselineBelowCentre: measure.baselineBelowCentre, fit: fit, model: model)
                         .modifier(FamilyItem(family: pinned, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                         .frame(width: rowWidth)
+                        .opacity(known == nil ? 0 : 1)
                 }
             })
             .visibleHeight($visibleHeight)
@@ -131,7 +134,11 @@ struct FontGrid: View {
         }
     }
 
-    private var sampleInputs: Int {
+    private var sampleInputs: Int { Self.sampleInputs(model: model, preview: preview) }
+
+    private var sampleText: String { Self.sampleText(preview) }
+
+    static func sampleInputs(model: AppModel, preview: PreviewSettings) -> Int {
         var hasher = Hasher()
         hasher.combine(model.library.fingerprint)
         hasher.combine(model.data.showSystemFonts)
@@ -140,39 +147,43 @@ struct FontGrid: View {
         return hasher.finalize()
     }
 
-    private var sampleText: String {
+    static func sampleText(_ preview: PreviewSettings) -> String {
         preview.sampleText.isEmpty ? PreviewSettings.tileSample : preview.sampleText
     }
 
-    private func measureSamples(_ inputs: Int) async {
-        let text = sampleText
-        if SampleWidths.shared.hasMeasured(inputs) {
-            shown = Shown(text: text, ratio: SampleWidths.shared.listRatio)
-            return
-        }
-        if !preview.sampleText.isEmpty {
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-        }
+    static func samples(model: AppModel, text: String, priority: TaskPriority) async -> [SampleWidths.Sample] {
         let families = model.library.families, data = model.data
         let axes = model.familyAxes.mapValues { (face: $0.face, values: $0.values) }
-        let samples = await Task.detached(priority: .userInitiated) {
+        return await Task.detached(priority: priority) {
             SampleWidths.measured(of: families.filter(data.lists)).map { family in
                 let (style, weight) = family.previewStyle(for: SearchQuery(""))
                 let variations = axes[family.id].flatMap { $0.face == style.id ? $0.values : nil } ?? [:]
                 return SampleWidths.Sample(face: style.face, text: text, weight: weight, variations: variations, features: [])
             }
         }.value
+    }
+
+    private func measureSamples(_ inputs: Int) async {
+        let text = sampleText
+        if let ratio = SampleWidths.shared.ratio(for: inputs) {
+            shown = Shown(text: text, ratio: ratio)
+            return
+        }
+        if let shown, shown.text != text {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+        }
+        let samples = await Self.samples(model: model, text: text, priority: .userInitiated)
         guard !Task.isCancelled else { return }
         let meanwhile = Task {
             try? await Task.sleep(for: .milliseconds(300))
-            if !Task.isCancelled { shown = Shown(text: text, ratio: SampleWidths.shared.listRatio) }
+            if !Task.isCancelled { shown = Shown(text: text, ratio: SampleWidths.shared.ratio(forText: text) ?? SampleWidths.shared.listRatio) }
         }
         defer { meanwhile.cancel() }
         // A `Task` isn't cancelled with the one that made it: left to run, it would show this text after newer text.
         let scriptSamples = model.scriptSamples
         let ratio = await withTaskCancellationHandler {
-            await SampleWidths.shared.measure(inputs, samples: samples, scriptSamples: scriptSamples)
+            await SampleWidths.shared.measure(inputs, text: text, samples: samples, scriptSamples: scriptSamples)
         } onCancel: {
             meanwhile.cancel()
         }

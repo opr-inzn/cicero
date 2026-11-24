@@ -1020,6 +1020,7 @@ private struct PreviewOptions: View {
             Section {
                 TextField("Preview Text", text: text, prompt: Text(own?.placeholder ?? "Preview Text"))
                     .labelsHidden()
+                    .noAutoFill()
                 HStack {
                     Menu("Presets\u{200A}") {
                         ForEach(preview.savedPresets, id: \.self) { sample in
@@ -1086,6 +1087,11 @@ private struct PreviewOptions: View {
 }
 
 extension View {
+    // Unmarked, a field is one AppKit's AutoFill guesses could take a name or an address: on its first use after launch, AutoFill's empty suggestions window flashed over the rest of the field's popover.
+    func noAutoFill() -> some View {
+        textContentType(NSTextContentType(rawValue: "none"))
+    }
+
     @ViewBuilder func popoverFormMargins() -> some View {
         if #available(macOS 26, *) {
             self

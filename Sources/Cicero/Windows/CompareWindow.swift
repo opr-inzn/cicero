@@ -140,6 +140,7 @@ private struct AddFamilies: View {
         VStack(spacing: 0) {
             TextField("Search", text: $text, prompt: Text("Search"))
                 .textFieldStyle(.roundedBorder)
+                .noAutoFill()
                 .focused($isFocused)
                 // The field can keep an action from before the last search: `current` is read when it's pressed.
                 .onSubmit { if let current { toggle(current) } }
