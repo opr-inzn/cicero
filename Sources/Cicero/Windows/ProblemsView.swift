@@ -4,6 +4,7 @@ import SwiftUI
 struct ProblemsView: View {
     @Environment(AppModel.self) private var model
     @State private var width: CGFloat = 0
+    @State private var marks: [String: Set<String>] = [:]
 
     var body: some View {
         let groups = ProblemKind.allCases.compactMap { kind -> (kind: ProblemKind, problems: [Problem])? in
@@ -23,7 +24,9 @@ struct ProblemsView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 32) {
                         ForEach(groups, id: \.kind) { group in
-                            if group.kind.isMinor {
+                            if group.kind == .duplicates {
+                                DuplicatesSection(problems: group.problems, marks: $marks)
+                            } else if group.kind.isMinor {
                                 MinorProblemGroup(kind: group.kind, problems: group.problems)
                             } else {
                                 ProblemGroup(kind: group.kind, problems: group.problems)
@@ -36,6 +39,11 @@ struct ProblemsView: View {
                     .padding(.leading, max(0, (width - 808) / 2))
                     // The scroll view is only as wide as its content; fill the window so it scrolls anywhere and its bar sits at the edge.
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if let duplicates = groups.first(where: { $0.kind == .duplicates }) {
+                        DuplicatesBar(problems: duplicates.problems, marks: $marks)
+                    }
                 }
             }
         }
@@ -83,6 +91,147 @@ private struct ProblemGroup: View {
             Text(kind.explanation).foregroundStyle(.secondary)
             ForEach(problems) { ProblemCard(problem: $0) }
         }
+    }
+}
+
+private extension Problem {
+    func marked(_ marks: [String: Set<String>]) -> Set<String> {
+        guard let chosen = marks[id] else { return Set(extraCopies) }
+        let valid = chosen.intersection(trashable)
+        return copyGroups.contains { $0.allSatisfy(valid.contains) } ? Set(extraCopies) : valid
+    }
+}
+
+private enum DuplicateColumn {
+    static let folder: CGFloat = 180
+    static let version: CGFloat = 64
+    static let modified: CGFloat = 96
+}
+
+private struct DuplicatesSection: View {
+    let problems: [Problem]
+    @Binding var marks: [String: Set<String>]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(ProblemKind.duplicates.title).font(.title2.bold())
+            Text(ProblemKind.duplicates.explanation).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 12) {
+                    Text("Name").frame(maxWidth: .infinity, alignment: .leading)
+                    Text("Folder").frame(width: DuplicateColumn.folder, alignment: .leading)
+                    Text("Version").frame(width: DuplicateColumn.version, alignment: .leading)
+                    Text("Modified").frame(width: DuplicateColumn.modified, alignment: .leading)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 5)
+                Divider()
+                ForEach(problems) { problem in
+                    let marked = problem.marked(marks)
+                    HStack(spacing: 6) {
+                        Text(problem.title).fontWeight(.semibold)
+                        Text(problem.files.count == 1 ? "1 file" : "\(problem.files.count.plain) files").foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.top, 14)
+                    .padding(.bottom, 5)
+                    ForEach(Array(problem.files.enumerated()), id: \.element.path) { index, file in
+                        DuplicateRow(file: file, problem: problem, marked: marked, isStriped: !index.isMultiple(of: 2), marks: $marks)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct DuplicateRow: View {
+    @Environment(AppModel.self) private var model
+    let file: ProblemFile
+    let problem: Problem
+    let marked: Set<String>
+    let isStriped: Bool
+    @Binding var marks: [String: Set<String>]
+
+    var body: some View {
+        let isMarked = marked.contains(file.path)
+        let blocker = isMarked ? nil : blocker
+        HStack(spacing: 12) {
+            Toggle(isOn: Binding(get: { isMarked }, set: { toggle($0) })) {
+                Text((file.path as NSString).lastPathComponent)
+                    .strikethrough(isMarked)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .toggleStyle(.checkbox)
+            .disabled(blocker != nil)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(((file.path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(width: DuplicateColumn.folder, alignment: .leading)
+            Text(file.version.map(FontFace.displayVersion) ?? "")
+                .frame(width: DuplicateColumn.version, alignment: .leading)
+            Text(file.modified?.formatted(date: .abbreviated, time: .omitted) ?? "")
+                .frame(width: DuplicateColumn.modified, alignment: .leading)
+        }
+        .foregroundStyle(isMarked ? .secondary : .primary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(isStriped ? Color.primary.opacity(0.035) : .clear, in: .rect(cornerRadius: 5))
+        .help(blocker ?? "")
+        .contextMenu {
+            Button("Show in Finder") { model.apply(.reveal([file.path]), family: problem.family) }
+        }
+    }
+
+    private var blocker: String? {
+        problem.trashable.contains(file.path) ? nil : "This file also holds a font that has no other copy."
+    }
+
+    private func toggle(_ isOn: Bool) {
+        var set = marked
+        guard isOn else {
+            set.remove(file.path)
+            marks[problem.id] = set
+            return
+        }
+        set.insert(file.path)
+        for group in problem.copyGroups where group.contains(file.path) && group.allSatisfy(set.contains) {
+            if let other = group.first(where: { $0 != file.path }) { set.remove(other) }
+        }
+        marks[problem.id] = set
+    }
+}
+
+private struct DuplicatesBar: View {
+    @Environment(AppModel.self) private var model
+    let problems: [Problem]
+    @Binding var marks: [String: Set<String>]
+
+    var body: some View {
+        let paths = problems.flatMap { $0.marked(marks).sorted() }
+        HStack(spacing: 12) {
+            Text(paths.isEmpty ? "No duplicates selected."
+                : paths.count == 1 ? "1 duplicate file will go to the Trash." : "\(paths.count.plain) duplicate files will go to the Trash.")
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if !paths.isEmpty {
+                Button("Deselect All") { marks = Dictionary(uniqueKeysWithValues: problems.map { ($0.id, []) }) }
+            } else if problems.contains(where: { !$0.extraCopies.isEmpty }) {
+                Button("Select Extra Copies") { marks = [:] }
+            }
+            Button(paths.count == 1 ? "Move 1 File to Trash" : "Move \(paths.count.plain) Files to Trash") {
+                model.trashExtraCopies(of: problems.filter { !$0.marked(marks).isEmpty }, paths: paths)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(paths.isEmpty)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 }
 

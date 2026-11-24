@@ -1327,9 +1327,9 @@ extension AppModel {
         }
     }
 
-    func trashExtraCopies(of problems: [Problem]) {
+    func trashExtraCopies(of problems: [Problem], paths chosen: [String]? = nil) {
         var seen = Set<String>()
-        let paths = problems.flatMap(\.extraCopies).filter { seen.insert($0).inserted }
+        let paths = (chosen ?? problems.flatMap(\.extraCopies)).filter { seen.insert($0).inserted }
         guard var plan = engine.spareCopiesTrashPlan(paths, families: Set(problems.compactMap(\.family)), in: library) else { return }
         plan.title = plan.paths.count == 1 ? "1 Extra Copy" : "\(plan.paths.count) Extra Copies"
         ask { [plan] in $0.trashPlan = plan }

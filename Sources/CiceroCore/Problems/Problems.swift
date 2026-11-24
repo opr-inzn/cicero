@@ -32,7 +32,7 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .external:
             "These fonts are used from a disk that can be unplugged, or a server. They turn off while it’s gone."
         case .duplicates:
-            "The same font file is more than once in the same folder. Files that only share a font’s name aren’t listed. Copies in different folders, like each client’s, aren’t listed: choose between them with Use Copy From."
+            "The same font file is more than once in the same folder. Selected files go to the Trash. Each font keeps at least one file."
         }
     }
 }
@@ -103,10 +103,12 @@ public struct Problem: Identifiable, Hashable, Sendable {
     public var folderFixes: [String: [ProblemFix]]
     public var newestFolder: String?
     public var extraCopies: [String]
+    public var copyGroups: [[String]]
+    public var trashable: Set<String>
 
     public init(id: String, kind: ProblemKind, title: String, family: String? = nil, summary: String, files: [ProblemFile], fixes: [ProblemFix],
                 fileFixes: [String: [ProblemFix]], folderFixes: [String: [ProblemFix]] = [:], newestFolder: String? = nil,
-                extraCopies: [String] = []) {
+                extraCopies: [String] = [], copyGroups: [[String]] = [], trashable: Set<String> = []) {
         self.id = id
         self.kind = kind
         self.title = title
@@ -118,6 +120,8 @@ public struct Problem: Identifiable, Hashable, Sendable {
         self.folderFixes = folderFixes
         self.newestFolder = newestFolder
         self.extraCopies = extraCopies
+        self.copyGroups = copyGroups
+        self.trashable = trashable
     }
 
     public var folders: [ProblemFolder] {
@@ -503,6 +507,7 @@ public enum ProblemDetector {
             for (copy, spot) in zip(copyPaths, placed) { place[copy.path] = spot.key }
 
             var paths: [String] = []
+            var groups: [[String]] = []
             var keep = Set<String>()
             var styles = 0
             for face in family.faces {
@@ -517,10 +522,13 @@ public enum ProblemDetector {
                 styles += 1
                 for copies in spares {
                     for path in copies where !paths.contains(path) { paths.append(path) }
+                    if !groups.contains(copies) { groups.append(copies) }
                     for path in copies { _ = context.version(of: path) }
                     let kept = copies.first { origins.contains($0) } ?? copies.max { a, b in
                         let (va, vb) = (context.versionNumber(of: a), context.versionNumber(of: b))
                         if va != vb { return va.lexicographicallyPrecedes(vb) }
+                        let (ca, cb) = (looksLikeACopy(a), looksLikeACopy(b))
+                        if ca != cb { return ca }
                         return (Context.modified(a) ?? .distantPast) < (Context.modified(b) ?? .distantPast)
                     }!
                     keep.insert(kept)
@@ -535,6 +543,10 @@ public enum ProblemDetector {
             for path in paths where !keep.contains(path) && !ActivationEngine.isProtected(path) {
                 if context.copies.takeIfSpare(path, removed: &removed, removedIDs: &removedIDs) { extras.append(path) }
             }
+            let trashable = paths.filter { path in
+                var removed = Set<String>(), removedIDs = Set<SpareCopies.FileID>()
+                return !ActivationEngine.isProtected(path) && context.copies.takeIfSpare(path, removed: &removed, removedIDs: &removedIDs)
+            }
             problems.append(Problem(
                 id: "duplicate.\(family.id)", kind: .duplicates, title: family.name, family: family.id,
                 summary: styles == 1 ? "In \(paths.count) files." : "\(styles) styles in \(paths.count) files.",
@@ -542,10 +554,17 @@ public enum ProblemDetector {
                 fixes: extras.isEmpty ? [] : [.trash(extras)],
                 fileFixes: Dictionary(uniqueKeysWithValues: paths.map { ($0, [ProblemFix.reveal([$0])]) }),
                 folderFixes: folderFixes(paths, [:]) { _, _ in false },
-                extraCopies: extras
+                extraCopies: extras,
+                copyGroups: groups.map { $0.sorted() },
+                trashable: Set(trashable)
             ))
         }
         return problems
+    }
+
+    private static func looksLikeACopy(_ path: String) -> Bool {
+        let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+        return name.range(of: #"([ _]\d+|[ _-]copy( \d+)?| \(\d+\))$"#, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     private static func identicalGroups(_ paths: [String]) -> [[String]] {
