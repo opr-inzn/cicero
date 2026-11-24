@@ -39,7 +39,9 @@ struct LanguagesRow: View {
         .loading($loaded, for: FileFace(face), cached: { [face] in
             model.coverage.coverage(of: face.id).map(prepare)
         }) { [face] in
-            prepare(await model.coverage.coverage(computing: face))
+            async let coverage = model.coverage.coverage(computing: face)
+            await model.languages.load()
+            return prepare(await coverage)
         }
     }
 
@@ -69,15 +71,26 @@ private struct LanguageList: View {
     let coverage: FaceCoverage
     @State private var query = ""
     @State private var showsMissing: String?
+    @State private var cache = SearchCache()
+
+    private struct Results {
+        var scripts: [(name: String, languages: [Language])]
+        var unsupported: [(language: Language, missingCount: Int)]
+    }
+
+    private final class SearchCache {
+        var query: String?
+        var results: Results?
+        var missingCounts: [String: Int] = [:]
+        var unsupportedBySpeakers: [Language]?
+    }
 
     var body: some View {
-        let shown = query.isEmpty ? languages : languages.filter(matches)
-        let unsupported = query.isEmpty ? [] : unsupportedMatches
-        let scripts = Dictionary(grouping: shown) { $0.scripts.first ?? "Other" }
+        let results = searchResults()
         List {
-            ForEach(scripts.keys.sorted { (scripts[$0]?.count ?? 0) > (scripts[$1]?.count ?? 0) }, id: \.self) { script in
-                Section("\(script) (\((scripts[script]?.count ?? 0).plain))") {
-                    ForEach(scripts[script] ?? []) { language in
+            ForEach(results.scripts, id: \.name) { script in
+                Section("\(script.name) (\(script.languages.count.plain))") {
+                    ForEach(script.languages) { language in
                         HStack {
                             Text(language.name)
                             if let autonym = language.autonym, autonym != language.name {
@@ -93,9 +106,9 @@ private struct LanguageList: View {
                     }
                 }
             }
-            if !unsupported.isEmpty {
-                Section("Not Supported (\(unsupported.count.plain))") {
-                    ForEach(unsupported, id: \.language.id) { entry in
+            if !results.unsupported.isEmpty {
+                Section("Not Supported (\(results.unsupported.count.plain))") {
+                    ForEach(results.unsupported, id: \.language.id) { entry in
                         unsupportedRow(entry.language, missingCount: entry.missingCount)
                     }
                 }
@@ -113,16 +126,40 @@ private struct LanguageList: View {
         .frame(width: 320, height: 420)
     }
 
+    private func searchResults() -> Results {
+        if cache.query == query, let results = cache.results { return results }
+        let shown = query.isEmpty ? languages : languages.filter(matches)
+        let grouped = Dictionary(grouping: shown) { $0.scripts.first ?? "Other" }
+        let scripts = grouped.keys.sorted { (grouped[$0]?.count ?? 0) > (grouped[$1]?.count ?? 0) }.map {
+            (name: $0, languages: grouped[$0] ?? [])
+        }
+        let unsupported: [(language: Language, missingCount: Int)]
+        if query.isEmpty {
+            unsupported = []
+        } else {
+            let candidates = cache.unsupportedBySpeakers ?? {
+                let list = model.languages.languages.filter { coverage.support(for: $0.id) == nil }.sorted { $0.speakers > $1.speakers }
+                cache.unsupportedBySpeakers = list
+                return list
+            }()
+            unsupported = candidates.filter(matches).map { language in
+                let missing = cache.missingCounts[language.id] ?? {
+                    let count = model.languages.missingCount(language.id, in: coverage.scalars)
+                    cache.missingCounts[language.id] = count
+                    return count
+                }()
+                return (language, missing)
+            }
+        }
+        let results = Results(scripts: scripts, unsupported: unsupported)
+        cache.query = query
+        cache.results = results
+        return results
+    }
+
     private func matches(_ language: Language) -> Bool {
         language.name.localizedCaseInsensitiveContains(query) || (language.autonym?.localizedCaseInsensitiveContains(query) ?? false)
             || language.scripts.contains { $0.localizedCaseInsensitiveContains(query) }
-    }
-
-    private var unsupportedMatches: [(language: Language, missingCount: Int)] {
-        model.languages.languages
-            .filter { coverage.support(for: $0.id) == nil && matches($0) }
-            .sorted { $0.speakers > $1.speakers }
-            .map { ($0, model.languages.missingCount($0.id, in: coverage.scalars)) }
     }
 
     private func unsupportedRow(_ language: Language, missingCount: Int) -> some View {

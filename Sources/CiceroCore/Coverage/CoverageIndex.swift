@@ -42,9 +42,18 @@ public final class CoverageIndex: Sendable {
     private let oldFile: URL
     private let languages: LanguageCatalog
     private let state = Mutex(State())
+    private let loadLock = Mutex(())
     private let saveQueue = DispatchQueue(label: "Cicero.CoverageIndex.save", qos: .utility)
 
-    private struct Entry: Sendable {
+    public struct Snapshot: Sendable {
+        fileprivate let entries: [FaceID: Entry]
+
+        public func coverage(of face: FaceID) -> FaceCoverage? {
+            entries[face]?.coverage
+        }
+    }
+
+    fileprivate struct Entry: Sendable {
         var stamp: CoverageStamp
         var coverage: FaceCoverage
     }
@@ -53,6 +62,7 @@ public final class CoverageIndex: Sendable {
         var entries: [FaceID: Entry] = [:]
         var loaded = false
         var dirty = false
+        var saveScheduled = false
         var generation = 0
     }
 
@@ -65,7 +75,7 @@ public final class CoverageIndex: Sendable {
     public func update(_ families: [Family], saves: Bool = true, progress: @escaping @Sendable (Int, Int) -> Void) async {
         let signpost = Signposts.library.beginInterval("Coverage")
         defer { Signposts.library.endInterval("Coverage", signpost) }
-        loadIfNeeded(removingOldFile: saves)
+        _ = loadIfNeeded(removingOldFile: saves)
         let run = state.withLock { state -> Int in
             state.generation += 1
             return state.generation
@@ -78,6 +88,7 @@ public final class CoverageIndex: Sendable {
             let total = work.count
             progress(0, total)
             var done = 0
+            var lastSave = ContinuousClock.now
             await withTaskGroup(of: (FaceID, CoverageStamp, FaceCoverage).self) { group in
                 var pending = work.makeIterator()
                 func addNext() {
@@ -86,25 +97,24 @@ public final class CoverageIndex: Sendable {
                 }
                 for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
                 for await (id, stamp, coverage) in group {
-                    let checkpoint: [FaceID: Entry]? = state.withLock { state in
-                        guard state.generation == run else { return nil }
+                    let updated = state.withLock { state -> Bool in
+                        guard state.generation == run else { return false }
                         state.entries[id] = Entry(stamp: stamp, coverage: coverage)
                         state.dirty = true
                         done += 1
-                        if saves, done % 200 == 0 {
-                            state.dirty = false
-                            return state.entries
-                        }
-                        return nil
+                        return true
                     }
-                    if let checkpoint { saveQueue.async { self.write(checkpoint) } }
+                    if updated, saves, done % 200 == 0, ContinuousClock.now - lastSave >= .seconds(5) {
+                        lastSave = .now
+                        scheduleSave()
+                    }
                     progress(done, total)
                     addNext()
                 }
             }
         }
-        if saves, !Task.isCancelled, let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) }), generation: run) {
-            saveQueue.async { self.write(entries) }
+        if saves, !Task.isCancelled, pruneEntries(keeping: Set(families.flatMap { $0.faces.map(\.id) }), generation: run) {
+            scheduleSave()
         }
     }
 
@@ -112,8 +122,12 @@ public final class CoverageIndex: Sendable {
         state.withLock { $0.entries[face]?.coverage }
     }
 
+    public func snapshot() -> Snapshot {
+        state.withLock { Snapshot(entries: $0.entries) }
+    }
+
     public func coverage(computing face: FontFace) async -> FaceCoverage {
-        loadIfNeeded()
+        _ = loadIfNeeded()
         let stamp = CoverageStamp.of(path: face.path)
         if let entry = state.withLock({ $0.entries[face.id] }), entry.stamp == stamp {
             return entry.coverage
@@ -126,7 +140,8 @@ public final class CoverageIndex: Sendable {
         return coverage
     }
 
-    public func loadSaved(removingOldFile: Bool = false) {
+    @discardableResult
+    public func loadSaved(removingOldFile: Bool = false) -> Bool {
         loadIfNeeded(removingOldFile: removingOldFile)
     }
 
@@ -135,22 +150,14 @@ public final class CoverageIndex: Sendable {
             $0.generation += 1
             $0.entries = [:]
             $0.dirty = false
+            $0.saveScheduled = false
             $0.loaded = true
         }
         saveQueue.async { try? FileManager.default.removeItem(at: self.file) }
     }
 
     public func flush() {
-        let entries: [FaceID: Entry]? = state.withLock { state in
-            guard state.dirty else { return nil }
-            state.dirty = false
-            return state.entries
-        }
-        if let entries {
-            saveQueue.sync { self.write(entries) }
-        } else {
-            saveQueue.sync {}
-        }
+        saveQueue.sync { self.saveIfNeeded() }
     }
 
     public func waitForSave() {
@@ -175,40 +182,75 @@ public final class CoverageIndex: Sendable {
 
     // MARK: - Disk cache
 
-    private func loadIfNeeded(removingOldFile: Bool = true) {
-        state.withLock { state in
-            guard !state.loaded else { return }
-            state.loaded = true
+    @discardableResult
+    private func loadIfNeeded(removingOldFile: Bool = true) -> Bool {
+        if state.withLock({ $0.loaded }) { return false }
+        return loadLock.withLock { _ in
+            guard let startGeneration = state.withLock({ $0.loaded ? nil : $0.generation }) else { return false }
             if removingOldFile { try? FileManager.default.removeItem(at: oldFile) }
-            guard let data = try? Data(contentsOf: file),
-                  let cache = try? PropertyListDecoder().decode(CacheFile.self, from: data),
-                  cache.language == languages.dataVersion
-            else { return }
-            let order = languages.order
-            for entry in cache.entries {
-                let bounds = entry.bounds.array(of: UInt32.self)
-                guard ScalarRanges.isValid(bounds: bounds) else { continue }
-                let coverage = FaceCoverage(
-                    scalars: ScalarRanges(bounds: bounds), order: order,
-                    bits: LanguageBits(base: entry.base.array(of: UInt64.self), full: entry.full.array(of: UInt64.self))
-                )
-                state.entries[FaceID(path: entry.path, index: entry.index)] = Entry(stamp: CoverageStamp(modified: entry.modified, size: entry.size), coverage: coverage)
+            var decoded: [FaceID: Entry] = [:]
+            if let data = try? Data(contentsOf: file),
+               let cache = try? PropertyListDecoder().decode(CacheFile.self, from: data),
+               cache.language == languages.dataVersion {
+                let order = languages.order
+                decoded.reserveCapacity(cache.entries.count)
+                for entry in cache.entries {
+                    let bounds = entry.bounds.array(of: UInt32.self)
+                    guard ScalarRanges.isValid(bounds: bounds) else { continue }
+                    let coverage = FaceCoverage(
+                        scalars: ScalarRanges(bounds: bounds), order: order,
+                        bits: LanguageBits(base: entry.base.array(of: UInt64.self), full: entry.full.array(of: UInt64.self))
+                    )
+                    decoded[FaceID(path: entry.path, index: entry.index)] = Entry(stamp: CoverageStamp(modified: entry.modified, size: entry.size), coverage: coverage)
+                }
+            }
+            return state.withLock { state in
+                guard !state.loaded, state.generation == startGeneration else { return false }
+                for (id, entry) in decoded where state.entries[id] == nil { state.entries[id] = entry }
+                state.loaded = true
+                return !decoded.isEmpty
             }
         }
     }
 
-    private func entriesToSave(keeping known: Set<FaceID>, generation: Int) -> [FaceID: Entry]? {
+    private func pruneEntries(keeping known: Set<FaceID>, generation: Int) -> Bool {
         state.withLock { state in
-            guard state.generation == generation else { return nil }
+            guard state.generation == generation else { return false }
             let kept = state.entries.filter { known.contains($0.key) }
-            guard state.dirty || kept.count != state.entries.count else { return nil }
+            guard state.dirty || kept.count != state.entries.count else { return false }
             state.entries = kept
-            state.dirty = false
-            return kept
+            state.dirty = true
+            return true
         }
     }
 
-    private func write(_ entries: [FaceID: Entry]) {
+    private func scheduleSave() {
+        let shouldEnqueue = state.withLock { state -> Bool in
+            guard state.dirty, !state.saveScheduled else { return false }
+            state.saveScheduled = true
+            return true
+        }
+        guard shouldEnqueue else { return }
+        saveQueue.async { self.saveIfNeeded() }
+    }
+
+    private func saveIfNeeded() {
+        let snapshot: (entries: [FaceID: Entry], generation: Int)? = state.withLock { state in
+            state.saveScheduled = false
+            guard state.dirty else { return nil }
+            state.dirty = false
+            return (state.entries, state.generation)
+        }
+        guard let snapshot else { return }
+        if !write(snapshot.entries) {
+            state.withLock { state in
+                if state.generation == snapshot.generation { state.dirty = true }
+            }
+        }
+    }
+
+    @discardableResult
+    private func write(_ entries: [FaceID: Entry]) -> Bool {
         let signpost = Signposts.library.beginInterval("Save coverage")
         defer { Signposts.library.endInterval("Save coverage", signpost) }
         let cache = CacheFile(language: languages.dataVersion, entries: entries.map { id, entry in
@@ -220,9 +262,9 @@ public final class CoverageIndex: Sendable {
         })
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
-        guard let data = try? encoder.encode(cache) else { return }
+        guard let data = try? encoder.encode(cache) else { return false }
         try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: file, options: .atomic)
+        return (try? data.write(to: file, options: .atomic)) != nil
     }
 
     private struct CacheFile: Codable {

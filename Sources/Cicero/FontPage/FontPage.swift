@@ -66,7 +66,8 @@ struct FontPage: View {
                     Color.canvas.frame(height: 2).background(Color.canvas.ignoresSafeArea(edges: .top))
                 }
             }
-            .onAppear { [keeper] in keeper.scrollTo = { position.scrollTo(y: $0) } }
+            .onAppear { [keeper, _position] in keeper.scrollTo = { _position.wrappedValue.scrollTo(y: $0) } }
+            .onDisappear { [keeper] in keeper.scrollTo = nil }
             // The font list under this page in the navigation stack keeps the focus, and defaultFocus counts only when the window opens.
             .task { focused = true }
             .task(id: FileFace(family.regular.face)) {

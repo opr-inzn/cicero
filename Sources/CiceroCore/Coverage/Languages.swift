@@ -34,10 +34,19 @@ public final class LanguageCatalog: Sendable {
 
     public init(contentsOf url: URL?) {
         loaded.enter()
-        DispatchQueue.global(qos: .userInitiated).async { [self] in
+        DispatchQueue.global(qos: .userInteractive).async { [self] in
             let storage = Storage(contentsOf: url)
             self.storage.withLock { $0 = storage }
             loaded.leave()
+        }
+    }
+
+    public func load() async {
+        if storage.withLock({ $0 != nil }) { return }
+        await withCheckedContinuation { continuation in
+            loaded.notify(queue: DispatchQueue.global(qos: .userInitiated)) {
+                continuation.resume()
+            }
         }
     }
 
@@ -71,6 +80,7 @@ public final class LanguageCatalog: Sendable {
     }
 
     private var store: Storage {
+        if let ready = storage.withLock({ $0 }) { return ready }
         loaded.wait()
         return storage.withLock { $0! }
     }

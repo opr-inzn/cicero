@@ -203,7 +203,7 @@ private struct SidebarContent: View {
         }
         .padding(.trailing, 10)
         // Behind a header inside the list, so the outline view is among its superviews.
-        .background(OutlineViewSetup(drag: drag) { model.dragOutOfSidebar($0) })
+        .background(OutlineViewSetup(drag: drag) { [model] in model.dragOutOfSidebar($0) })
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -595,16 +595,17 @@ private extension UTType {
 }
 
 private struct GroupDragSource: ViewModifier {
-    let payload: () -> GroupDrag
+    let payload: @MainActor () -> GroupDrag
 
     func body(content: Content) -> some View {
         if #available(macOS 26, *) {
             content.draggable(payload())
         } else {
+            let make = payload
             // On macOS 15 a title dragged with `draggable` never leaves the list.
             content.onDrag {
                 let provider = NSItemProvider()
-                provider.register(payload())
+                provider.register(MainActor.assumeIsolated { make() })
                 return provider
             }
         }

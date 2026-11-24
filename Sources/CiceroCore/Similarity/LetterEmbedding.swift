@@ -49,9 +49,43 @@ public final class LetterEmbedding: Sendable {
         state.withLock { if case .failed = $0 { true } else { false } }
     }
 
+    public func prepare() async {
+        if case .unloaded = state.withLock({ $0 }) {} else { return }
+        await withCheckedContinuation { continuation in
+            loadQueue.async {
+                _ = self.loadOnQueue()
+                continuation.resume()
+            }
+        }
+    }
+
+    public func unload(if shouldUnload: @escaping @Sendable () -> Bool = { true }) {
+        loadQueue.async {
+            guard shouldUnload() else { return }
+            self.state.withLock { if case .loaded = $0 { $0 = .unloaded } }
+        }
+    }
+
     public func read(_ font: CTFont) -> Reading? {
         if case .read(let reading) = outcome(font) { return reading }
         return nil
+    }
+
+    private func loadOnQueue() -> LoadedModel? {
+        switch state.withLock({ $0 }) {
+        case .loaded(let loaded): return loaded
+        case .failed: return nil
+        case .unloaded: break
+        }
+        guard let mlModel = try? MLModel(contentsOf: url) else {
+            state.withLock { $0 = .failed }
+            return nil
+        }
+        let inputs = mlModel.modelDescription.inputDescriptionsByName
+        let loaded = LoadedModel(model: mlModel, takesStrips: inputs["strips"] != nil,
+                                 takesDetails: inputs["details"] != nil, takesAdvances: inputs["advances"] != nil)
+        state.withLock { $0 = .loaded(loaded) }
+        return loaded
     }
 
     private func loadedModel() -> LoadedModel? {
@@ -60,22 +94,7 @@ public final class LetterEmbedding: Sendable {
         case .failed: return nil
         case .unloaded: break
         }
-        return loadQueue.sync {
-            switch state.withLock({ $0 }) {
-            case .loaded(let loaded): return loaded
-            case .failed: return nil
-            case .unloaded: break
-            }
-            guard let mlModel = try? MLModel(contentsOf: url) else {
-                state.withLock { $0 = .failed }
-                return nil
-            }
-            let inputs = mlModel.modelDescription.inputDescriptionsByName
-            let loaded = LoadedModel(model: mlModel, takesStrips: inputs["strips"] != nil,
-                                     takesDetails: inputs["details"] != nil, takesAdvances: inputs["advances"] != nil)
-            state.withLock { $0 = .loaded(loaded) }
-            return loaded
-        }
+        return loadQueue.sync { loadOnQueue() }
     }
 
     func outcome(_ font: CTFont) -> Outcome {

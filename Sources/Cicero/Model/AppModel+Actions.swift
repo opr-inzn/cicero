@@ -130,13 +130,15 @@ extension AppModel {
         if hadMoves {
             let support = locations.support
             let store = store
+            let recorded = Set(data.records.appFolderOrigins.keys)
             Task.detached(priority: .utility) {
-                if store.flush(durably: true) { AppFolderMoves.remove(support: support) }
+                if store.flush(durably: true) { AppFolderMoves.remove(recorded: recorded, support: support) }
             }
         }
         if !result.message.isEmpty { showToast(result.message, undo: undo) }
         var except: Set<String> = [locations.userFonts.path, locations.allUsersFonts.path]
-        except.formUnion(locations.inactiveFolders.map(\.path))
+        except.formUnion(locations.allInactiveFolders.map(\.path))
+        if hadMoves { except.formUnion(data.scannedFolders().filter { $0.appName != nil }.map(\.path)) }
         if let libraryFolder = data.fontLibrary?.path { except.insert(libraryFolder) }
         let scan = rescanFontd(except: except)
         for operation in [operation].compactMap(\.self) + operations { settle(operation, after: scan) }

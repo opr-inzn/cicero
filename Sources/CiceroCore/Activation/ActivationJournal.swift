@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Synchronization
 
 public struct ActivationJournal: Codable, Equatable, Sendable {
     public struct Entry: Codable, Equatable, Sendable {
@@ -84,6 +85,8 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
 }
 
 public struct AppFolderMoves: Codable, Sendable {
+    private static let lock = Mutex(())
+
     struct Move: Codable, Sendable {
         var moved: String
         var origin: String
@@ -98,14 +101,16 @@ public struct AppFolderMoves: Codable, Sendable {
 
     static func note(_ entries: [(moved: String, origin: String)], support: URL) throws {
         guard !entries.isEmpty else { return }
-        let url = url(support: support)
-        var list = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(AppFolderMoves.self, from: $0) } ?? AppFolderMoves()
-        for entry in entries {
-            list.moves.append(Move(moved: entry.moved, origin: entry.origin, digest: ActivationJournal.digest(of: entry.origin)))
+        try lock.withLock { _ in
+            let url = url(support: support)
+            var list = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(AppFolderMoves.self, from: $0) } ?? AppFolderMoves()
+            for entry in entries {
+                list.moves.append(Move(moved: entry.moved, origin: entry.origin, digest: ActivationJournal.digest(of: entry.origin)))
+            }
+            try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+            try JSONEncoder().encode(list).write(to: url, options: .atomic)
+            _ = UserDataStore.syncToDisk(url)
         }
-        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-        try JSONEncoder().encode(list).write(to: url, options: .atomic)
-        _ = UserDataStore.syncToDisk(url)
     }
 
     public static func exists(support: URL) -> Bool {
@@ -125,7 +130,25 @@ public struct AppFolderMoves: Codable, Sendable {
         return records
     }
 
+    public static func remove(recorded: Set<String>, support: URL) {
+        lock.withLock { _ in
+            let url = url(support: support)
+            guard let data = try? Data(contentsOf: url),
+                  var list = try? JSONDecoder().decode(AppFolderMoves.self, from: data) else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            list.moves.removeAll { recorded.contains($0.moved) }
+            if list.moves.isEmpty {
+                try? FileManager.default.removeItem(at: url)
+            } else if let encoded = try? JSONEncoder().encode(list) {
+                try? encoded.write(to: url, options: .atomic)
+                _ = UserDataStore.syncToDisk(url)
+            }
+        }
+    }
+
     public static func remove(support: URL) {
-        try? FileManager.default.removeItem(at: url(support: support))
+        lock.withLock { _ in try? FileManager.default.removeItem(at: url(support: support)) }
     }
 }

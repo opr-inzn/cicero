@@ -232,10 +232,13 @@ private enum ExportPanel {
         panel.nameFieldLabel = "Export As:"
         panel.nameFieldStringValue = name
         let choice = ExportChoice()
-        let picker = NSHostingView(rootView: FormatPicker(choice: choice) { apply($0, to: panel) })
+        let picker = NSHostingView(rootView: FormatPicker(choice: choice) { [weak panel] in
+            if let panel { apply($0, to: panel) }
+        })
         picker.setFrameSize(picker.fittingSize)
         panel.accessoryView = picker
         apply(choice.format, to: panel)
+        defer { panel.accessoryView = nil }
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
         return (url, url.pathExtension.lowercased() == "zip" ? .zip : choice.format)
     }

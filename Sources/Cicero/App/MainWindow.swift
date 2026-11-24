@@ -45,7 +45,7 @@ struct MainWindow: View {
         .searchSuggestions { SearchSuggestions() }
         .searchFocused($isSearchFocused)
         .environment(\.startFocus, startFocus)
-        .focusedSceneValue(\.focusSearch) { isSearchFocused = true }
+        .focusedSceneValue(\.focusSearch, FocusSearchAction(id: ObjectIdentifier(startFocus)) { isSearchFocused = true })
         .toolbarGlassFollowsAppearance()
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
@@ -185,8 +185,22 @@ struct MainWindow: View {
     }
 }
 
+struct FocusSearchAction: Equatable {
+    let id: ObjectIdentifier
+    private let run: () -> Void
+
+    init(id: ObjectIdentifier, run: @escaping () -> Void) {
+        self.id = id
+        self.run = run
+    }
+
+    func callAsFunction() { run() }
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
+}
+
 extension FocusedValues {
-    @Entry var focusSearch: (() -> Void)?
+    @Entry var focusSearch: FocusSearchAction?
 }
 
 @Observable

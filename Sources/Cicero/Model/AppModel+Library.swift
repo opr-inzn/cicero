@@ -288,18 +288,30 @@ extension AppModel {
     func searchSuggestions(for typed: String) -> [Family] {
         let query = SearchQuery(typed)
         guard !query.isEmpty else { return [] }
-        var prefix: [Family] = []
-        var other: [Family] = []
-        for family in listedFamilies(where: { _ in true }) {
-            guard let rank = query.suggestionRank(of: family.name.lowercased()) else { continue }
-            if rank == 0 {
-                prefix.append(family)
-                if prefix.count >= 8 { return prefix }
-            } else if other.count < 8 {
-                other.append(family)
+        let candidates = listedFamilies(where: { _ in true })
+        if !hasOwnOrder && documentList == nil {
+            var prefix: [Family] = []
+            var other: [Family] = []
+            for family in candidates {
+                guard let rank = query.suggestionRank(of: family.name.lowercased()) else { continue }
+                if rank == 0 {
+                    prefix.append(family)
+                    if prefix.count >= 8 { return prefix }
+                } else if other.count < 8 {
+                    other.append(family)
+                }
             }
+            return Array((prefix + other).prefix(8))
         }
-        return Array((prefix + other).prefix(8))
+        var found: [(family: Family, rank: Int)] = []
+        for family in candidates {
+            guard let rank = query.suggestionRank(of: family.name.lowercased()) else { continue }
+            found.append((family, rank))
+        }
+        found.sort { a, b in
+            a.rank != b.rank ? a.rank < b.rank : a.family.name.localizedStandardCompare(b.family.name) == .orderedAscending
+        }
+        return found.prefix(8).map(\.family)
     }
 
     func compareCandidates(for typed: String) -> [Family] {
@@ -314,12 +326,18 @@ extension AppModel {
 
     var familyFilters: FamilyFilters {
         let guess = classificationGuess()
+        let snapshot = coverage.snapshot()
+        let revision = coverageRevision
         return FamilyFilters(
             library: library, data: data, classificationGuess: { guess($0)?.classification },
             coverage: CoverageAnswers(
                 characterSet: { [unowned self] in self.characterSet($0) },
-                missingCount: { [unowned self] in self.missingCount($0, $1) },
-                supports: { [unowned self] in self.supports($0, language: $1) }
+                missingCount: { [unowned self] set, family in
+                    self.characterSetLookup.missingCount(set, face: family.regular.id, revision: revision) {
+                        snapshot.coverage(of: family.regular.id)?.scalars
+                    }
+                },
+                supports: { family, id in snapshot.coverage(of: family.regular.id).map { $0.support(for: id) != nil } }
             )
         )
     }

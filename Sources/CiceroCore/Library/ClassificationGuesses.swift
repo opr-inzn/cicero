@@ -30,9 +30,10 @@ public enum ClassificationGuesses {
     }
 
     public static func letters(of families: [Family], measurements: MeasurementIndex) -> [String: Classification] {
+        let snapshot = measurements.snapshot()
         var found: [String: Classification] = [:]
         for family in families where family.classification == .unclassified && !family.mixesSerifAndSans {
-            guard let seen = measurements.classification(of: family.regular.face.id), seen.likelihood >= letterLikelihood else { continue }
+            guard let seen = snapshot.classification(of: family.regular.face.id), seen.likelihood >= letterLikelihood else { continue }
             found[family.id] = seen.classification
         }
         return found

@@ -258,6 +258,8 @@ final class AppModel {
     @ObservationIgnored private var measurementTask: Task<Void, Never>?
     @ObservationIgnored private var coverageRun = 0
     @ObservationIgnored private var measurementRun = 0
+    @ObservationIgnored private var pendingPrompts: [(overActivationSheets: Bool, show: (AppModel) -> Void)] = []
+    @ObservationIgnored private var watchingPrompts = false
     @ObservationIgnored private var problemsTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -442,7 +444,14 @@ final class AppModel {
 
     private func restoreLibrary() {
         let scanner = scanner, records = data.records, coverage = coverage
-        DispatchQueue.global(qos: .userInitiated).async { coverage.loadSaved(removingOldFile: true) }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard coverage.loadSaved(removingOldFile: true) else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.coverageRevision &+= 1
+                self.characterSetLookup.reset()
+            }
+        }
         restoring = SavedLibraryRead {
             scanner.savedLibrary(records: records)
         }
@@ -657,6 +666,7 @@ final class AppModel {
         if !store.isReadOnly, !new.goneFiles.isEmpty || !data.missingFontFiles.isEmpty { data.noteGoneFiles(new.goneFiles) }
         guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
         let previousFaces = first ? [] : library.families.map(\.regular.face.id)
+        let previousMeasured = first ? [] : measurements.measuredFaceIDs(of: library.families)
         let known = Set(library.families.lazy.flatMap(\.faces).map(\.face.path))
         if !store.isReadOnly { data.recordActivations(from: library, to: new) }
         let offline = library.offlinePaths
@@ -678,6 +688,8 @@ final class AppModel {
         FontLoader.shared.prefetch(visibleFamilies.prefix(Self.readAheadFirst).map(\.regular.face))
         if first || !new.changedPaths.isEmpty || previousFaces != new.families.map(\.regular.face.id) {
             updateCoverage()
+        } else if previousMeasured != measurements.measuredFaceIDs(of: new.families) {
+            updateMeasurements()
         }
         updateProblems()
     }
@@ -955,10 +967,54 @@ final class AppModel {
 
     func ask(overActivationSheets: Bool = false, _ show: @escaping (AppModel) -> Void) {
         guard isAsking(overActivationSheets: overActivationSheets) else { return show(self) }
-        Task {
-            while isAsking(overActivationSheets: overActivationSheets) { try? await Task.sleep(for: .milliseconds(200)) }
-            show(self)
+        pendingPrompts.append((overActivationSheets, show))
+        watchPrompts()
+    }
+
+    private func watchPrompts() {
+        guard !watchingPrompts, !pendingPrompts.isEmpty else { return }
+        watchingPrompts = true
+        withObservationTracking {
+            observePromptStates()
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.watchingPrompts = false
+                self.drainPrompts()
+            }
         }
+    }
+
+    private func drainPrompts() {
+        if let index = pendingPrompts.firstIndex(where: { !isAsking(overActivationSheets: $0.overActivationSheets) }) {
+            let next = pendingPrompts.remove(at: index)
+            next.show(self)
+        }
+        if !pendingPrompts.isEmpty { watchPrompts() }
+    }
+
+    private func observePromptStates() {
+        _ = installPrompt != nil
+        _ = documentFonts != nil
+        _ = manyActivationPrompt != nil
+        _ = movingOutPrompt != nil
+        _ = copySwitchPrompt != nil
+        _ = duplicatePrompt != nil
+        _ = replacePrompt != nil
+        _ = openAppsReplacePrompt != nil
+        _ = trashPlan != nil
+        _ = textPrompt != nil
+        _ = newTagRequest != nil
+        _ = editingSmartSet != nil
+        _ = editingAppsForSet != nil
+        _ = editingCharacterSet != nil
+        _ = deletingCharacterSets.isEmpty
+        _ = isClearingCaches
+        _ = importing != nil
+        _ = earlierImportPrompt != nil
+        _ = showsGuessingQuestion
+        _ = showsBackupSheet
+        _ = restorePrompt != nil
     }
 
     var isShowingPrompt: Bool { isAsking(overActivationSheets: false) }

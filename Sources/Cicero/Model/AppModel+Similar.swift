@@ -13,11 +13,11 @@ extension AppModel {
         let key = SimilarKey(fingerprint: library.fingerprint, measurementRevision: measurementRevision, dataRevision: dataRevision,
                              guessRevision: guessRevision)
         if let cached = similarCache, cached.key == key { return cached.table }
-        let measurements = measurements
-        let table = SimilarFonts(families: library.families.filter(data.lists), measurements: { measurements.measurements(of: $0.regular.face.id) },
-                                 embeddings: { measurements.embedding(of: $0.regular.face.id) },
-                                 styleMeasurements: { measurements.measurements(of: $0.id) },
-                                 styleEmbeddings: { measurements.embedding(of: $0.id) },
+        let snapshot = measurements.snapshot()
+        let table = SimilarFonts(families: library.families.filter(data.lists), measurements: { snapshot.measurements(of: $0.regular.face.id) },
+                                 embeddings: { snapshot.embedding(of: $0.regular.face.id) },
+                                 styleMeasurements: { snapshot.measurements(of: $0.id) },
+                                 styleEmbeddings: { snapshot.embedding(of: $0.id) },
                                  classification: similarClassifier())
         similarCache = (key, table)
         return table

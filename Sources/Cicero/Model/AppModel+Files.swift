@@ -73,17 +73,27 @@ extension AppModel {
 
     func openOnSidebar(_ urls: [URL]) {
         let urls = urls.filter(\.isFileURL).map(\.standardizedFileURL)
-        let folders = urls.filter { url in
-            var isDirectory: ObjCBool = false
-            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
-                && !NSWorkspace.shared.isFilePackage(atPath: url.path)
+        guard !urls.isEmpty else { return }
+        Task {
+            let (folders, rest) = await Task.detached(priority: .userInitiated) {
+                var folders: [URL] = []
+                var rest: [URL] = []
+                for url in urls {
+                    let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
+                    if values?.isDirectory == true && values?.isPackage != true {
+                        folders.append(url)
+                    } else {
+                        rest.append(url)
+                    }
+                }
+                return (folders, rest)
+            }.value
+            if !folders.isEmpty {
+                addFolders(folders)
+                if rest.isEmpty, folders.count == 1, let folder = data.folders.first(where: { $0.path == folders[0].path }) { selection = .folder(folder.id) }
+            }
+            if !rest.isEmpty { open(rest) }
         }
-        let rest = urls.filter { !folders.contains($0) }
-        if !folders.isEmpty {
-            addFolders(folders)
-            if rest.isEmpty, folders.count == 1, let folder = data.folders.first(where: { $0.path == folders[0].path }) { selection = .folder(folder.id) }
-        }
-        if !rest.isEmpty { open(rest) }
     }
 
     func pasteFiles() {
@@ -99,59 +109,72 @@ extension AppModel {
     }
 
     private func open(_ urls: [URL], target: SidebarItem?) {
-        let fm = FileManager.default
-        var folders: [URL] = []
-        var files: [String] = []
-        var documents: [URL] = []
-        // Web fonts are left out: Adobe apps don't see them in a Fonts folder, and set blank text in them used in place.
-        var webFonts: Set<String> = []
-        let imports = importFiles(among: urls.filter(\.isFileURL).map(\.standardizedFileURL))
-        let lookup = pathLookup()
-        var seenFiles = Set<String>()
-        for url in urls where url.isFileURL && !imports.contains(url.standardizedFileURL) {
-            let url = url.standardizedFileURL
-            var isDirectory: ObjCBool = false
-            guard fm.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
-            let pathExtension = url.pathExtension.lowercased()
-            if isDirectory.boolValue {
-                if !NSWorkspace.shared.isFilePackage(atPath: url.path) { folders.append(url) }
-            } else if FontFormat.fileExtensions.contains(pathExtension) {
-                let path = lookup.libraryPath(of: url.path)
-                if seenFiles.insert(path).inserted { files.append(path) }
-            } else if DocumentFonts.fileExtensions.contains(pathExtension) {
-                documents.append(url)
-            } else if ["woff", "woff2"].contains(pathExtension) {
-                webFonts.insert(pathExtension.uppercased())
+        let fileURLs = urls.filter(\.isFileURL).map(\.standardizedFileURL)
+        let imports = importFiles(among: fileURLs)
+        let candidates = fileURLs.filter { !imports.contains($0) }
+        let readFolders = readFolders
+        let totalCount = urls.count
+        Task {
+            let classified = await Task.detached(priority: .userInitiated) { () -> (folders: [URL], files: [String], seen: Set<String>, documents: [URL], webFonts: Set<String>) in
+                let realFolders = readFolders.compactMap { folder in Self.realPath(folder).map { (folder, $0) } }
+                let lookup = PathLookup(addedFiles: [], libraryPaths: [], folders: readFolders, realFolders: realFolders)
+                let fm = FileManager.default
+                var folders: [URL] = []
+                var files: [String] = []
+                var seen = Set<String>()
+                var documents: [URL] = []
+                // Web fonts are left out: Adobe apps don't see them in a Fonts folder, and set blank text in them used in place.
+                var webFonts: Set<String> = []
+                for url in candidates {
+                    var isDirectory: ObjCBool = false
+                    guard fm.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
+                    let pathExtension = url.pathExtension.lowercased()
+                    if isDirectory.boolValue {
+                        let isPackage = (try? url.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true
+                        if !isPackage { folders.append(url) }
+                    } else if FontFormat.fileExtensions.contains(pathExtension) {
+                        let path = lookup.libraryPath(of: url.path)
+                        if seen.insert(path).inserted { files.append(path) }
+                    } else if DocumentFonts.fileExtensions.contains(pathExtension) {
+                        documents.append(url)
+                    } else if ["woff", "woff2"].contains(pathExtension) {
+                        webFonts.insert(pathExtension.uppercased())
+                    }
+                }
+                return (folders, files, seen, documents, webFonts)
+            }.value
+            let folders = classified.folders
+            let files = classified.files
+            let seenFiles = classified.seen
+            let documents = classified.documents
+            let webFonts = classified.webFonts
+            if let document = documents.first { findFonts(in: document) }
+            guard !folders.isEmpty || !files.isEmpty else {
+                guard documents.isEmpty, imports.isEmpty else { return }
+                if !webFonts.isEmpty { return showToast("Cicero doesn’t use web fonts like \(webFonts.sorted().listed())") }
+                return showToast(totalCount == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
             }
-        }
-        if let document = documents.first { findFonts(in: document) }
-        guard !folders.isEmpty || !files.isEmpty else {
-            guard documents.isEmpty, imports.isEmpty else { return }
-            if !webFonts.isEmpty { return showToast("Cicero doesn’t use web fonts like \(webFonts.sorted().listed())") }
-            return showToast(urls.count == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
-        }
-        var method: InstallMethod?
-        var location: DropLocation?
-        if case .folder(let id) = target {
-            if id == WatchedFolder.addedFilesID { method = .inPlace } else { location = dropLocation(id) }
-        }
-        let opened = folders.filter { WatchedFolder.detectAppName(forPath: $0.path) == nil }
-        guard (method ?? data.installMethod) != .inPlace, !opened.isEmpty else {
-            return add(files, folders: folders, method: method, location: location, target: target)
-        }
-        Task { [files, seenFiles] in
-            var files = files
+            var method: InstallMethod?
+            var location: DropLocation?
+            if case .folder(let id) = target {
+                if id == WatchedFolder.addedFilesID { method = .inPlace } else { location = dropLocation(id) }
+            }
+            let opened = folders.filter { WatchedFolder.detectAppName(forPath: $0.path) == nil }
+            guard (method ?? data.installMethod) != .inPlace, !opened.isEmpty else {
+                return add(files, folders: folders, method: method, location: location, target: target)
+            }
+            var expandedFiles = files
             var seen = seenFiles
             let found = await Task.detached(priority: .userInitiated) { opened.flatMap(LibraryScanner.fontFiles(in:)) }.value
             let lookup = pathLookup()
             for raw in found {
                 let path = lookup.libraryPath(of: raw)
-                if seen.insert(path).inserted { files.append(path) }
+                if seen.insert(path).inserted { expandedFiles.append(path) }
             }
-            guard !files.isEmpty || opened.count < folders.count else {
+            guard !expandedFiles.isEmpty || opened.count < folders.count else {
                 return showToast(opened.count == 1 ? "There are no fonts Cicero can read in “\(opened[0].lastPathComponent)”" : "There are no fonts Cicero can read in those folders")
             }
-            add(files, folders: folders.filter { !opened.contains($0) }, method: method, location: location, target: target)
+            add(expandedFiles, folders: folders.filter { !opened.contains($0) }, method: method, location: location, target: target)
         }
     }
 
@@ -327,7 +350,7 @@ extension AppModel {
         return skipped.count > 2 ? "Skipped \(names) already in your library" : "Skipped \(names), already in your library"
     }
 
-    private struct PathLookup {
+    nonisolated private struct PathLookup: Sendable {
         let addedFiles: Set<String>
         let libraryPaths: Set<String>
         let folders: [String]
@@ -369,7 +392,7 @@ extension AppModel {
     }
 
     private var readFolders: [String] {
-        [locations.userFonts.path, locations.allUsersFonts.path] + locations.inactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
+        [locations.userFonts.path, locations.allUsersFonts.path] + locations.allInactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
     }
 
     func libraryPath(of path: String, folders: [String]) -> String {
@@ -381,7 +404,7 @@ extension AppModel {
         return path
     }
 
-    private static func realPath(_ path: String) -> String? {
+    nonisolated private static func realPath(_ path: String) -> String? {
         guard let real = realpath(path, nil) else { return nil }
         defer { free(real) }
         return String(cString: real)

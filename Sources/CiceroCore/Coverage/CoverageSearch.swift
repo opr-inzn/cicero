@@ -25,10 +25,11 @@ public enum CoverageSearch {
     public static func families(having text: String, in families: [Family], maxMissing: Int, index: CoverageIndex) -> (matches: [TextMatch], unindexed: Int) {
         let ordered = scalars(in: text)
         let sorted = ordered.sorted()
+        let snapshot = index.snapshot()
         var matches: [(position: Int, match: TextMatch)] = []
         var unindexed = 0
         for (position, family) in families.enumerated() {
-            guard let coverage = index.coverage(of: family.regular.id) else {
+            guard let coverage = snapshot.coverage(of: family.regular.id) else {
                 unindexed += 1
                 continue
             }
@@ -46,11 +47,12 @@ public enum CoverageSearch {
     }
 
     public static func families(supporting languageID: String, in families: [Family], index: CoverageIndex) -> (full: [Family], base: [Family], unindexed: Int) {
+        let snapshot = index.snapshot()
         var full: [Family] = []
         var base: [Family] = []
         var unindexed = 0
         for family in families {
-            guard let coverage = index.coverage(of: family.regular.id) else {
+            guard let coverage = snapshot.coverage(of: family.regular.id) else {
                 unindexed += 1
                 continue
             }

@@ -53,6 +53,10 @@ public struct Locations: Sendable {
 
     private static let formerInactiveNames = ["Inactive", "Deactivated"]
 
+    public var allInactiveFolders: [URL] {
+        [inactiveFolder] + formerInactiveFolders
+    }
+
     public var inactiveFolders: [URL] {
         [inactiveFolder] + formerInactiveFolders.filter { FileManager.default.fileExists(atPath: $0.path) }
     }
@@ -307,7 +311,7 @@ public final class LibraryScanner: Sendable {
         } else {
             let registrar = registrar
             async let active = Self.activeFontURLs(registrar)
-            let replaying = changes == nil && kept != nil && !rereadAll && last?.input == input ? last?.walks : nil
+            let replaying = changes == nil && kept != nil && !rereadAll && last?.input.folders == input.folders && last?.input.files == input.files ? last?.walks : nil
             var (found, reach, walks, replayed) = enumerateFolders(input, replaying: replaying, except: kept ?? [])
             #if CICERO_MEASURE
             if kept != nil { detail = "fontd, \(replayed) of \(walks.count) folders replayed" }
@@ -573,12 +577,14 @@ public final class LibraryScanner: Sendable {
 
     private static func holds(_ path: String, any paths: Set<String>) -> Bool {
         guard !paths.isEmpty else { return false }
-        let given = path + "/", resolved = realPath(path) + "/"
-        return paths.contains { $0.hasPrefix(given) || $0.hasPrefix(resolved) }
+        let resolved = realPath(path)
+        let given = path + "/", resolvedPrefix = resolved + "/"
+        return paths.contains { $0 == path || $0 == resolved || $0.hasPrefix(given) || $0.hasPrefix(resolvedPrefix) }
     }
 
     private func enumerateFolders(_ input: ScanInput, replaying: [WalkKey: Walk]? = nil, except: Set<String> = [])
         -> ([String: FoundFile], OutOfReach, [WalkKey: Walk], Int) {
+        let excluded = except.isEmpty ? except : Set(except.flatMap { [$0, Self.realPath($0)] })
         var found: [String: FoundFile] = [:]
         found.reserveCapacity(4096)
         var reach = OutOfReach()
@@ -588,7 +594,7 @@ public final class LibraryScanner: Sendable {
                   _ body: (String, FaceStamp) -> Void) {
             let key = WalkKey(path: folder.path, includingHidden: includingHidden, skipping: skipping)
             // Never replayed on a server: FSEvents doesn't hear of other Macs' changes there.
-            if let kept = replaying?[key], Reachability.isOnLocalDisk(folder.path), !Self.holds(folder.path, any: except) {
+            if let kept = replaying?[key], Reachability.isOnLocalDisk(folder.path), !Self.holds(folder.path, any: excluded) {
                 for file in kept.files { body(file.path, file.stamp) }
                 if let onlineOnly { kept.onlineOnly.forEach(onlineOnly) }
                 walks[key] = kept
