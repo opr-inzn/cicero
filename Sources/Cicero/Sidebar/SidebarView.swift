@@ -86,27 +86,23 @@ private struct SidebarContent: View {
             if editing || model.isVisible(section.key) {
                 let groups = section == .characterSets ? model.characterSetGroups : []
                 let rows = section == .characterSets ? [] : model.rows(for: section)
-                // Not `Section(isExpanded:)`: the list's chevron would push the header's + aside.
-                Section {
-                    if model.isExpanded(section) {
-                        if section == .classifications && model.asksAboutGuessing && !editing {
-                            OrganizeRow()
-                        }
-                        if section == .characterSets {
-                            characterSetGroups(groups)
-                        } else {
-                            movableRows(rows, in: section.rawValue, section: section)
-                        }
-                        if editing && rows.isEmpty && groups.isEmpty {
-                            Text("Nothing here yet")
-                                .foregroundStyle(.tertiary)
-                                .selectionDisabled()
-                        }
+                Section(isExpanded: expansion(section)) {
+                    if section == .classifications && model.asksAboutGuessing && !editing {
+                        OrganizeRow()
+                    }
+                    if section == .characterSets {
+                        characterSetGroups(groups)
+                    } else {
+                        movableRows(rows, in: section.rawValue, section: section)
+                    }
+                    if editing && rows.isEmpty && groups.isEmpty {
+                        Text("Nothing here yet")
+                            .foregroundStyle(.tertiary)
+                            .selectionDisabled()
                     }
                 } header: {
                     sectionHeader(section)
                 }
-                .notCollapsible()
             }
         }
     }
@@ -202,7 +198,7 @@ private struct SidebarContent: View {
         }
         .padding(.trailing, 10)
         // Behind a header inside the list, so the outline view is among its superviews.
-        .background(OutlineViewSetup(drag: drag) { [model] in model.dragOutOfSidebar($0) })
+        .background(OutlineViewSetup(drag: drag, highlight: highlight) { [model] in model.dragOutOfSidebar($0) })
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -272,9 +268,6 @@ private struct SidebarContent: View {
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
         .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
         .tag(row.item)
-        .simultaneousGesture(TapGesture(count: 2).onEnded {
-            if row.isRenamable { highlight.renaming = row.item }
-        })
         .contextMenu { SidebarRowMenu(row: row, model: model, highlight: highlight) }
         // Asked for as the list starts dragging the row, which tells which rows a drag has.
         .itemProvider { drag.provider(for: row) }
@@ -595,9 +588,9 @@ private struct SidebarRenameField: View {
     }
 }
 
-private extension SidebarRow {
+private extension SidebarItem {
     var isRenamable: Bool {
-        switch item {
+        switch self {
         case .set, .tag, .folder: true
         default: false
         }
@@ -721,20 +714,24 @@ private struct GroupDrop: ViewModifier {
 
 private struct OutlineViewSetup: NSViewRepresentable {
     let drag: SidebarDrag
+    let highlight: SidebarHighlight
     let hide: ([SidebarRow]) -> Void
 
     func makeNSView(context: Context) -> NSView {
         drag.hide = hide
-        return Marker(drag: drag)
+        return Marker(drag: drag, highlight: highlight)
     }
 
     func updateNSView(_ nsView: NSView, context: Context) { drag.hide = hide }
 
     private final class Marker: NSView {
         let drag: SidebarDrag
+        let highlight: SidebarHighlight
+        private weak var hookedOutline: NSOutlineView?
 
-        init(drag: SidebarDrag) {
+        init(drag: SidebarDrag, highlight: SidebarHighlight) {
             self.drag = drag
+            self.highlight = highlight
             super.init(frame: .zero)
         }
 
@@ -751,7 +748,24 @@ private struct OutlineViewSetup: NSViewRepresentable {
             outline.refusesFirstResponder = true
             // Without the answers, a row dragged out of the list stops Cicero.
             if SidebarDataSource.answer(for: outline, drag: drag) { outline.draggingDestinationFeedbackStyle = .gap }
+            if hookedOutline !== outline {
+                hookedOutline = outline
+                // On the outline view instead of SwiftUI's TapGesture(count: 2) on rows, which blocks single-click selection.
+                let doubleClick = NSClickGestureRecognizer(target: self, action: #selector(handleDoubleClick(_:)))
+                doubleClick.numberOfClicksRequired = 2
+                doubleClick.delaysPrimaryMouseButtonEvents = false
+                outline.addGestureRecognizer(doubleClick)
+            }
             SidebarDrag.prepare(in: outline)
+        }
+
+        @objc private func handleDoubleClick(_ recognizer: NSClickGestureRecognizer) {
+            guard let outline = recognizer.view as? NSOutlineView else { return }
+            let row = outline.row(at: recognizer.location(in: outline))
+            guard row >= 0, let item = outline.item(atRow: row),
+                  outline.delegate?.outlineView?(outline, isGroupItem: item) != true,
+                  highlight.selected.count == 1, let selected = highlight.selected.first, selected.isRenamable else { return }
+            highlight.renaming = selected
         }
     }
 }
@@ -869,12 +883,15 @@ private enum SidebarDataSource {
     private typealias SessionEnded = @convention(c) (NSOutlineView, Selector, NSDraggingSession, NSPoint, NSDragOperation) -> Void
     private typealias Update = @convention(c) (AnyObject, Selector, NSOutlineView, AnyObject) -> Void
     private typealias SessionMoved = @convention(c) (NSOutlineView, Selector, NSDraggingSession, NSPoint) -> Void
+    private typealias OutlineCellFrame = @convention(c) (NSOutlineView, Selector, Int) -> NSRect
     private static var answering: Set<ObjectIdentifier> = []
+    private static var hidingDisclosure: Set<ObjectIdentifier> = []
     private static let dragKey = UnsafeMutableRawPointer.allocate(byteCount: 1, alignment: 1)
 
     static func answer(for outline: NSOutlineView, drag: SidebarDrag) -> Bool {
         objc_setAssociatedObject(outline, dragKey, drag, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         followMoves(of: outline)
+        hideGroupDisclosure(in: outline)
         guard let source = outline.dataSource, let type = object_getClass(source) else { return false }
         if answering.contains(ObjectIdentifier(type)) { return true }
 
@@ -965,6 +982,25 @@ private enum SidebarDataSource {
             replace(type, end, method: inheritedEnd, with: imp_implementationWithBlock(ended))
         }
         answering.insert(ObjectIdentifier(type))
+    }
+
+    private static func hideGroupDisclosure(in outline: NSOutlineView) {
+        if let type = object_getClass(outline), !hidingDisclosure.contains(ObjectIdentifier(type)),
+           let inherited = class_getInstanceMethod(type, #selector(NSOutlineView.frameOfOutlineCell(atRow:))) {
+            let selector = #selector(NSOutlineView.frameOfOutlineCell(atRow:))
+            let appKit = unsafeBitCast(method_getImplementation(inherited), to: OutlineCellFrame.self)
+            let frame: @convention(block) (NSOutlineView, Int) -> NSRect = { outline, row in
+                // An empty frame keeps AppKit from making the section header's hover chevron, which would cover the header's +.
+                if let item = outline.item(atRow: row), outline.delegate?.outlineView?(outline, isGroupItem: item) == true { return .zero }
+                return appKit(outline, selector, row)
+            }
+            replace(type, selector, method: inherited, with: imp_implementationWithBlock(frame))
+            hidingDisclosure.insert(ObjectIdentifier(type))
+        }
+        // AppKit made the chevron, hidden, when it added the header rows, before this ran, and on hover only shows it again.
+        outline.enumerateAvailableRowViews { rowView, _ in
+            for button in rowView.subviews where button.identifier == NSOutlineView.showHideButtonIdentifier { button.removeFromSuperview() }
+        }
     }
 
     private static func sidebarDrag(of outline: NSOutlineView) -> SidebarDrag? {
