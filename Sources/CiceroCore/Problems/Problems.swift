@@ -32,7 +32,7 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .external:
             "These fonts are used from a disk that can be unplugged, or a server. They turn off while it’s gone."
         case .duplicates:
-            "The same font is more than once in the same folder. Copies in different folders, like each client’s, aren’t listed: choose between them with Use Copy From."
+            "The same font file is more than once in the same folder. Files that only share a font’s name aren’t listed. Copies in different folders, like each client’s, aren’t listed: choose between them with Use Copy From."
         }
     }
 }
@@ -511,7 +511,8 @@ public enum ProblemDetector {
                     !context.library.activePaths.contains(path) && context.isInWatchedFolder(path) && !(fontLibrary.map(path.hasPrefix) ?? false)
                 }
                 // Copies in different places, like each client's folder, are for Use Copy From to choose between, not spares.
-                let spares = Dictionary(grouping: inactive) { place[$0] ?? ($0 as NSString).deletingLastPathComponent }.values.filter { $0.count >= 2 }
+                let spares = Dictionary(grouping: inactive) { place[$0] ?? ($0 as NSString).deletingLastPathComponent }.values
+                    .flatMap(identicalGroups).filter { $0.count >= 2 }
                 guard !spares.isEmpty else { continue }
                 styles += 1
                 for copies in spares {
@@ -545,6 +546,18 @@ public enum ProblemDetector {
             ))
         }
         return problems
+    }
+
+    private static func identicalGroups(_ paths: [String]) -> [[String]] {
+        var groups: [[String]] = []
+        for path in paths {
+            if let index = groups.firstIndex(where: { AddedDuplicates.isSameFile($0[0], path) }) {
+                groups[index].append(path)
+            } else {
+                groups.append([path])
+            }
+        }
+        return groups
     }
 
     // MARK: Missing

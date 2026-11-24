@@ -163,7 +163,7 @@ public enum AddedDuplicates {
         return theirs.lexicographicallyPrecedes(mine) ? .newer : .older
     }
 
-    private static func isSameFile(_ a: String, _ b: String) -> Bool {
+    static func isSameFile(_ a: String, _ b: String) -> Bool {
         let fm = FileManager.default
         guard let sizeA = (try? fm.attributesOfItem(atPath: a))?[.size] as? Int,
               let sizeB = (try? fm.attributesOfItem(atPath: b))?[.size] as? Int,
