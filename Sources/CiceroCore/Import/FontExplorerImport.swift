@@ -408,12 +408,20 @@ private struct Reader {
 
         var byID: [Int: SQLiteFile.Row] = [:]
         for item in items { byID[item.int("serialID")] = item }
-        func name(_ item: SQLiteFile.Row) -> String {
-            var parts = [item.text("title") ?? "Untitled"]
+        func title(_ item: SQLiteFile.Row) -> String {
+            item.text("title") ?? "Untitled"
+        }
+        func folderParent(_ item: SQLiteFile.Row) -> String? {
+            let parentID = item.int("parentSerialID")
+            guard parentID != item.int("serialID"), let parent = byID[parentID], parent.int("type") == 8 else { return nil }
+            return String(parentID)
+        }
+        func fullPath(_ item: SQLiteFile.Row) -> String {
+            var parts = [title(item)]
             var parent = byID[item.int("parentSerialID")]
             var seen: Set<Int> = [item.int("serialID")]
             while let folder = parent, folder.int("type") == 8, seen.insert(folder.int("serialID")).inserted {
-                parts.insert(folder.text("title") ?? "Untitled", at: 0)
+                parts.insert(title(folder), at: 0)
                 parent = byID[folder.int("parentSerialID")]
             }
             return parts.joined(separator: " / ")
@@ -433,14 +441,17 @@ private struct Reader {
         for item in items {
             let serial = item.int("serialID")
             switch item.int("type") {
+            case 8:
+                setIDs[serial] = String(serial)
+                library.sets.append(ImportedSet(id: String(serial), name: title(item), parentID: folderParent(item), path: fullPath(item), isFolder: true))
             case 7:
                 let fonts = setFonts(serial)
                 if fonts.isEmpty, !(members[serial] ?? []).isEmpty {
-                    unreadableSets.append(name(item))
+                    unreadableSets.append(fullPath(item))
                     continue
                 }
                 setIDs[serial] = String(serial)
-                library.sets.append(ImportedSet(id: String(serial), name: name(item), fonts: fonts))
+                library.sets.append(ImportedSet(id: String(serial), name: title(item), parentID: folderParent(item), path: fullPath(item), fonts: fonts))
             case 31:
                 let children = items.filter { $0.int("parentSerialID") == serial }
                 var fonts: [ImportedFont] = []
@@ -457,11 +468,12 @@ private struct Reader {
                     }
                 }
                 if fonts.isEmpty, hadFonts {
-                    unreadableSets.append(name(item))
+                    unreadableSets.append(fullPath(item))
                     continue
                 }
                 setIDs[serial] = String(serial)
-                library.sets.append(ImportedSet(id: String(serial), name: name(item), fonts: fonts, apps: apps[serial] ?? [], isApplicationSet: true))
+                library.sets.append(ImportedSet(id: String(serial), name: title(item), parentID: folderParent(item), path: fullPath(item),
+                                                fonts: fonts, apps: apps[serial] ?? [], isApplicationSet: true))
             default: break
             }
         }
@@ -483,8 +495,8 @@ private struct Reader {
                     if !unsupported.contains(rule.description) { unsupported.append(rule.description) }
                 }
             }
-            library.smartSets.append(ImportedSmartSet(id: String(serial), name: name(item), matchAll: item.int("specialFlag") != 0,
-                                                      rules: rules, unsupported: unsupported))
+            library.smartSets.append(ImportedSmartSet(id: String(serial), name: title(item), parentID: folderParent(item), path: fullPath(item),
+                                                      matchAll: item.int("specialFlag") != 0, rules: rules, unsupported: unsupported))
         }
 
         for (number, color) in FontExplorerImport.labels.sorted(by: { $0.key < $1.key })

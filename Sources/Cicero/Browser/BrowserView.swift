@@ -30,7 +30,9 @@ struct BrowserView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if case .folder(let id) = model.selection, !families.isEmpty, model.onlineOnlyCount(inFolder: id) > 0 {
-                OnlineOnlyBar(folderID: id)
+                OnlineOnlyBar(folderID: id, relativePath: nil)
+            } else if case .subfolder(let id, let rel) = model.selection, !families.isEmpty, model.onlineOnlyCount(inSubfolder: rel, of: id) > 0 {
+                OnlineOnlyBar(folderID: id, relativePath: rel)
             }
         }
         .topBar {
@@ -119,9 +121,10 @@ private struct ScanCapsule: View {
 private struct OnlineOnlyBar: View {
     @Environment(AppModel.self) private var model
     let folderID: UUID
+    let relativePath: String?
 
     var body: some View {
-        let count = model.onlineOnlyCount(inFolder: folderID)
+        let count = relativePath.map { model.onlineOnlyCount(inSubfolder: $0, of: folderID) } ?? model.onlineOnlyCount(inFolder: folderID)
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "icloud.and.arrow.down")

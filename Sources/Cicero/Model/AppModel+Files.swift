@@ -7,6 +7,7 @@ struct OpenedFiles {
     var paths: Set<String>
     var target: SidebarItem?
     var note: AddNote
+    var folderAssignments: [(parentID: UUID, rootName: String, groups: [(relativePath: String, paths: Set<String>)])] = []
 }
 
 struct AddNote {
@@ -55,7 +56,8 @@ extension AppModel {
         switch selection {
         case .set(let id): return data.sets.contains { $0.id == id } ? selection : nil
         case .tag(let name): return data.tags.contains(name) ? selection : nil
-        case .folder(let id): return id == WatchedFolder.addedFilesID || dropLocation(id) != nil ? selection : nil
+        case .folder(let id): return id == WatchedFolder.addedFilesID || dropLocation(for: selection) != nil ? selection : nil
+        case .subfolder: return dropLocation(for: selection) != nil ? selection : nil
         default: return nil
         }
     }
@@ -65,6 +67,21 @@ extension AppModel {
         guard library.unavailableFolders[id] == nil,
               let folder = candidates.first(where: { FileManager.default.isWritableFile(atPath: $0.path) }) else { return nil }
         return DropLocation(id: id, name: folderName(id), folder: folder.url, isActive: folder.isActive, app: folder.appName)
+    }
+
+    func dropLocation(for item: SidebarItem) -> DropLocation? {
+        switch item {
+        case .folder(let id):
+            return dropLocation(id)
+        case .subfolder(let id, let rel):
+            guard library.unavailableFolders[id] == nil, let folder = data.folders.first(where: { $0.id == id }) else { return nil }
+            let url = folder.url.appendingPathComponent(rel, isDirectory: true)
+            guard FileManager.default.isWritableFile(atPath: url.path) else { return nil }
+            let policy = folder.policy(forSubfolder: rel)
+            return DropLocation(id: id, name: (rel as NSString).lastPathComponent, folder: url, isActive: policy.isActive, app: policy.appName)
+        default:
+            return nil
+        }
     }
 
     static var pastedFiles: [URL] {
@@ -84,6 +101,157 @@ extension AppModel {
             if rest.isEmpty, folders.count == 1, let folder = data.folders.first(where: { $0.path == folders[0].path }) { selection = .folder(folder.id) }
         }
         if !rest.isEmpty { open(rest) }
+    }
+
+    func dropFiles(_ urls: [URL], on item: SidebarItem) {
+        let urls = urls.filter(\.isFileURL).map(\.standardizedFileURL)
+        let folders = urls.filter { url in
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
+                && !NSWorkspace.shared.isFilePackage(atPath: url.path)
+        }
+        let rest = urls.filter { !folders.contains($0) }
+        switch item {
+        case .folder, .subfolder:
+            if !rest.isEmpty { open(rest, into: item) }
+            if !folders.isEmpty { copyFoldersIntoLocation(folders, target: item) }
+        case .set(let setID):
+            if !rest.isEmpty { open(rest, into: item) }
+            if !folders.isEmpty { addFoldersIntoSet(folders, setID: setID) }
+        default:
+            openOnSidebar(urls)
+        }
+    }
+
+    private func copyFoldersIntoLocation(_ sources: [URL], target: SidebarItem) {
+        guard let location = dropLocation(for: target) else {
+            let name: String = switch target {
+            case .folder(let id): folderName(id)
+            case .subfolder(_, let rel): (rel as NSString).lastPathComponent
+            default: "this location"
+            }
+            return showToast("Couldn’t copy into “\(name)”")
+        }
+        let targetURL = location.folder
+        let targetName = location.name
+        var toCopy: [URL] = []
+        for source in sources {
+            let rel = FolderPath.relationship(between: targetURL, and: source)
+            if rel == .same {
+                showToast("“\(source.lastPathComponent)” is already “\(targetName)”")
+                continue
+            }
+            if rel == .contains {
+                if case .folder(let id) = target, let folder = folder(id), let subRel = FolderPath.relativePath(of: source, inside: folder.url) {
+                    expandAncestors(of: id, relativePath: subRel)
+                    if library.folderTrees[id]?.nodes[subRel] != nil { selection = .subfolder(id, subRel) }
+                } else if case .subfolder(let id, _) = target, let folder = folder(id), let subRel = FolderPath.relativePath(of: source, inside: folder.url) {
+                    expandAncestors(of: id, relativePath: subRel)
+                    if library.folderTrees[id]?.nodes[subRel] != nil { selection = .subfolder(id, subRel) }
+                }
+                showToast("“\(source.lastPathComponent)” is already in “\(targetName)”")
+                continue
+            }
+            if FolderPath.relationship(between: source, and: targetURL) == .contains {
+                showToast("Can’t copy “\(source.lastPathComponent)” into a folder inside itself")
+                continue
+            }
+            toCopy.append(source)
+        }
+        guard !toCopy.isEmpty else { return }
+        Task { [weak self] in
+            var copiedRoots: [URL] = []
+            var emptyNames: [String] = []
+            var failed = 0
+            for source in toCopy {
+                do {
+                    if let result = try await Task.detached(priority: .userInitiated, operation: {
+                        try FolderCopy.copyFontFolders(from: source, into: targetURL)
+                    }).value {
+                        copiedRoots.append(result.copiedRoot)
+                    } else {
+                        emptyNames.append(source.lastPathComponent)
+                    }
+                } catch {
+                    failed += 1
+                }
+            }
+            guard let self else { return }
+            guard !copiedRoots.isEmpty else {
+                if failed > 0 {
+                    return showToast("Couldn’t copy into “\(targetName)”")
+                }
+                return showToast(emptyNames.count == 1
+                    ? "There are no fonts Cicero can read in “\(emptyNames[0])”"
+                    : "There are no fonts Cicero can read in those folders")
+            }
+            switch target {
+            case .folder(let id):
+                if let index = data.folders.firstIndex(where: { $0.id == id }), !data.showsSubfolders(for: data.folders[index]) {
+                    data.folders[index].showsSubfolders = true
+                }
+                data.sidebar.expanded.insert("folder.\(id)")
+            case .subfolder(let id, let rel):
+                expandAncestors(of: id, relativePath: rel)
+                data.sidebar.expanded.insert("folder.\(id)/\(rel)")
+            default:
+                break
+            }
+            rescan()
+            let label = copiedRoots.count == 1 ? "“\(copiedRoots[0].lastPathComponent)”" : "\(copiedRoots.count.plain) folders"
+            showToast("Copied \(label) into “\(targetName)”") { [weak self] in
+                self?.undoCopiedFolders(copiedRoots)
+            }
+        }
+    }
+
+    private func undoCopiedFolders(_ roots: [URL]) {
+        let prefixes = roots.map { $0.standardizedFileURL.path + "/" }
+        let active = library.families.flatMap(\.faces).filter { face in
+            prefixes.contains { face.face.path.hasPrefix($0) } && face.canDeactivate
+        }
+        enqueue { model in
+            if !active.isEmpty {
+                let result = await model.engine.deactivate(active, records: model.data.records)
+                model.data.records = result.records
+            }
+            for root in roots where FileManager.default.fileExists(atPath: root.path) {
+                try? FileManager.default.trashItem(at: root, resultingItemURL: nil)
+            }
+            model.rescan()
+            model.showToast(roots.count == 1 ? "Moved “\(roots[0].lastPathComponent)” to the Trash" : "Moved \(roots.count.plain) folders to the Trash")
+        }
+    }
+
+    private func addFoldersIntoSet(_ sources: [URL], setID: UUID) {
+        guard data.sets.contains(where: { $0.id == setID }) else { return }
+        let readFolders = readFolders
+        Task {
+            let structures = await Task.detached(priority: .userInitiated) {
+                sources.map { (name: $0.lastPathComponent, groups: FolderCopy.fontStructure(in: $0)) }
+            }.value
+            let nonEmpty = structures.filter { !$0.groups.isEmpty }
+            guard !nonEmpty.isEmpty else {
+                return showToast(sources.count == 1
+                    ? "There are no fonts Cicero can read in “\(sources[0].lastPathComponent)”"
+                    : "There are no fonts Cicero can read in those folders")
+            }
+            var allPaths: [String] = []
+            var seen = Set<String>()
+            var assignments: [(parentID: UUID, rootName: String, groups: [(relativePath: String, paths: Set<String>)])] = []
+            for entry in nonEmpty {
+                var mappedGroups: [(relativePath: String, paths: Set<String>)] = []
+                for group in entry.groups {
+                    let paths = group.fontPaths.map { libraryPath(of: $0, folders: readFolders) }
+                    for path in paths where seen.insert(path).inserted { allPaths.append(path) }
+                    mappedGroups.append((group.relativePath, Set(paths)))
+                }
+                assignments.append((setID, entry.name, mappedGroups))
+            }
+            addCheckingDuplicates(allPaths) { model, paths, note in
+                model.awaitingScan.append(OpenedFiles(scan: model.rescan(), paths: paths, target: .set(setID), note: note, folderAssignments: assignments))
+            }
+        }
     }
 
     func pasteFiles() {
@@ -130,8 +298,13 @@ extension AppModel {
         }
         var method: InstallMethod?
         var location: DropLocation?
-        if case .folder(let id) = target {
-            if id == WatchedFolder.addedFilesID { method = .inPlace } else { location = dropLocation(id) }
+        switch target {
+        case .folder(let id):
+            if id == WatchedFolder.addedFilesID { method = .inPlace } else { location = dropLocation(for: target!) }
+        case .subfolder:
+            location = dropLocation(for: target!)
+        default:
+            break
         }
         let opened = folders.filter { WatchedFolder.detectAppName(forPath: $0.path) == nil }
         guard (method ?? data.installMethod) != .inPlace, !opened.isEmpty else {
@@ -382,6 +555,48 @@ extension AppModel {
         let joins = { (place: String) in
             opened.note.installedAll ? self.showToast("\(names) installed and added to “\(place)”") : say("\(names) added to “\(place)”")
         }
+        if !opened.folderAssignments.isEmpty {
+            let installedCopies = data.records.installedCopies
+            func matchingFamilies(_ originalPaths: Set<String>) -> [Family] {
+                let copyPaths = Set(installedCopies.filter { originalPaths.contains($0.value) }.keys)
+                let wanted = originalPaths.union(copyPaths)
+                return families.filter { family in
+                    family.faces.contains { wanted.contains($0.face.path) || $0.otherCopies.contains(where: wanted.contains) }
+                }
+            }
+            func ensureChildSet(named name: String, parentID: UUID) -> UUID {
+                if let existing = data.sets.first(where: { $0.parentID == parentID && $0.name == name }) {
+                    data.sidebar.collapsed.remove("set.\(parentID)")
+                    return existing.id
+                }
+                return data.addSet(named: name, parentID: parentID) ?? parentID
+            }
+            var firstCreated: UUID?
+            for assignment in opened.folderAssignments where data.sets.contains(where: { $0.id == assignment.parentID }) {
+                let rootID = ensureChildSet(named: assignment.rootName, parentID: assignment.parentID)
+                if firstCreated == nil { firstCreated = rootID }
+                for group in assignment.groups {
+                    let groupFamilies = matchingFamilies(group.paths)
+                    guard !groupFamilies.isEmpty else { continue }
+                    var targetID = rootID
+                    if !group.relativePath.isEmpty {
+                        for part in group.relativePath.split(separator: "/") {
+                            targetID = ensureChildSet(named: String(part), parentID: targetID)
+                        }
+                    }
+                    setMembership(true, for: groupFamilies, in: targetID)
+                }
+            }
+            if let firstCreated, let targetName = data.sets.first(where: { $0.id == opened.folderAssignments[0].parentID })?.name {
+                joins(targetName)
+                clearSearch()
+                selection = .set(firstCreated)
+                selectedIDs = [families[0].id]
+                openFamilyID = nil
+                jumpTargets = Set(families.map(\.id))
+                return
+            }
+        }
         switch opened.target {
         case .set(let id) where data.sets.contains { $0.id == id }:
             setMembership(true, for: families, in: id)
@@ -397,7 +612,12 @@ extension AppModel {
         let added = families.allSatisfy { $0.folderIDs.contains(WatchedFolder.addedFilesID) }
         var first = families[0]
         if let target = opened.target {
-            let joined = if case .folder(let id) = target { families.filter { $0.folderIDs.contains(id) } } else { families }
+            let joined: [Family] = switch target {
+            case .folder(let id): families.filter { $0.folderIDs.contains(id) }
+            case .subfolder(let id, let rel):
+                families.filter { library.folderTrees[id]?.nodes[rel]?.families.contains($0.id) == true }
+            default: families
+            }
             if let shown = joined.first {
                 first = shown
                 if !isShown(joined) { clearSearch() }

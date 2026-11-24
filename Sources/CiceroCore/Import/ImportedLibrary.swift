@@ -60,23 +60,29 @@ public struct ImportedLibrary: Sendable {
 public struct ImportedSet: Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
+    public var parentID: String?
+    public var path: String?
     public var fonts: [ImportedFont] = []
     public var families: [String] = []
     public var excluded: Set<String> = []
     public var apps: [String] = []
     public var isApplicationSet = false
     public var isBuiltIn = false
+    public var isFolder = false
 
-    public init(id: String, name: String, fonts: [ImportedFont] = [], families: [String] = [], excluded: Set<String> = [],
-                apps: [String] = [], isApplicationSet: Bool = false, isBuiltIn: Bool = false) {
+    public init(id: String, name: String, parentID: String? = nil, path: String? = nil, fonts: [ImportedFont] = [], families: [String] = [],
+                excluded: Set<String> = [], apps: [String] = [], isApplicationSet: Bool = false, isBuiltIn: Bool = false, isFolder: Bool = false) {
         self.id = id
         self.name = name
+        self.parentID = parentID
+        self.path = path
         self.fonts = fonts
         self.families = families
         self.excluded = excluded
         self.apps = apps
         self.isApplicationSet = isApplicationSet
         self.isBuiltIn = isBuiltIn
+        self.isFolder = isFolder
     }
 
     public var count: Int { fonts.count + families.count }
@@ -85,13 +91,17 @@ public struct ImportedSet: Identifiable, Hashable, Sendable {
 public struct ImportedSmartSet: Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
+    public var parentID: String?
+    public var path: String?
     public var matchAll: Bool
     public var rules: [SmartRule]
     public var unsupported: [String]
 
-    public init(id: String, name: String, matchAll: Bool, rules: [SmartRule], unsupported: [String] = []) {
+    public init(id: String, name: String, parentID: String? = nil, path: String? = nil, matchAll: Bool, rules: [SmartRule], unsupported: [String] = []) {
         self.id = id
         self.name = name
+        self.parentID = parentID
+        self.path = path
         self.matchAll = matchAll
         self.rules = rules
         self.unsupported = unsupported

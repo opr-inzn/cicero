@@ -698,6 +698,49 @@ struct FolderActivationPicker: View {
     }
 }
 
+struct SubfolderActivationPicker: View {
+    let folder: WatchedFolder
+    let relativePath: String
+    let parentName: String
+    let askForApp: () -> Void
+    @Environment(AppModel.self) private var model
+
+    private static let inherit = "\u{0}inherit", active = "\u{0}active", specificApp = "\u{0}app"
+
+    var body: some View {
+        let own = folder.subfolders[relativePath]
+        let inherited = folder.inheritedPolicy(forSubfolder: relativePath)
+        let inheritedLabel = inherited.isActive ? "Active" : inherited.appName.map { "Active in \(FaceState.appDescription($0))" } ?? "Inactive"
+        Picker(selection: Binding(
+            get: {
+                guard let own else { return Self.inherit }
+                return own.isActive ? Self.active : own.appName ?? ""
+            },
+            set: { choice in
+                switch choice {
+                case Self.inherit: model.setActivation(ofSubfolder: relativePath, in: folder.id, policy: nil)
+                case Self.specificApp: askForApp()
+                case Self.active: model.setActivation(ofSubfolder: relativePath, in: folder.id, policy: FolderPolicy(isActive: true))
+                default: model.setActivation(ofSubfolder: relativePath, in: folder.id, policy: FolderPolicy(isActive: false, appName: choice.isEmpty ? nil : choice))
+                }
+            }
+        )) {
+            Text("Same as “\(parentName)” (\(inheritedLabel))").tag(Self.inherit)
+            Divider()
+            Text("Inactive").tag("")
+            Text("Active").tag(Self.active)
+            Text("Active in Adobe Apps").tag("Adobe")
+            if let app = own?.appName, app != "Adobe" {
+                Text("Active in \(FaceState.appDescription(app))").tag(app)
+            }
+            Divider()
+            Text("Active in Specific App").tag(Self.specificApp)
+        } label: {
+            Label("Fonts in This Folder", systemImage: "switch.2")
+        }
+    }
+}
+
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
     let options: [(title: String, value: Value)]
     @Binding var selection: Value

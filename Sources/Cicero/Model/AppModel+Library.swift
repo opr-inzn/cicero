@@ -45,12 +45,20 @@ struct SidebarRow: Identifiable, Hashable {
     var item: SidebarItem
     var badge = 0
     var color: TagColor?
+    var depth = 0
+    var hasChildren = false
+    var isExpanded = false
+    var canMove = true
+    var parentKey: String?
 
     var id: String { key }
 
     static let alwaysShown: Set<String> = ["library.all", "library.active", "library.inactive"]
 
-    var canHide: Bool { !Self.alwaysShown.contains(key) }
+    var canHide: Bool {
+        if case .subfolder = item { return false }
+        return !Self.alwaysShown.contains(key)
+    }
 }
 
 struct VisibleKey: Equatable {
@@ -93,23 +101,39 @@ extension AppModel {
 
     func family(_ id: String) -> Family? { library.family(id).map(shown) }
 
-    var shownLocation: UUID? {
-        guard documentList == nil, similarFamilyID == nil, selectedItems.count == 1, case .folder(let id) = selectedItems.first else { return nil }
-        return id
+    var shownPlace: SidebarItem? {
+        guard documentList == nil, similarFamilyID == nil, selectedItems.count == 1, let first = selectedItems.first else { return nil }
+        switch first {
+        case .folder, .subfolder: return first
+        default: return nil
+        }
     }
 
     func shown(_ family: Family) -> Family {
-        guard let location = shownLocation else { return family }
-        return onlyIn(location)[family.id] ?? family
+        guard let place = shownPlace else { return family }
+        return onlyIn(place)[family.id] ?? family
     }
 
-    func onlyIn(_ location: UUID) -> [String: Family] {
-        if let cached = locationOnlyCache, cached.fingerprint == library.fingerprint, cached.location == location { return cached.families }
+    func onlyIn(_ place: SidebarItem) -> [String: Family] {
+        if let cached = locationOnlyCache, cached.fingerprint == library.fingerprint, cached.place == place { return cached.families }
         var families: [String: Family] = [:]
-        for family in library.families where family.folderIDs.contains(location) {
-            if let only = family.only(inLocation: location), only != family { families[family.id] = only }
+        switch place {
+        case .folder(let location):
+            for family in library.families where family.folderIDs.contains(location) {
+                if let only = family.only(inLocation: location), only != family { families[family.id] = only }
+            }
+        case .subfolder(let location, let relativePath):
+            if let folder = folder(location) {
+                let prefixes = FolderPath.prefixes(of: folder, relativePath: relativePath)
+                let ids = library.folderTrees[location]?.nodes[relativePath]?.families ?? []
+                for family in library.families where ids.contains(family.id) {
+                    if let only = family.only(insidePrefixes: prefixes), only != family { families[family.id] = only }
+                }
+            }
+        default:
+            break
         }
-        locationOnlyCache = (library.fingerprint, location, families)
+        locationOnlyCache = (library.fingerprint, place, families)
         return families
     }
 
@@ -134,7 +158,7 @@ extension AppModel {
     }
 
     private func inLibraryOrder(_ ids: Set<String>) -> [Family] {
-        let library = library, only = shownLocation.map(onlyIn)
+        let library = library, only = shownPlace.map(onlyIn)
         return ids.compactMap { library.position(of: $0) }.sorted().map { index in
             let family = library.families[index]
             return only?[family.id] ?? family
@@ -276,8 +300,8 @@ extension AppModel {
         var kept: [Int] = []
         for index in families.indices where keeps(families[index]) { kept.append(index) }
         let listed = kept.count == families.count ? families : kept.map { families[$0] }
-        if let location = shownLocation {
-            let only = onlyIn(location)
+        if let place = shownPlace {
+            let only = onlyIn(place)
             return listed.map { only[$0.id] ?? $0 }
         }
         return selectedItems == [.recent] ? Family.latestFirst(listed) : listed

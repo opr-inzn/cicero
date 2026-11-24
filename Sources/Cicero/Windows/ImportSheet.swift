@@ -162,25 +162,25 @@ struct ImportSheet: View {
                 }
             }
         }
-        let plain = library.sets.filter { !$0.isApplicationSet }
+        let plain = library.sets.filter { !$0.isApplicationSet && !$0.isFolder }
         if !plain.isEmpty {
             section(prompt.source == .fontExplorer ? "Sets" : "Collections", selecting: plain.map(\.id), in: \.sets) {
-                ForEach(plain) { set in checkbox(set.name, detail: detail(set), isOn: member(set.id, of: \.sets)) }
+                ForEach(plain) { set in checkbox(set.path ?? set.name, detail: detail(set), isOn: member(set.id, of: \.sets)) }
             }
         }
-        let applicationSets = library.sets.filter(\.isApplicationSet)
+        let applicationSets = library.sets.filter { $0.isApplicationSet && !$0.isFolder }
         if !applicationSets.isEmpty {
             section("Application Sets", selecting: applicationSets.map(\.id), in: \.sets) {
-                ForEach(applicationSets) { set in checkbox(set.name, detail: detail(set), isOn: member(set.id, of: \.sets)) }
+                ForEach(applicationSets) { set in checkbox(set.path ?? set.name, detail: detail(set), isOn: member(set.id, of: \.sets)) }
             }
         }
         if !library.smartSets.isEmpty {
             section("Smart Sets", selecting: library.smartSets.filter(\.unsupported.isEmpty).map(\.id), in: \.smartSets) {
                 ForEach(library.smartSets) { smart in
                     if smart.unsupported.isEmpty {
-                        checkbox(smart.name, detail: rulesDetail(smart), isOn: member(smart.id, of: \.smartSets))
+                        checkbox(smart.path ?? smart.name, detail: rulesDetail(smart), isOn: member(smart.id, of: \.smartSets))
                     } else {
-                        checkbox(smart.name, detail: "Cicero has no rule for \(smart.unsupported.listed()).",
+                        checkbox(smart.path ?? smart.name, detail: "Cicero has no rule for \(smart.unsupported.listed()).",
                                  isOn: .constant(false))
                             .disabled(true)
                     }

@@ -112,13 +112,21 @@ private struct SidebarContent: View {
     }
 
     private func movableRows(_ rows: [SidebarRow], in list: String, section: SidebarSection?) -> some View {
-        let shownRows = shown(rows)
-        return ForEach(shownRows) { row($0, section: section) }
+        let shownRows = shown(rows, in: section)
+        let hasHierarchy = (section == .folders || section == .sets) && shownRows.contains { $0.hasChildren || $0.depth > 0 }
+        return ForEach(shownRows) { row($0, section: section, hasHierarchy: hasHierarchy) }
             .onMove { source, destination in
                 var transaction = Transaction(animation: nil)
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
-                    model.moveSidebarItems(source, to: destination, shown: shownRows.map(\.key), all: rows.map(\.key), in: list)
+                    switch section {
+                    case .sets:
+                        model.moveFolderRows(source, to: destination, shown: shownRows)
+                    case .folders:
+                        model.moveLocationRows(source, to: destination, shown: shownRows)
+                    default:
+                        model.moveSidebarItems(source, to: destination, shown: shownRows.map(\.key), all: rows.map(\.key), in: list)
+                    }
                 }
             }
     }
@@ -180,8 +188,24 @@ private struct SidebarContent: View {
         return GroupDrag(group: group)
     }
 
-    private func shown(_ rows: [SidebarRow]) -> [SidebarRow] {
-        model.isEditingSidebar ? rows : rows.filter { model.isVisible($0.key) }
+    private func shown(_ rows: [SidebarRow], in section: SidebarSection? = nil) -> [SidebarRow] {
+        if model.isEditingSidebar {
+            return section == .folders ? rows.filter { $0.depth == 0 } : rows
+        }
+        return rows.filter { row in
+            guard model.isVisible(row.key) else { return false }
+            switch row.item {
+            case .subfolder(let id, _):
+                return model.isVisible("folder.\(id)")
+            case .set(let id):
+                return model.data.ancestorIDs(ofSet: id).allSatisfy { model.isVisible("set.\($0)") }
+            case .smartSet(let id):
+                guard let parent = model.data.smartSets.first(where: { $0.id == id })?.parentID else { return true }
+                return model.isVisible("set.\(parent)") && model.data.ancestorIDs(ofSet: parent).allSatisfy { model.isVisible("set.\($0)") }
+            default:
+                return true
+            }
+        }
     }
 
     private func expansion(_ section: SidebarSection) -> Binding<Bool> {
@@ -205,14 +229,33 @@ private struct SidebarContent: View {
         .background(OutlineViewSetup(drag: drag) { model.dragOutOfSidebar($0) })
     }
 
+    @ViewBuilder
     private func sectionHeader(_ section: SidebarSection) -> some View {
-        SectionHeader(title: section.title, key: section.key, fit: fit, isExpanded: expansion(section),
-                      isDimmed: model.isEditingSidebar && !model.isVisible(section.key)) {
+        let header = SectionHeader(title: section.title, key: section.key, fit: fit, isExpanded: expansion(section),
+                                   isDimmed: model.isEditingSidebar && !model.isVisible(section.key)) {
             if model.isEditingSidebar {
                 checkbox(section.key, section.title)
             }
         } trailing: {
             if !model.isEditingSidebar { addButton(section) }
+        }
+        if section == .sets {
+            header
+                .background {
+                    if highlight.foldersHeaderTargeted {
+                        RoundedRectangle(cornerRadius: 6).fill(.tint.opacity(0.2)).padding(.horizontal, -6)
+                    }
+                    SidebarRowReparentTarget(
+                        canDrop: { model.canDropFolderItems(drag.draggedItems, onto: nil) },
+                        isOver: { highlight.foldersHeaderTargeted = $0 },
+                        perform: {
+                            highlight.foldersHeaderTargeted = false
+                            model.moveFolderItems(drag.draggedItems, to: nil)
+                        }
+                    )
+                }
+        } else {
+            header
         }
     }
 
@@ -262,38 +305,108 @@ private struct SidebarContent: View {
     // MARK: Rows
 
     @ViewBuilder
-    private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
+    private func row(_ row: SidebarRow, section: SidebarSection?, hasHierarchy: Bool) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
-        let content = HStack(spacing: 6) {
+        let content = HStack(spacing: 4) {
             if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
+            if hasHierarchy {
+                if row.hasChildren {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(highlight.dropTarget == row.item ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                        .rotationEffect(.degrees(row.isExpanded ? 90 : 0))
+                        .transaction { $0.animation = nil }
+                        .frame(width: 12, height: 18)
+                        .contentShape(.rect)
+                        .onTapGesture { model.toggleExpanded(for: row) }
+                        .accessibilityLabel(row.isExpanded ? "Collapse" : "Expand")
+                } else {
+                    Color.clear.frame(width: 12, height: 1)
+                }
+            }
             SidebarLabel(row: row, highlight: highlight, fit: fit)
         }
+        .padding(.leading, CGFloat(row.depth) * 14)
         .badge(row.badge > 0 ? Text(row.badge.plain) : nil)
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
         .listRowBackground(SidebarRowBackground(item: row.item, highlight: highlight))
         .tag(row.item)
+        .moveDisabled(!row.canMove)
         .contextMenu { SidebarRowMenu(row: row, model: model, highlight: highlight) }
         // Asked for as the list starts dragging the row, which tells which rows a drag has.
         .itemProvider { drag.provider(for: row) }
-        // Only rows that take families, or styles of them, are drop targets: being one makes a row much slower to appear.
-        if model.takesFamilies(row.item) {
+        // Only rows that take families, files or child folders are drop targets: being one makes a row much slower to appear.
+        if case .set(let setID) = row.item {
+            content
+                .background {
+                    FontDropTarget(isOver: { isOver in
+                        setDropTarget(isOver, for: row)
+                    }, files: .init(isOver: { isOver in
+                        setDropTarget(isOver, for: row)
+                    }) { urls in
+                        clearDropTarget(for: row)
+                        model.dropFiles(urls, on: row.item)
+                    }) { drags in
+                        clearDropTarget(for: row)
+                        _ = model.handleDrop(drags, on: row.item)
+                    }
+                    SidebarRowReparentTarget(
+                        canDrop: { model.canDropFolderItems(drag.draggedItems, onto: row.item) },
+                        isOver: { isOver in setDropTarget(isOver, for: row) },
+                        perform: {
+                            clearDropTarget(for: row)
+                            model.moveFolderItems(drag.draggedItems, to: setID)
+                        }
+                    )
+                    .padding(.vertical, 5)
+                }
+        } else if takesRowFiles(row.item) {
+            content
+                .background(FontDropTarget(files: .init(isOver: { isOver in
+                    setDropTarget(isOver, for: row)
+                }) { urls in
+                    clearDropTarget(for: row)
+                    model.dropFiles(urls, on: row.item)
+                }))
+        } else if model.takesFamilies(row.item) {
             content
                 .background(FontDropTarget(isOver: { isOver in
-                    if isOver {
-                        if highlight.dropTarget != row.item { highlight.dropTarget = row.item }
-                    } else if highlight.dropTarget == row.item {
-                        highlight.dropTarget = nil
-                    }
+                    setDropTarget(isOver, for: row)
                 }, files: .init(isOver: { highlight.filesOver = $0 }) { urls in
                     highlight.filesOver = false
                     model.openOnSidebar(urls)
                 }) { drags in
-                    highlight.dropTarget = nil
+                    clearDropTarget(for: row)
                     _ = model.handleDrop(drags, on: row.item)
                 })
         } else {
             content
         }
+    }
+
+    private func takesRowFiles(_ item: SidebarItem) -> Bool {
+        switch item {
+        case .folder(let id): id != WatchedFolder.adobeFontsID && id != WatchedFolder.addedFilesID
+        case .subfolder: true
+        default: false
+        }
+    }
+
+    private func setDropTarget(_ isOver: Bool, for row: SidebarRow) {
+        if isOver {
+            if highlight.dropTarget != row.item { highlight.dropTarget = row.item }
+            if row.hasChildren && !row.isExpanded {
+                highlight.scheduleSpringLoad(for: row.item) { model.toggleExpanded(for: row) }
+            }
+        } else if highlight.dropTarget == row.item {
+            highlight.dropTarget = nil
+            highlight.cancelSpringLoad()
+        }
+    }
+
+    private func clearDropTarget(for row: SidebarRow) {
+        if highlight.dropTarget == row.item { highlight.dropTarget = nil }
+        highlight.cancelSpringLoad()
     }
 }
 
@@ -313,8 +426,8 @@ private struct SidebarRowMenu: View {
                 Button("Activate Permanently", systemImage: "checkmark.seal") { model.activateFonts(in: rows) }
                 Button("Deactivate", systemImage: "xmark.seal") { model.deactivateFonts(in: [row.item]) }
             }
-        case .folder:
-            locationItems(rows.compactMap { if case .folder(let id) = $0.item { id } else { nil } })
+        case .folder, .subfolder:
+            locationItems(rows)
         case .set, .smartSet:
             folderItems(rows)
         case .tag:
@@ -366,7 +479,7 @@ private struct SidebarRowMenu: View {
 
     private var noun: String {
         switch row.item {
-        case .folder: "Locations"
+        case .folder, .subfolder: "Locations"
         case .set, .smartSet: "Folders"
         case .tag: "Tags"
         case .foundry: "Foundries"
@@ -377,31 +490,50 @@ private struct SidebarRowMenu: View {
     }
 
     @ViewBuilder
-    private func locationItems(_ ids: [UUID]) -> some View {
-        if ids.count == 1, let id = ids.first {
-            Button("Rename Location", systemImage: "pencil") {
-                model.prompt("Rename Location", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
-            }
-            switch id {
-            case WatchedFolder.adobeFontsID:
-                Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
-            case WatchedFolder.adobeAppsID, WatchedFolder.addedFilesID:
-                revealButton(ids)
-            default:
-                if let folder = model.folder(id) {
-                    revealButton(ids)
-                    Divider()
-                    FolderActivationPicker(folder: folder) {
-                        model.prompt("Active in Specific App", confirm: "OK", requiresText: true) { model.setActivation(ofFolder: id, active: false, app: $0) }
+    private func locationItems(_ rows: [SidebarRow]) -> some View {
+        if rows.count == 1, let only = rows.first {
+            switch only.item {
+            case .folder(let id):
+                Button("Rename Location", systemImage: "pencil") {
+                    model.prompt("Rename Location", text: model.folderName(id), confirm: "Rename") { model.renameFolder(id, to: $0) }
+                }
+                switch id {
+                case WatchedFolder.adobeFontsID:
+                    Button("Manage in Creative Cloud", systemImage: "arrow.up.forward.app") { CreativeCloud.open() }
+                case WatchedFolder.adobeAppsID, WatchedFolder.addedFilesID:
+                    revealButton([only.item])
+                default:
+                    if let folder = model.folder(id) {
+                        revealButton([only.item])
+                        Toggle("Show Subfolders", isOn: Binding(
+                            get: { model.showsSubfolders(for: id) },
+                            set: { model.setShowsSubfolders($0, for: id) }
+                        ))
+                        Divider()
+                        FolderActivationPicker(folder: folder) {
+                            model.prompt("Active in Specific App", confirm: "OK", requiresText: true) { model.setActivation(ofFolder: id, active: false, app: $0) }
+                        }
                     }
                 }
+            case .subfolder(let id, let rel):
+                revealButton([only.item])
+                if let folder = model.folder(id) {
+                    Divider()
+                    SubfolderActivationPicker(folder: folder, relativePath: rel, parentName: model.subfolderParentName(of: rel, in: id)) {
+                        model.prompt("Active in Specific App", confirm: "OK", requiresText: true) {
+                            model.setActivation(ofSubfolder: rel, in: id, policy: FolderPolicy(isActive: false, appName: $0))
+                        }
+                    }
+                }
+            default:
+                EmptyView()
             }
         } else {
-            revealButton(ids.filter { $0 != WatchedFolder.adobeFontsID })
+            revealButton(rows.map(\.item).filter { $0 != .folder(WatchedFolder.adobeFontsID) })
         }
-        let removable = ids.filter(model.isRemovableFolder)
+        let removable = rows.compactMap { if case .folder(let id) = $0.item, model.isRemovableFolder(id) { id } else { nil } }
         if !removable.isEmpty {
-            if ids.count > 1 { Divider() }
+            if rows.count > 1 { Divider() }
             Button(removable.count == 1 ? "Remove Location from Library" : "Remove Locations from Library", systemImage: "folder.badge.minus") {
                 model.removeFolders(Set(removable))
             }
@@ -409,10 +541,10 @@ private struct SidebarRowMenu: View {
     }
 
     @ViewBuilder
-    private func revealButton(_ ids: [UUID]) -> some View {
-        if !ids.isEmpty {
+    private func revealButton(_ items: [SidebarItem]) -> some View {
+        if !items.isEmpty {
             Button("Reveal in Finder", systemImage: "finder") {
-                NSWorkspace.shared.activateFileViewerSelecting(ids.flatMap(model.finderURLs))
+                NSWorkspace.shared.activateFileViewerSelecting(items.flatMap(model.finderURLs(of:)))
             }
         }
     }
@@ -429,10 +561,33 @@ private struct SidebarRowMenu: View {
         Divider()
         if rows.count == 1 {
             if let id = sets.first, let set = model.data.sets.first(where: { $0.id == id }) {
+                Button("New Folder", systemImage: "folder.badge.plus") {
+                    model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0, parentID: id) }
+                }
                 Button("Rename Folder", systemImage: "pencil") { model.prompt("Rename Folder", text: set.name, confirm: "Rename") { model.renameSet(id, to: $0) } }
                 Button(set.apps.isEmpty ? "Activate with Apps" : "Edit Apps", systemImage: "app.badge.checkmark") { model.ask { $0.editingAppsForSet = id } }
             } else if let id = smartSets.first, let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
                 Button("Edit Smart Folder", systemImage: "slider.horizontal.3") { model.ask { $0.editingSmartSet = smartSet } }
+            }
+        }
+        let items = rows.map(\.item)
+        let destinations = model.allRows(for: .sets).compactMap { candidate -> FontSet? in
+            guard case .set(let id) = candidate.item,
+                  let set = model.data.sets.first(where: { $0.id == id }),
+                  model.canDropFolderItems(items, onto: .set(id))
+            else { return nil }
+            return set
+        }
+        let hasNested = rows.contains { $0.depth > 0 }
+        if hasNested || !destinations.isEmpty {
+            Menu("Move To", systemImage: "folder") {
+                if hasNested {
+                    Button("Top Level") { model.moveFolderItems(items, to: nil) }
+                    if !destinations.isEmpty { Divider() }
+                }
+                ForEach(destinations) { dest in
+                    Button(model.data.path(ofSet: dest.id)) { model.moveFolderItems(items, to: dest.id) }
+                }
             }
         }
         Button("Delete \(kinds)", systemImage: "trash") {
@@ -520,6 +675,27 @@ final class SidebarHighlight {
     var selected: Set<SidebarItem> = []
     var dropTarget: SidebarItem?
     var filesOver = false
+    var foldersHeaderTargeted = false
+    @ObservationIgnored private var springTarget: SidebarItem?
+    @ObservationIgnored private var springTask: Task<Void, Never>?
+
+    func scheduleSpringLoad(for item: SidebarItem, expand: @escaping () -> Void) {
+        guard springTarget != item else { return }
+        springTarget = item
+        springTask?.cancel()
+        springTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled, self?.springTarget == item else { return }
+            self?.springTarget = nil
+            expand()
+        }
+    }
+
+    func cancelSpringLoad() {
+        springTarget = nil
+        springTask?.cancel()
+        springTask = nil
+    }
 }
 
 private struct OrganizeRow: View {
@@ -591,6 +767,56 @@ private nonisolated struct GroupDrag: Codable, Transferable {
 
 private extension UTType {
     nonisolated static let ciceroSidebarGroup = UTType(exportedAs: "com.maximilianinzinger.cicero.sidebar-group")
+    nonisolated static let ciceroSidebarRow = UTType(exportedAs: "com.maximilianinzinger.cicero.sidebar-row")
+}
+
+private struct SidebarRowReparentTarget: NSViewRepresentable {
+    var canDrop: () -> Bool
+    var isOver: (Bool) -> Void
+    var perform: () -> Void
+
+    func makeNSView(context: Context) -> TargetView {
+        let view = TargetView()
+        view.registerForDraggedTypes([NSPasteboard.PasteboardType(UTType.ciceroSidebarRow.identifier)])
+        return view
+    }
+
+    func updateNSView(_ view: TargetView, context: Context) {
+        view.canDrop = canDrop
+        view.isOver = isOver
+        view.perform = perform
+    }
+
+    final class TargetView: NSView {
+        var canDrop: () -> Bool = { false }
+        var isOver: (Bool) -> Void = { _ in }
+        var perform: () -> Void = {}
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+            let allowed = canDrop()
+            isOver(allowed)
+            return allowed ? .move : []
+        }
+
+        override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+            let allowed = canDrop()
+            isOver(allowed)
+            return allowed ? .move : []
+        }
+
+        override func draggingExited(_ sender: (any NSDraggingInfo)?) { isOver(false) }
+
+        override func draggingEnded(_ sender: any NSDraggingInfo) { isOver(false) }
+
+        override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+            isOver(false)
+            guard canDrop() else { return false }
+            perform()
+            return true
+        }
+    }
 }
 
 private struct GroupDragSource: ViewModifier {
@@ -711,13 +937,25 @@ final class SidebarDrag {
     private var listFrame = NSRect.zero
     private var pictures: [NSImage?] = []
 
+    var draggedItems: [SidebarItem] { session == nil ? [] : rows.map(\.item) }
+
     func provider(for row: SidebarRow) -> NSItemProvider {
         let now = ContinuousClock.now
         // The list asks each row it drags for an item, and on macOS 26 also as the mouse goes down on one, so a drag's rows are the last ones asked for.
         if lastAsked.map({ now - $0 > .milliseconds(500) }) ?? true { rows = [] }
         lastAsked = now
         rows.append(row)
-        return NSItemProvider()
+        let provider = NSItemProvider()
+        switch row.item {
+        case .set, .smartSet:
+            provider.registerDataRepresentation(forTypeIdentifier: UTType.ciceroSidebarRow.identifier, visibility: .ownProcess) { completion in
+                completion(Data(), nil)
+                return nil
+            }
+        default:
+            break
+        }
+        return provider
     }
 
     func began(_ session: NSDraggingSession, count: Int, in outline: NSOutlineView) {

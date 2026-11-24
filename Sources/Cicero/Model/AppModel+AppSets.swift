@@ -3,13 +3,14 @@ import CiceroCore
 import UniformTypeIdentifiers
 
 extension AppModel {
-    func newApplicationSet(with families: [Family] = []) {
+    func newApplicationSet(parentID: UUID? = nil, with families: [Family] = []) {
         prompt("New App Folder", confirm: "Create") { name in
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }
-            let set = FontSet(name: trimmed, families: families.map(\.id))
+            let set = FontSet(name: trimmed, parentID: parentID, families: families.map(\.id))
             self.data.sets.append(set)
             self.data.sidebar.hidden.remove(SidebarSection.sets.key)
+            if let parentID { self.data.sidebar.collapsed.remove("set.\(parentID)") }
             self.selection = .set(set.id)
             self.ask { $0.editingAppsForSet = set.id }
         }

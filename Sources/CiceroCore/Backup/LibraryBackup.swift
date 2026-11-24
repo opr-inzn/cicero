@@ -446,7 +446,11 @@ public struct LibraryBackup: Sendable {
             Dictionary(dictionary.map { (map($0.key), map($0.value)) }, uniquingKeysWith: { first, _ in first })
         }
         var data = contents.userData
-        data.folders = data.folders.map { WatchedFolder(id: $0.id, path: map($0.path), appName: $0.appName, isActive: $0.isActive) }
+        data.folders = data.folders.map {
+            var folder = $0
+            folder.path = map($0.path)
+            return folder
+        }
         data.fontFiles = data.fontFiles.map(map)
         data.missingFontFiles = [:]
         data.fontLibraryPath = libraries.restored

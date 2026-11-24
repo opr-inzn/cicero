@@ -14,7 +14,7 @@ public struct ImportChoices: Equatable, Sendable {
     public var removeCopies = true
 
     public init(for library: ImportedLibrary) {
-        sets = Set(library.sets.filter { !$0.isBuiltIn }.map(\.id))
+        sets = Set(library.sets.filter { !$0.isBuiltIn && !$0.isFolder }.map(\.id))
         smartSets = Set(library.smartSets.filter(\.unsupported.isEmpty).map(\.id))
         activate = !library.active.isEmpty
     }
@@ -104,8 +104,26 @@ public enum LibraryImport {
         }
 
         var setIDs: [String: UUID] = [:]
+        let foldersByID = Dictionary(imported.sets.filter(\.isFolder).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        func ensureFolder(_ id: String?, seen: Set<String> = []) -> UUID? {
+            guard let id, !seen.contains(id) else { return nil }
+            if let existing = setIDs[id] { return existing }
+            guard let folder = foldersByID[id] else { return nil }
+            var nextSeen = seen
+            nextSeen.insert(id)
+            let parent = ensureFolder(folder.parentID, seen: nextSeen)
+            if let existing = data.sets.first(where: { $0.parentID == parent && $0.name == folder.name }) {
+                setIDs[id] = existing.id
+                return existing.id
+            }
+            let created = FontSet(name: folder.name, parentID: parent)
+            data.sets.append(created)
+            setIDs[id] = created.id
+            return created.id
+        }
+
         let apps = AppFinder(folders: appFolders)
-        for set in imported.sets where choices.sets.contains(set.id) {
+        for set in imported.sets where !set.isFolder && choices.sets.contains(set.id) {
             var whole: [String] = []
             var styles: [String: [String]] = [:]
             var order: [String] = []
@@ -141,8 +159,11 @@ public enum LibraryImport {
                     if !summary.missingApps.contains(name) { summary.missingApps.append(name) }
                 }
             }
+            let flatExistingIndex = set.path.flatMap { path in
+                path != set.name ? data.sets.firstIndex(where: { $0.parentID == nil && $0.name == path }) : nil
+            }
             let changed: Bool
-            if let index = data.sets.firstIndex(where: { $0.name == set.name }) {
+            if let index = flatExistingIndex {
                 let before = data.sets[index]
                 data.sets[index].add(families: whole)
                 for (family, names) in styles { for name in names { data.sets[index].add(style: name, of: family) } }
@@ -152,13 +173,25 @@ public enum LibraryImport {
                 setIDs[set.id] = data.sets[index].id
                 changed = data.sets[index] != before
             } else if whole.isEmpty, styles.isEmpty, set.count > 0 {
-                summary.emptySets.append(set.name)
+                summary.emptySets.append(set.path ?? set.name)
                 continue
             } else {
-                let new = FontSet(name: set.name, families: whole, styles: styles, apps: linked)
-                data.sets.append(new)
-                setIDs[set.id] = new.id
-                changed = true
+                let parent = ensureFolder(set.parentID)
+                if let index = data.sets.firstIndex(where: { $0.parentID == parent && $0.name == set.name }) {
+                    let before = data.sets[index]
+                    data.sets[index].add(families: whole)
+                    for (family, names) in styles { for name in names { data.sets[index].add(style: name, of: family) } }
+                    for app in linked where !data.sets[index].apps.contains(where: { $0.bundleID == app.bundleID }) {
+                        data.sets[index].apps.append(app)
+                    }
+                    setIDs[set.id] = data.sets[index].id
+                    changed = data.sets[index] != before
+                } else {
+                    let new = FontSet(name: set.name, parentID: parent, families: whole, styles: styles, apps: linked)
+                    data.sets.append(new)
+                    setIDs[set.id] = new.id
+                    changed = true
+                }
             }
             guard changed else { continue }
             if set.isApplicationSet { summary.applicationSets += 1 } else { summary.sets += 1 }
@@ -183,16 +216,19 @@ public enum LibraryImport {
             }
         }
 
-        let setNames = Dictionary(imported.sets.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let setPaths = Dictionary(imported.sets.map { ($0.id, $0.path ?? $0.name) }, uniquingKeysWith: { first, _ in first })
         for smart in imported.smartSets where choices.smartSets.contains(smart.id) {
-            guard !data.smartSets.contains(where: { $0.name == smart.name }) else { continue }
+            let flatName = smart.path ?? smart.name
+            if data.smartSets.contains(where: { $0.parentID == nil && $0.name == flatName }) { continue }
             var rules = smart.rules
             var complete = smart.unsupported.isEmpty
             for index in rules.indices {
                 switch rules[index].field {
                 case .set:
                     let id = rules[index].value
-                    let existing = setNames[id].flatMap { name in data.sets.first { $0.name == name }?.id }
+                    let existing = setPaths[id].flatMap { path in
+                        data.sets.first { $0.name == path || data.path(ofSet: $0.id) == path }?.id
+                    }
                     if let uuid = setIDs[id] ?? existing { rules[index].value = uuid.uuidString } else { complete = false }
                 case .tag:
                     if !data.tags.contains(rules[index].value) { complete = false }
@@ -201,10 +237,12 @@ public enum LibraryImport {
                 }
             }
             guard complete else {
-                summary.skippedSmartSets.append(smart.name)
+                summary.skippedSmartSets.append(smart.path ?? smart.name)
                 continue
             }
-            data.smartSets.append(SmartSet(name: smart.name, matchAll: smart.matchAll, rules: rules))
+            let parent = ensureFolder(smart.parentID)
+            guard !data.smartSets.contains(where: { $0.parentID == parent && $0.name == smart.name }) else { continue }
+            data.smartSets.append(SmartSet(name: smart.name, parentID: parent, matchAll: smart.matchAll, rules: rules))
             summary.smartSets += 1
         }
 

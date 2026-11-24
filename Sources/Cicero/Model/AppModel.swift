@@ -283,7 +283,7 @@ final class AppModel {
     @ObservationIgnored private var fontdChangedDuringScan = false
     @ObservationIgnored private var fontsFolderCheck: Task<Void, Never>?
     @ObservationIgnored var visibleCache: (key: VisibleKey, families: [Family], ids: Set<String>)?
-    @ObservationIgnored var locationOnlyCache: (fingerprint: Int, location: UUID, families: [String: Family])?
+    @ObservationIgnored var locationOnlyCache: (fingerprint: Int, place: SidebarItem, families: [String: Family])?
     @ObservationIgnored var visibleCountsCache: (key: VisibleKey, active: Int, appOnly: [String])?
     @ObservationIgnored var fontRowsCache: (key: FontRowsKey, rows: [FontRow], families: [Family])?
     @ObservationIgnored let characterSetLookup = CharacterSetLookup()
@@ -431,11 +431,11 @@ final class AppModel {
     }
 
     private func restoreLibrary() {
-        let scanner = scanner, records = data.records, coverage = coverage
+        let scanner = scanner, records = data.records, folders = data.folders, coverage = coverage
         restoring = SavedLibraryRead {
             let coverageRead = DispatchGroup()
             DispatchQueue.global(qos: .userInteractive).async(group: coverageRead) { coverage.loadSaved(removingOldFile: true) }
-            let library = scanner.savedLibrary(records: records)
+            let library = scanner.savedLibrary(records: records, folders: folders)
             coverageRead.wait()
             return library
         }
@@ -642,7 +642,11 @@ final class AppModel {
         if !store.isReadOnly { data.recordActivations(from: library, to: new) }
         let offline = library.offlinePaths
         library = new
-        if !store.isReadOnly { activateAddedFonts(knowing: known, offline: offline) }
+        if !store.isReadOnly {
+            relocateSubfolderPolicies(in: new)
+            activateAddedFonts(knowing: known, offline: offline)
+        }
+        fixGoneSubfolderSelection(in: new)
         endScan(id)
         if first {
             offerEarlierImportCopy()
@@ -661,13 +665,56 @@ final class AppModel {
         updateProblems()
     }
 
+    private func relocateSubfolderPolicies(in library: Library) {
+        var changed = false
+        var updated = data.folders
+        for index in updated.indices {
+            let folder = updated[index]
+            guard !folder.subfolders.isEmpty, let tree = library.folderTrees[folder.id] else { continue }
+            let missing = folder.subfolders.filter { tree.nodes[$0.key] == nil && $0.value.fileID != nil }
+            guard !missing.isEmpty else { continue }
+            var byInode: [UInt64: String] = [:]
+            for rel in tree.nodes.keys {
+                if let inode = FolderPath.fileID(of: folder.path + "/" + rel) { byInode[inode] = rel }
+            }
+            for (oldRel, policy) in missing {
+                guard let inode = policy.fileID, let newRel = byInode[inode], updated[index].subfolders[newRel] == nil else { continue }
+                updated[index].subfolders.removeValue(forKey: oldRel)
+                updated[index].subfolders[newRel] = policy
+                changed = true
+            }
+        }
+        if changed { data.folders = updated }
+    }
+
+    private func fixGoneSubfolderSelection(in library: Library) {
+        let gone = selectedItems.filter { item in
+            guard case .subfolder(let id, let rel) = item else { return false }
+            return library.folderTrees[id]?.nodes[rel] == nil
+        }
+        guard !gone.isEmpty else { return }
+        var next = selectedItems.subtracting(gone)
+        for item in gone {
+            guard case .subfolder(let id, let rel) = item, data.folders.contains(where: { $0.id == id }) else { continue }
+            let fallback = FolderTree.ancestors(of: rel).reversed().first { library.folderTrees[id]?.nodes[$0] != nil }
+            next.insert(fallback.map { .subfolder(id, $0) } ?? .folder(id))
+        }
+        if next.isEmpty { selection = .all } else { selectSidebarItems(next) }
+    }
+
     private func activateAddedFonts(knowing known: Set<String>, offline: Set<String>) {
-        let active = data.folders.filter(\.isActive)
+        let active = data.folders.filter(\.hasActivePolicy)
         guard !active.isEmpty, !known.isEmpty || !offline.isEmpty else { return }
-        keepOn(faces(in: active).filter { face in
+        let roots = active.map { (folder: $0, prefixes: FolderPath.prefixes(of: $0)) }
+        let targets = library.families.flatMap(\.faces).filter { face in
             let path = face.face.path
-            return !known.contains(path) && (!offline.contains(path) || data.records.inPlace.contains(path))
-        })
+            guard !locations.isInInactiveFolder(path), !known.contains(path),
+                  !offline.contains(path) || data.records.inPlace.contains(path) else { return false }
+            return roots.contains { root in
+                root.prefixes.contains(where: path.hasPrefix) && root.folder.policy(forPath: path).isActive
+            }
+        }
+        keepOn(targets)
     }
 
     private func updateCoverage() {

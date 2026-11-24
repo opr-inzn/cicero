@@ -106,12 +106,36 @@ private struct RuleRow: View {
             .buttonStyle(.borderless)
     }
 
+    private var setOptions: [(id: String, title: String)] {
+        model.allRows(for: .sets).compactMap { row in
+            guard case .set(let id) = row.item else { return nil }
+            let indent = String(repeating: "    ", count: row.depth)
+            return (id.uuidString, indent + row.title)
+        }
+    }
+
     private var folderOptions: [(id: String, title: String)] {
         let own = (model.data.showAdobeAppFolders ? [WatchedFolder.adobeAppsID] : [])
             + (model.ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) ? [WatchedFolder.adobeFontsID] : [])
             + (model.data.fontFiles.isEmpty ? [] : [WatchedFolder.addedFilesID])
             + (rule.value == WatchedFolder.fontLibraryID.uuidString ? [WatchedFolder.fontLibraryID] : [])
-        return model.data.namedFolders.map { ($0.id.uuidString, $0.displayName) } + own.map { ($0.uuidString, model.folderName($0)) }
+        var result: [(id: String, title: String)] = []
+        for folder in model.data.namedFolders {
+            result.append((folder.id.uuidString, folder.displayName))
+            if model.data.showsSubfolders(for: folder), let tree = model.library.folderTrees[folder.id] {
+                func appendNodes(_ paths: [String], depth: Int) {
+                    for rel in paths {
+                        guard let node = tree.nodes[rel] else { continue }
+                        let indent = String(repeating: "    ", count: depth)
+                        result.append(("\(folder.id.uuidString)/\(rel)", indent + node.name))
+                        appendNodes(node.children, depth: depth + 1)
+                    }
+                }
+                appendNodes(tree.rootChildren, depth: 1)
+            }
+        }
+        result += own.map { ($0.uuidString, model.folderName($0)) }
+        return result
     }
 
     private var fields: [SmartRule.Field] {
@@ -173,7 +197,7 @@ private struct RuleRow: View {
         case .rating:
             options([("0", "No Rating")] + (1...5).reversed().map { (String($0), Rating.stars($0)) })
         case .set:
-            options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No folders yet")
+            options(setOptions, empty: "No folders yet")
         case .folder:
             options(folderOptions, empty: "No locations yet")
         case .status:

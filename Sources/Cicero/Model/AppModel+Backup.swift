@@ -22,7 +22,7 @@ extension AppModel {
     func canExport(_ item: SidebarItem) -> Bool {
         switch item {
         case .folder(WatchedFolder.adobeFontsID): false
-        case .set, .smartSet, .tag, .folder, .foundry, .classification, .characterSet: true
+        case .set, .smartSet, .tag, .folder, .subfolder, .foundry, .classification, .characterSet: true
         case .all, .active, .inactive, .temporary, .system, .recent, .problems: false
         }
     }

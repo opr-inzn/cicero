@@ -5,6 +5,7 @@ public enum SidebarItem: Hashable, Sendable {
     case recent
     case temporary
     case folder(UUID)
+    case subfolder(UUID, String)
     case set(UUID)
     case smartSet(UUID)
     case tag(String)
@@ -96,8 +97,11 @@ public struct FamilyFilters {
             return { $0.lastAdded.map { $0 > cutoff } ?? false }
         case .problems: return { _ in false }
         case .folder(let id): return { $0.folderIDs.contains(id) }
+        case .subfolder(let id, let relativePath):
+            let families = library.folderTrees[id]?.nodes[relativePath]?.families ?? []
+            return { families.contains($0.id) }
         case .set(let id):
-            let members = Set(data.sets.first { $0.id == id }?.memberFamilies ?? [])
+            let members = data.members(ofSet: id).families
             return { members.contains($0.id) }
         case .smartSet(let id):
             guard let smartSet = data.smartSets.first(where: { $0.id == id }) else { return { _ in false } }
@@ -185,9 +189,14 @@ public struct FamilyFilters {
             default: return compare { ratings[$0.id, default: 0] == stars }
             }
         case .set:
-            let members = Set(data.sets.first { $0.id.uuidString == value }?.memberFamilies ?? [])
+            let members = UUID(uuidString: value).map { data.members(ofSet: $0).families } ?? []
             return compare { members.contains($0.id) }
         case .folder:
+            if let slash = value.firstIndex(of: "/"), let id = UUID(uuidString: String(value[..<slash])) {
+                let relativePath = String(value[value.index(after: slash)...])
+                let families = library.folderTrees[id]?.nodes[relativePath]?.families ?? []
+                return compare { families.contains($0.id) }
+            }
             let id = UUID(uuidString: value)
             return compare { id.map($0.folderIDs.contains) ?? false }
         case .status:

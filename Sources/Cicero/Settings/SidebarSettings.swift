@@ -23,6 +23,20 @@ struct SidebarSettings: View {
                             }
                         case .foundries:
                             note("Hide individual foundries with Edit in the sidebar.")
+                        case .folders:
+                            let rows = model.topLevelLocationRows
+                            if rows.isEmpty {
+                                note("No \(section.title.lowercased()) yet.")
+                            } else {
+                                ForEach(rows) { checkbox($0, in: section) }
+                            }
+                        case .sets:
+                            let rows = model.allRows(for: .sets)
+                            if rows.isEmpty {
+                                note("No \(section.title.lowercased()) yet.")
+                            } else {
+                                ForEach(rows) { checkbox($0, in: section).padding(.leading, CGFloat($0.depth) * 18) }
+                            }
                         default:
                             // A section without rows still gets a card, or its header runs into the next one.
                             let rows = model.rows(for: section)

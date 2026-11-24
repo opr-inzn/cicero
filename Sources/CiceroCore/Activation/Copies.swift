@@ -246,6 +246,13 @@ extension Family {
         guard faces.count < self.faces.count else { return self }
         return Family(name: self.id, faces: faces, state: LibraryScanner.familyState(of: faces), folderIDs: folderIDs, manufacturer: manufacturer)
     }
+
+    public func only(insidePrefixes prefixes: [String]) -> Family? {
+        let faces = faces.compactMap { $0.copy(insidePrefixes: prefixes) }
+        guard !faces.isEmpty else { return nil }
+        guard faces != self.faces else { return self }
+        return Family(name: self.id, faces: faces, state: LibraryScanner.familyState(of: faces), folderIDs: folderIDs, manufacturer: manufacturer)
+    }
 }
 
 private extension LibraryFace {
@@ -254,5 +261,12 @@ private extension LibraryFace {
         guard let adobe = copies.first(where: { ActiveSource.isAdobeFonts($0.face.path) }) else { return nil }
         let others = [FaceCopy(self)] + copies.filter { $0.face.path != adobe.face.path }
         return LibraryFace(face: adobe.face, state: adobe.state, copies: others, dateAdded: dateAdded, app: adobe.app, folderIDs: folderIDs)
+    }
+
+    func copy(insidePrefixes prefixes: [String]) -> LibraryFace? {
+        if prefixes.contains(where: { face.path.hasPrefix($0) }) { return self }
+        guard let match = copies.first(where: { copy in prefixes.contains { copy.face.path.hasPrefix($0) } }) else { return nil }
+        let others = [FaceCopy(self)] + copies.filter { $0.face.path != match.face.path }
+        return LibraryFace(face: match.face, state: match.state, copies: others, dateAdded: dateAdded, app: match.app, folderIDs: folderIDs)
     }
 }

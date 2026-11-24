@@ -514,28 +514,105 @@ extension AppModel {
     }
 
     func addFolders(_ urls: [URL]) {
-        let existing = Set(data.folders.map(\.path))
         let paths = urls.map(\.standardizedFileURL.path)
-        let new = paths.filter { !existing.contains($0) }
-        guard !new.isEmpty else {
-            let name = URL(fileURLWithPath: paths.first ?? "").lastPathComponent
-            return showToast(paths.count == 1 ? "“\(name)” is already a location" : "These folders are already locations")
-        }
-        var added: [String] = []
-        for path in new {
+        var added: [WatchedFolder] = []
+        var absorbedNames: [String] = []
+        var alreadyInside: (sub: String, outer: String, id: UUID, rel: String)?
+        var alreadyExact: WatchedFolder?
+        var turnedOnAdobe = false
+        let before = data
+        let libraryID = data.fontLibraryLocation?.id
+
+        for path in paths {
             if WatchedFolder.detectAppName(forPath: path) != nil {
                 data.showAdobeAppFolders = true
-            } else {
-                data.folders.append(WatchedFolder(path: path))
-                added.append(path)
+                turnedOnAdobe = true
+                continue
             }
+            let url = URL(fileURLWithPath: path, isDirectory: true)
+            if let existing = data.folders.first(where: { FolderPath.relationship(between: $0.url, and: url) == .same }) {
+                alreadyExact = existing
+                continue
+            }
+            if let outer = data.folders.first(where: { $0.id != libraryID && FolderPath.relationship(between: $0.url, and: url) == .contains }),
+               let rel = FolderPath.relativePath(of: url, inside: outer.url) {
+                alreadyInside = (url.lastPathComponent, data.named(outer).displayName, outer.id, rel)
+                continue
+            }
+            let contained = data.folders.filter { $0.id != libraryID && FolderPath.relationship(between: url, and: $0.url) == .contains }
+            let newFolder = WatchedFolder(path: path)
+            data.folders.append(newFolder)
+            let outerIndex = data.folders.count - 1
+            if !contained.isEmpty {
+                let firstKey = "folder.\(contained[0].id)"
+                for inner in contained {
+                    if let rel = FolderPath.relativePath(of: inner.url, inside: url) {
+                        data.absorb(inner, into: outerIndex, relativePath: rel)
+                        absorbedNames.append(data.named(inner).displayName)
+                    }
+                }
+                if var order = data.sidebar.order["folders"], let pos = order.firstIndex(of: firstKey) {
+                    order[pos] = "folder.\(newFolder.id)"
+                    data.sidebar.order["folders"] = order
+                }
+                let removedIDs = Set(contained.map(\.id))
+                data.folders.removeAll { removedIDs.contains($0.id) }
+                for id in removedIDs {
+                    data.folderNames[id.uuidString] = nil
+                    data.sidebar.forget("folder.\(id)")
+                }
+                deselect { item in
+                    switch item {
+                    case .folder(let id), .subfolder(let id, _): removedIDs.contains(id)
+                    default: false
+                    }
+                }
+            }
+            data.sidebar.expanded.insert("folder.\(newFolder.id)")
+            added.append(newFolder)
         }
-        data.sidebar.hidden.remove(SidebarSection.folders.key)
-        rescan()
-        if added.count == 1 {
-            showToast("Added “\(URL(fileURLWithPath: added[0]).lastPathComponent)” as a location")
-        } else if added.count > 1 {
-            showToast("Added \(added.count.plain) locations")
+
+        if !added.isEmpty {
+            data.sidebar.hidden.remove(SidebarSection.folders.key)
+            rescan()
+            if !absorbedNames.isEmpty, added.count == 1 {
+                let outerName = data.named(added[0]).displayName
+                let innerText = absorbedNames.count > 3 ? "\(absorbedNames.count) locations" : absorbedNames.map { "“\($0)”" }.listed()
+                showToast("\(innerText) \(absorbedNames.count == 1 ? "is" : "are") now inside “\(outerName)”") { [weak self] in
+                    guard let self else { return }
+                    var restored = self.data
+                    restored.folders = before.folders
+                    restored.folderNames = before.folderNames
+                    restored.smartSets = before.smartSets
+                    restored.sidebar = before.sidebar
+                    self.data = restored
+                    self.rescan()
+                }
+            } else if added.count == 1 {
+                showToast("Added “\(URL(fileURLWithPath: added[0].path).lastPathComponent)” as a location")
+            } else {
+                showToast("Added \(added.count.plain) locations")
+            }
+            return
+        }
+        if let inside = alreadyInside {
+            if let index = data.folders.firstIndex(where: { $0.id == inside.id }), !data.showsSubfolders(for: data.folders[index]) {
+                data.folders[index].showsSubfolders = true
+            }
+            expandAncestors(of: inside.id, relativePath: inside.rel)
+            if library.folderTrees[inside.id]?.nodes[inside.rel] != nil {
+                selection = .subfolder(inside.id, inside.rel)
+                showToast("“\(inside.sub)” is already in “\(inside.outer)”")
+            } else {
+                selection = .folder(inside.id)
+                showToast("“\(inside.sub)” in “\(inside.outer)” has no fonts")
+            }
+        } else if let existing = alreadyExact {
+            selection = .folder(existing.id)
+            showToast(paths.count == 1 ? "“\(data.named(existing).displayName)” is already a location" : "These folders are already locations")
+        } else if turnedOnAdobe {
+            data.sidebar.hidden.remove(SidebarSection.folders.key)
+            rescan()
         }
     }
 
@@ -563,10 +640,17 @@ extension AppModel {
     }
 
     func removingFolders(_ ids: Set<UUID>) -> [LibraryFace] {
-        let keptOn = turnOffKeptFonts(in: data.folders.filter { ids.contains($0.id) && $0.isActive }, silently: true)
+        let activeFolders = data.folders.filter { ids.contains($0.id) && $0.hasActivePolicy }
+        let keptOn = turnOffKeptFonts(in: activeFolders, silently: true)
         let values = Set(ids.map(\.uuidString))
-        for index in data.smartSets.indices where data.smartSets[index].rules.contains(where: { $0.field == .folder && values.contains($0.value) }) {
-            data.smartSets[index].rules.removeAll { $0.field == .folder && values.contains($0.value) }
+        let prefixes = ids.map { $0.uuidString + "/" }
+        for index in data.smartSets.indices {
+            let matches = { (rule: SmartRule) in
+                rule.field == .folder && (values.contains(rule.value) || prefixes.contains(where: rule.value.hasPrefix))
+            }
+            if data.smartSets[index].rules.contains(where: matches) {
+                data.smartSets[index].rules.removeAll(where: matches)
+            }
         }
         forgetFolders(ids)
         rescan()
@@ -594,7 +678,12 @@ extension AppModel {
             data.folderNames[id.uuidString] = nil
         }
         self.data = data
-        deselect { item in ids.contains { item == .folder($0) } }
+        deselect { item in
+            switch item {
+            case .folder(let id), .subfolder(let id, _): ids.contains(id)
+            default: false
+            }
+        }
     }
 
     func availability(ofFolder id: UUID) -> FolderAvailability? {
@@ -603,6 +692,12 @@ extension AppModel {
 
     func onlineOnlyCount(inFolder id: UUID) -> Int {
         library.onlineOnlyFiles[id]?.count ?? 0
+    }
+
+    func onlineOnlyCount(inSubfolder rel: String, of id: UUID) -> Int {
+        guard let folder = folder(id), let paths = library.onlineOnlyFiles[id] else { return 0 }
+        let prefixes = FolderPath.prefixes(of: folder, relativePath: rel)
+        return paths.count { path in prefixes.contains(where: path.hasPrefix) }
     }
 
     func downloadOnlineOnlyFonts(inFolder id: UUID) {
@@ -629,6 +724,26 @@ extension AppModel {
         NSWorkspace.shared.open(url)
     }
 
+    func showsSubfolders(for id: UUID) -> Bool {
+        guard let folder = data.folders.first(where: { $0.id == id }) else { return false }
+        return data.showsSubfolders(for: folder)
+    }
+
+    func setShowsSubfolders(_ show: Bool, for id: UUID) {
+        guard let index = data.folders.firstIndex(where: { $0.id == id }) else { return }
+        data.folders[index].showsSubfolders = show
+        if !show {
+            let hadSubfolder = selectedItems.contains { if case .subfolder(let folderID, _) = $0 { folderID == id } else { false } }
+            if hadSubfolder {
+                let kept = Set(selectedItems.map { item -> SidebarItem in
+                    if case .subfolder(let folderID, _) = item, folderID == id { return .folder(id) }
+                    return item
+                })
+                selectSidebarItems(kept)
+            }
+        }
+    }
+
     func setActivation(ofFolder id: UUID, active: Bool, app: String?) {
         guard let index = data.folders.firstIndex(where: { $0.id == id }) else { return }
         let folder = data.folders[index]
@@ -636,18 +751,60 @@ extension AppModel {
         if !active, trimmed?.isEmpty == true { return }
         let app = active ? nil : trimmed
         guard folder.isActive != active || folder.appName != app else { return }
-        if folder.isActive && !active { turnOffKeptFonts(in: [folder]) }
+        let affected = facesAffected(by: folder, subfolder: nil)
+        if folder.isActive && !active { turnOffKeptFaces(affected) }
         data.folders[index].isActive = active
         data.folders[index].appName = app
-        if active { keepOn(faces(in: [folder])) }
+        if active && !folder.isActive { keepOn(affected) }
         rescan()
     }
 
-    func faces(in folders: [WatchedFolder]) -> [LibraryFace] {
-        let prefixes = folders.map { $0.path + "/" }
-        guard !prefixes.isEmpty else { return [] }
+    func setActivation(ofSubfolder rel: String, in id: UUID, policy: FolderPolicy?) {
+        guard let index = data.folders.firstIndex(where: { $0.id == id }) else { return }
+        let folder = data.folders[index]
+        let previous = folder.policy(forSubfolder: rel)
+        let next: (isActive: Bool, appName: String?)
+        var storedPolicy = policy
+        if let policy {
+            let trimmed = policy.appName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !policy.isActive, trimmed?.isEmpty == true { return }
+            let app = policy.isActive ? nil : trimmed
+            storedPolicy = FolderPolicy(isActive: policy.isActive, appName: app, fileID: FolderPath.fileID(of: folder.path + "/" + rel))
+            next = (policy.isActive, app)
+        } else {
+            next = folder.inheritedPolicy(forSubfolder: rel)
+        }
+        guard folder.subfolders[rel]?.isActive != storedPolicy?.isActive || folder.subfolders[rel]?.appName != storedPolicy?.appName else { return }
+        let affected = facesAffected(by: folder, subfolder: rel)
+        if previous.isActive && !next.isActive { turnOffKeptFaces(affected) }
+        data.folders[index].subfolders[rel] = storedPolicy
+        if !previous.isActive && next.isActive { keepOn(affected) }
+        rescan()
+    }
+
+    func facesAffected(by folder: WatchedFolder, subfolder: String?) -> [LibraryFace] {
+        let prefixes = FolderPath.prefixes(of: folder, relativePath: subfolder)
+        let deeperKeys = folder.subfolders.keys.filter { key in
+            if let subfolder { return key.hasPrefix(subfolder + "/") }
+            return true
+        }
+        let deeperPrefixes = deeperKeys.flatMap { FolderPath.prefixes(of: folder, relativePath: $0) }
         return library.families.flatMap(\.faces).filter { face in
-            prefixes.contains { face.face.path.hasPrefix($0) } && !locations.isInInactiveFolder(face.face.path)
+            let path = face.face.path
+            guard !locations.isInInactiveFolder(path), prefixes.contains(where: path.hasPrefix) else { return false }
+            return !deeperPrefixes.contains(where: path.hasPrefix)
+        }
+    }
+
+    func faces(in folders: [WatchedFolder]) -> [LibraryFace] {
+        guard !folders.isEmpty else { return [] }
+        let roots = folders.map { (folder: $0, prefixes: FolderPath.prefixes(of: $0)) }
+        return library.families.flatMap(\.faces).filter { face in
+            let path = face.face.path
+            guard !locations.isInInactiveFolder(path) else { return false }
+            return roots.contains { root in
+                root.prefixes.contains(where: path.hasPrefix) && root.folder.policy(forPath: path).isActive
+            }
         }
     }
 
@@ -659,7 +816,12 @@ extension AppModel {
 
     @discardableResult
     private func turnOffKeptFonts(in folders: [WatchedFolder], silently: Bool = false) -> [LibraryFace] {
-        let targets = faces(in: folders).filter { $0.canDeactivate && data.records.inPlace.contains($0.face.path) }
+        turnOffKeptFaces(faces(in: folders), silently: silently)
+    }
+
+    @discardableResult
+    private func turnOffKeptFaces(_ faces: [LibraryFace], silently: Bool = false) -> [LibraryFace] {
+        let targets = faces.filter { $0.canDeactivate && data.records.inPlace.contains($0.face.path) }
         guard !targets.isEmpty else { return [] }
         guard silently else {
             performDeactivation(targets)
@@ -686,6 +848,14 @@ extension AppModel {
         }
     }
 
+    func finderURLs(of item: SidebarItem) -> [URL] {
+        switch item {
+        case .folder(let id): finderURLs(ofFolder: id)
+        case .subfolder(let id, let rel): folder(id).map { [$0.url.appendingPathComponent(rel, isDirectory: true)] } ?? []
+        default: []
+        }
+    }
+
     func isRemovableFolder(_ id: UUID) -> Bool {
         data.folders.contains { $0.id == id }
     }
@@ -699,6 +869,14 @@ extension AppModel {
         (folder(id) ?? data.named(WatchedFolder(id: id, path: ""))).displayName
     }
 
+    func subfolderParentName(of rel: String, in id: UUID) -> String {
+        if let slash = rel.lastIndex(of: "/") {
+            let parent = String(rel[..<slash])
+            return (parent as NSString).lastPathComponent
+        }
+        return folderName(id)
+    }
+
     func renameFolder(_ id: UUID, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         var own = folder(id) ?? WatchedFolder(id: id, path: "")
@@ -708,17 +886,164 @@ extension AppModel {
 
     // MARK: Sets
 
-    func addSet(named name: String, with families: [Family] = [], styles: [String: [String]] = [:]) {
-        data.addSet(named: name, families: families.map(\.id), styles: styles)
+    func addSet(named name: String, parentID: UUID? = nil, with families: [Family] = [], styles: [String: [String]] = [:]) {
+        data.addSet(named: name, parentID: parentID, families: families.map(\.id), styles: styles)
     }
 
     func renameSet(_ id: UUID, to name: String) {
         data.renameSet(id, to: name)
     }
 
-    func deleteSets(_ ids: Set<UUID>) {
+    func deleteSets(_ ids: Set<UUID>, undoable: Bool = true) {
+        let removed = data.sets.filter { ids.contains($0.id) }
+        guard !removed.isEmpty else { return }
+        let before = data
+        var allSets = ids
+        var allSmartSets = Set<UUID>()
+        for id in ids {
+            allSets.formUnion(data.descendants(ofSet: id))
+            allSmartSets.formUnion(data.subtreeSmartSets(of: id))
+        }
         data.deleteSets(ids)
-        deselect { if case .set(let id) = $0 { ids.contains(id) } else { false } }
+        deselect { item in
+            switch item {
+            case .set(let id): allSets.contains(id)
+            case .smartSet(let id): allSmartSets.contains(id)
+            default: false
+            }
+        }
+        guard undoable else { return }
+        let names = removed.count > 3 ? "\(removed.count) folders" : removed.map(\.name).listed()
+        showToast("\(names) deleted") { [weak self] in
+            guard let self else { return }
+            var restored = self.data
+            restored.sets = before.sets
+            restored.smartSets = before.smartSets
+            restored.sidebar = before.sidebar
+            self.data = restored
+        }
+    }
+
+    func moveFolderItems(_ items: [SidebarItem], to parentID: UUID?) {
+        var setIDs = Set<UUID>()
+        var smartIDs = Set<UUID>()
+        for item in items {
+            switch item {
+            case .set(let id): setIDs.insert(id)
+            case .smartSet(let id): smartIDs.insert(id)
+            default: break
+            }
+        }
+        setIDs = setIDs.filter { id in data.ancestorIDs(ofSet: id).allSatisfy { !setIDs.contains($0) } }
+        smartIDs = smartIDs.filter { id in
+            guard let smart = data.smartSets.first(where: { $0.id == id }), let parent = smart.parentID else { return true }
+            return !setIDs.contains(parent) && data.ancestorIDs(ofSet: parent).allSatisfy { !setIDs.contains($0) }
+        }
+        let validSets = setIDs.filter { data.canMove(set: $0, into: parentID) }
+        guard !validSets.isEmpty || !smartIDs.isEmpty else { return }
+        let movingKeys = items.compactMap { item -> String? in
+            switch item {
+            case .set(let id) where validSets.contains(id): "set.\(id)"
+            case .smartSet(let id) where smartIDs.contains(id): "smartset.\(id)"
+            default: nil
+            }
+        }
+        var updated = data
+        updated.moveSets(validSets, to: parentID)
+        updated.moveSmartSets(smartIDs, to: parentID)
+        if let parentID {
+            updated.sidebar.collapsed.remove("set.\(parentID)")
+            for ancestor in updated.ancestorIDs(ofSet: parentID) {
+                updated.sidebar.collapsed.remove("set.\(ancestor)")
+            }
+        }
+        let targetList = parentID.map { "sets.\($0)" } ?? SidebarSection.sets.rawValue
+        for list in updated.sidebar.order.keys where list == SidebarSection.sets.rawValue || list.hasPrefix("sets.") {
+            updated.sidebar.order[list]?.removeAll { movingKeys.contains($0) }
+        }
+        let currentSiblings = orderedFolderChildKeys(of: parentID, in: updated).filter { !movingKeys.contains($0) }
+        updated.sidebar.setOrder(currentSiblings + movingKeys, of: targetList)
+        data = updated
+    }
+
+    func canDropFolderItems(_ items: [SidebarItem], onto target: SidebarItem?) -> Bool {
+        let parentID: UUID?
+        switch target {
+        case nil: parentID = nil
+        case .set(let id): parentID = id
+        default: return false
+        }
+        var anyChanges = false
+        for item in items {
+            switch item {
+            case .set(let id):
+                guard let set = data.sets.first(where: { $0.id == id }), data.canMove(set: id, into: parentID) else { return false }
+                if set.parentID != parentID { anyChanges = true }
+            case .smartSet(let id):
+                guard let smart = data.smartSets.first(where: { $0.id == id }) else { return false }
+                if smart.parentID != parentID { anyChanges = true }
+            default:
+                return false
+            }
+        }
+        return anyChanges
+    }
+
+    private func orderedFolderChildKeys(of parentID: UUID?, in data: UserData) -> [String] {
+        let keys = data.sets.filter { $0.parentID == parentID }.map { "set.\($0.id)" }
+            + data.smartSets.filter { $0.parentID == parentID }.map { "smartset.\($0.id)" }
+        let list = parentID.map { "sets.\($0)" } ?? SidebarSection.sets.rawValue
+        return data.sidebar.ordered(keys, in: list) { $0 }
+    }
+
+    func moveFolderRows(_ source: IndexSet, to destination: Int, shown: [SidebarRow]) {
+        let rawMoving = source.map { shown[$0] }
+        let rawSetIDs = Set(rawMoving.compactMap { if case .set(let id) = $0.item { id } else { nil } })
+        let moving = rawMoving.filter { row in
+            switch row.item {
+            case .set(let id):
+                return data.ancestorIDs(ofSet: id).allSatisfy { !rawSetIDs.contains($0) }
+            case .smartSet(let id):
+                guard let parent = data.smartSets.first(where: { $0.id == id })?.parentID else { return true }
+                return !rawSetIDs.contains(parent) && data.ancestorIDs(ofSet: parent).allSatisfy { !rawSetIDs.contains($0) }
+            default:
+                return false
+            }
+        }
+        guard !moving.isEmpty else { return }
+        let targetRow = destination < shown.count ? shown[destination] : nil
+        let targetParentID: UUID? = targetRow?.parentKey.flatMap { key in
+            key.hasPrefix("set.") ? UUID(uuidString: String(key.dropFirst(4))) : nil
+        }
+        let movingKeys = moving.map(\.key)
+        let movingSetIDs = Set(moving.compactMap { if case .set(let id) = $0.item { id } else { nil } })
+        let movingSmartIDs = Set(moving.compactMap { if case .smartSet(let id) = $0.item { id } else { nil } })
+        guard movingSetIDs.allSatisfy({ data.canMove(set: $0, into: targetParentID) }) else { return }
+        var updated = data
+        updated.moveSets(movingSetIDs, to: targetParentID)
+        updated.moveSmartSets(movingSmartIDs, to: targetParentID)
+        for list in updated.sidebar.order.keys where list == SidebarSection.sets.rawValue || list.hasPrefix("sets.") {
+            updated.sidebar.order[list]?.removeAll { movingKeys.contains($0) }
+        }
+        let targetList = targetParentID.map { "sets.\($0)" } ?? SidebarSection.sets.rawValue
+        var siblings = orderedFolderChildKeys(of: targetParentID, in: updated).filter { !movingKeys.contains($0) }
+        if let targetKey = targetRow?.key, let insertAt = siblings.firstIndex(of: targetKey) {
+            siblings.insert(contentsOf: movingKeys, at: insertAt)
+        } else {
+            siblings.append(contentsOf: movingKeys)
+        }
+        updated.sidebar.setOrder(siblings, of: targetList)
+        data = updated
+    }
+
+    func moveLocationRows(_ source: IndexSet, to destination: Int, shown: [SidebarRow]) {
+        let topShown = shown.filter { $0.depth == 0 }
+        let movingKeys = Set(source.compactMap { shown[$0].depth == 0 ? shown[$0].key : nil })
+        guard !movingKeys.isEmpty else { return }
+        let topSource = IndexSet(topShown.indices.filter { movingKeys.contains(topShown[$0].key) })
+        let topDestination = shown.prefix(destination).count { $0.depth == 0 }
+        let allTop = topLevelLocationRows.map(\.key)
+        data.sidebar.move(topSource, to: topDestination, shown: topShown.map(\.key), all: allTop, in: SidebarSection.folders.rawValue)
     }
 
     func isMember(_ family: Family, of setID: UUID) -> Bool {
@@ -745,16 +1070,20 @@ extension AppModel {
     func faces(in item: SidebarItem) -> [LibraryFace] {
         let families = families(in: item)
         if item == .temporary { return families.flatMap { $0.faces.filter(\.isOnUntilQuit) } }
-        guard case .set(let id) = item, let set = data.sets.first(where: { $0.id == id }) else { return families.flatMap(\.faces) }
-        return families.flatMap { family in family.faces.filter { set.contains(style: $0.face.postScriptName, of: family.id) } }
+        guard case .set(let id) = item else { return families.flatMap(\.faces) }
+        return families.flatMap { family in family.faces.filter { data.contains(style: $0.face.postScriptName, of: family.id, inSetSubtree: id) } }
     }
 
     func families(in item: SidebarItem) -> [Family] {
         let test = filter(for: item)
         let families = library.families.filter { data.lists($0) && test($0) }
-        guard case .folder(let location) = item else { return families }
-        let onlyIn = onlyIn(location)
-        return families.map { onlyIn[$0.id] ?? $0 }
+        switch item {
+        case .folder, .subfolder:
+            let only = onlyIn(item)
+            return families.map { only[$0.id] ?? $0 }
+        default:
+            return families
+        }
     }
 
     func faces(in items: [SidebarItem]) -> [LibraryFace] {
@@ -790,6 +1119,7 @@ extension AppModel {
         } else {
             data.smartSets.append(smartSet)
             data.sidebar.hidden.remove(SidebarSection.sets.key)
+            if let parentID = smartSet.parentID { data.sidebar.collapsed.remove("set.\(parentID)") }
             selection = .smartSet(smartSet.id)
         }
     }
@@ -903,31 +1233,156 @@ extension AppModel {
     var hasTemporaryFonts: Bool { library.hasFacesOnUntilQuit }
 
     func rows(for section: SidebarSection) -> [SidebarRow] {
-        let rows = unorderedRows(for: section)
-        return section == .characterSets ? rows : data.sidebar.ordered(rows, in: section.rawValue, key: \.key)
+        switch section {
+        case .folders: return locationRows(expandedOnly: true)
+        case .sets: return folderRows(expandedOnly: true)
+        case .characterSets: return unorderedRows(for: section)
+        default: return data.sidebar.ordered(unorderedRows(for: section), in: section.rawValue, key: \.key)
+        }
+    }
+
+    func allRows(for section: SidebarSection) -> [SidebarRow] {
+        switch section {
+        case .folders: return locationRows(expandedOnly: false)
+        case .sets: return folderRows(expandedOnly: false)
+        default: return rows(for: section)
+        }
+    }
+
+    var topLevelLocationRows: [SidebarRow] {
+        var folders = data.folders
+        if ownFoldersWithFonts.contains(WatchedFolder.adobeAppsID) {
+            folders.append(WatchedFolder(id: WatchedFolder.adobeAppsID, path: "", appName: "Adobe"))
+        }
+        if ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) {
+            folders.append(WatchedFolder(id: WatchedFolder.adobeFontsID, path: ""))
+        }
+        if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
+            folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))
+        }
+        let rows = folders.map { folder -> SidebarRow in
+            let icon = folder.id == WatchedFolder.addedFilesID ? "doc"
+                : library.unavailableFolders[folder.id] != nil ? "questionmark.folder" : "folder"
+            let tree = data.showsSubfolders(for: folder) && library.unavailableFolders[folder.id] == nil ? library.folderTrees[folder.id] : nil
+            let hasChildren = !(tree?.isEmpty ?? true)
+            return SidebarRow(
+                key: "folder.\(folder.id)", title: data.named(folder).displayName, icon: icon, item: .folder(folder.id),
+                depth: 0, hasChildren: hasChildren, isExpanded: hasChildren && isLocationExpanded(folder.id), canMove: true
+            )
+        }
+        return data.sidebar.ordered(rows, in: SidebarSection.folders.rawValue, key: \.key)
+    }
+
+    private func locationRows(expandedOnly: Bool) -> [SidebarRow] {
+        var result: [SidebarRow] = []
+        for row in topLevelLocationRows {
+            result.append(row)
+            guard case .folder(let id) = row.item, row.hasChildren, !expandedOnly || row.isExpanded,
+                  let tree = library.folderTrees[id] else { continue }
+            func appendSubfolders(_ paths: [String], depth: Int, parentKey: String) {
+                for rel in paths {
+                    guard let node = tree.nodes[rel] else { continue }
+                    let key = "folder.\(id)/\(rel)"
+                    let hasChildren = !node.children.isEmpty
+                    let expanded = hasChildren && isSubfolderExpanded(id, rel)
+                    result.append(SidebarRow(
+                        key: key, title: node.name, icon: "folder", item: .subfolder(id, rel),
+                        depth: depth, hasChildren: hasChildren, isExpanded: expanded, canMove: false, parentKey: parentKey
+                    ))
+                    if hasChildren && (!expandedOnly || expanded) {
+                        appendSubfolders(node.children, depth: depth + 1, parentKey: key)
+                    }
+                }
+            }
+            appendSubfolders(tree.rootChildren, depth: 1, parentKey: row.key)
+        }
+        return result
+    }
+
+    private func folderRows(expandedOnly: Bool) -> [SidebarRow] {
+        var result: [SidebarRow] = []
+        let setsByParent = Dictionary(grouping: data.sets, by: \.parentID)
+        let smartByParent = Dictionary(grouping: data.smartSets, by: \.parentID)
+        func appendChildren(of parentID: UUID?, depth: Int) {
+            let parentKey = parentID.map { "set.\($0)" }
+            let listKey = parentID.map { "sets.\($0)" } ?? SidebarSection.sets.rawValue
+            let directSets = (setsByParent[parentID] ?? []).map { set -> SidebarRow in
+                let hasChildren = !(setsByParent[set.id]?.isEmpty ?? true) || !(smartByParent[set.id]?.isEmpty ?? true)
+                return SidebarRow(
+                    key: "set.\(set.id)", title: set.name, icon: set.apps.isEmpty ? "folder" : "app.badge.checkmark", item: .set(set.id),
+                    depth: depth, hasChildren: hasChildren, isExpanded: hasChildren && isSetExpanded(set.id), canMove: true, parentKey: parentKey
+                )
+            }
+            let directSmart = (smartByParent[parentID] ?? []).map { smart in
+                SidebarRow(
+                    key: "smartset.\(smart.id)", title: smart.name, icon: "gearshape", item: .smartSet(smart.id),
+                    depth: depth, hasChildren: false, isExpanded: false, canMove: true, parentKey: parentKey
+                )
+            }
+            let ordered = data.sidebar.ordered(directSets + directSmart, in: listKey, key: \.key)
+            for row in ordered {
+                result.append(row)
+                if case .set(let id) = row.item, row.hasChildren, !expandedOnly || row.isExpanded {
+                    appendChildren(of: id, depth: depth + 1)
+                }
+            }
+        }
+        appendChildren(of: nil, depth: 0)
+        return result
+    }
+
+    func orderedSetRows(parentID: UUID? = nil, depth: Int = 0) -> [(set: FontSet, depth: Int, children: [FontSet])] {
+        let byParent = Dictionary(grouping: data.sets, by: \.parentID)
+        let listKey = parentID.map { "sets.\($0)" } ?? SidebarSection.sets.rawValue
+        let sets = data.sidebar.ordered(byParent[parentID] ?? [], in: listKey) { "set.\($0.id)" }
+        return sets.map { set in
+            let kids = data.sidebar.ordered(byParent[set.id] ?? [], in: "sets.\(set.id)") { "set.\($0.id)" }
+            return (set, depth, kids)
+        }
+    }
+
+    func isLocationExpanded(_ id: UUID) -> Bool { data.sidebar.expanded.contains("folder.\(id)") }
+
+    func setLocationExpanded(_ id: UUID, _ expanded: Bool) {
+        if expanded { data.sidebar.expanded.insert("folder.\(id)") } else { data.sidebar.expanded.remove("folder.\(id)") }
+    }
+
+    func isSubfolderExpanded(_ id: UUID, _ rel: String) -> Bool { data.sidebar.expanded.contains("folder.\(id)/\(rel)") }
+
+    func setSubfolderExpanded(_ id: UUID, _ rel: String, _ expanded: Bool) {
+        let key = "folder.\(id)/\(rel)"
+        if expanded { data.sidebar.expanded.insert(key) } else { data.sidebar.expanded.remove(key) }
+    }
+
+    func expandAncestors(of id: UUID, relativePath: String) {
+        data.sidebar.expanded.insert("folder.\(id)")
+        for ancestor in FolderTree.ancestors(of: relativePath) {
+            data.sidebar.expanded.insert("folder.\(id)/\(ancestor)")
+        }
+    }
+
+    func isSetExpanded(_ id: UUID) -> Bool { !data.sidebar.collapsed.contains("set.\(id)") }
+
+    func setSetExpanded(_ id: UUID, _ expanded: Bool) {
+        if expanded { data.sidebar.collapsed.remove("set.\(id)") } else { data.sidebar.collapsed.insert("set.\(id)") }
+    }
+
+    func toggleExpanded(for row: SidebarRow) {
+        guard row.hasChildren else { return }
+        switch row.item {
+        case .folder(let id): setLocationExpanded(id, !row.isExpanded)
+        case .subfolder(let id, let rel): setSubfolderExpanded(id, rel, !row.isExpanded)
+        case .set(let id): setSetExpanded(id, !row.isExpanded)
+        default: break
+        }
     }
 
     private func unorderedRows(for section: SidebarSection) -> [SidebarRow] {
         switch section {
         case .folders:
-            var folders = data.folders
-            if ownFoldersWithFonts.contains(WatchedFolder.adobeAppsID) {
-                folders.append(WatchedFolder(id: WatchedFolder.adobeAppsID, path: "", appName: "Adobe"))
-            }
-            if ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) {
-                folders.append(WatchedFolder(id: WatchedFolder.adobeFontsID, path: ""))
-            }
-            if ownFoldersWithFonts.contains(WatchedFolder.addedFilesID) {
-                folders.append(WatchedFolder(id: WatchedFolder.addedFilesID, path: ""))
-            }
-            return folders.map {
-                let icon = $0.id == WatchedFolder.addedFilesID ? "doc"
-                    : library.unavailableFolders[$0.id] != nil ? "questionmark.folder" : "folder"
-                return SidebarRow(key: "folder.\($0.id)", title: data.named($0).displayName, icon: icon, item: .folder($0.id))
-            }
+            return topLevelLocationRows
         case .sets:
-            return data.sets.map { SidebarRow(key: "set.\($0.id)", title: $0.name, icon: $0.apps.isEmpty ? "folder" : "app.badge.checkmark", item: .set($0.id)) }
-                + data.smartSets.map { SidebarRow(key: "smartset.\($0.id)", title: $0.name, icon: "gearshape", item: .smartSet($0.id)) }
+            return folderRows(expandedOnly: false)
         case .tags:
             return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: SidebarSection.tags.icon, item: .tag($0), color: data.tagColors[$0]) }
         case .foundries:
@@ -953,8 +1408,9 @@ extension AppModel {
                 .map(\.title).listed()
         }
         if let row = libraryRows.first(where: { $0.item == item }) { return row.title }
+        if case .subfolder(_, let rel) = item { return (rel as NSString).lastPathComponent }
         for section in SidebarSection.allCases {
-            if let row = rows(for: section).first(where: { $0.item == item }) { return row.title }
+            if let row = allRows(for: section).first(where: { $0.item == item }) { return row.title }
         }
         return "Fonts"
     }
@@ -990,7 +1446,7 @@ extension AppModel {
         }
         let keptOn = locations.isEmpty ? [] : removingFolders(Set(locations.compactMap { if case .folder(let id) = $0.item { id } else { nil } }))
         let sets = Set(deleted.compactMap { if case .set(let id) = $0.item { id } else { nil } })
-        if !sets.isEmpty { deleteSets(sets) }
+        if !sets.isEmpty { deleteSets(sets, undoable: false) }
         let smartSets = Set(deleted.compactMap { if case .smartSet(let id) = $0.item { id } else { nil } })
         if !smartSets.isEmpty { deleteSmartSets(smartSets) }
         let tags = Set(deleted.compactMap { if case .tag(let name) = $0.item { name } else { nil } })
@@ -1058,7 +1514,7 @@ extension AppModel {
     func sidebarList(of item: SidebarItem) -> String {
         switch item {
         case .all, .active, .inactive, .temporary, .system, .recent, .problems: "library"
-        case .folder: SidebarSection.folders.rawValue
+        case .folder, .subfolder: SidebarSection.folders.rawValue
         case .set, .smartSet: SidebarSection.sets.rawValue
         case .tag: SidebarSection.tags.rawValue
         case .foundry: SidebarSection.foundries.rawValue
@@ -1070,7 +1526,7 @@ extension AppModel {
 
     private func rows(inList list: String) -> [SidebarRow] {
         if list == "library" { return libraryRows }
-        if let section = SidebarSection(rawValue: list) { return rows(for: section) }
+        if let section = SidebarSection(rawValue: list) { return allRows(for: section) }
         return characterSetGroups.first { "charsetgroup.\($0.id)" == list }?.rows ?? []
     }
 
@@ -1113,8 +1569,19 @@ extension AppModel {
 
     private func isShown(_ item: SidebarItem) -> Bool {
         if let row = libraryRows.first(where: { $0.item == item }) { return isVisible(row.key) }
+        if case .subfolder(let id, _) = item {
+            return isVisible(SidebarSection.folders.key) && isVisible("folder.\(id)")
+        }
         for section in SidebarSection.allCases {
-            if let row = rows(for: section).first(where: { $0.item == item }) { return isVisible(section.key) && isVisible(row.key) }
+            if let row = allRows(for: section).first(where: { $0.item == item }) {
+                if case .set(let id) = item {
+                    return isVisible(section.key) && isVisible(row.key) && data.ancestorIDs(ofSet: id).allSatisfy { isVisible("set.\($0)") }
+                }
+                if case .smartSet(let id) = item, let parent = data.smartSets.first(where: { $0.id == id })?.parentID {
+                    return isVisible(section.key) && isVisible(row.key) && isVisible("set.\(parent)") && data.ancestorIDs(ofSet: parent).allSatisfy { isVisible("set.\($0)") }
+                }
+                return isVisible(section.key) && isVisible(row.key)
+            }
         }
         return true
     }

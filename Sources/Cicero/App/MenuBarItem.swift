@@ -196,8 +196,16 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
 
     private func setItems() -> [NSMenuItem] {
         guard model.isVisible(SidebarSection.sets.key) else { return [] }
-        return model.rows(for: .sets).filter { model.isVisible($0.key) }.map { row in
+        return model.allRows(for: .sets).filter { row in
+            guard model.isVisible(row.key) else { return false }
+            if case .set(let id) = row.item { return model.data.ancestorIDs(ofSet: id).allSatisfy { model.isVisible("set.\($0)") } }
+            if case .smartSet(let id) = row.item, let parent = model.data.smartSets.first(where: { $0.id == id })?.parentID {
+                return model.isVisible("set.\(parent)") && model.data.ancestorIDs(ofSet: parent).allSatisfy { model.isVisible("set.\($0)") }
+            }
+            return true
+        }.map { row in
             let item = menuItem(row.title, action: #selector(toggleSet))
+            item.indentationLevel = row.depth
             let faces = model.faces(in: row.item)
             let on = faces.count { $0.position == .on }
             item.state = on == 0 ? .off : on == faces.count ? .on : .mixed

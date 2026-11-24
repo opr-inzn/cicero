@@ -107,11 +107,11 @@ struct OrganizingMenus: View {
 
     var body: some View {
         Menu {
-            ForEach(model.data.sets) { set in
-                Toggle(set.name, isOn: Binding(
-                    get: { families.allSatisfy { model.isMember($0, of: set.id) } },
-                    set: { model.setMembership($0, for: families, in: set.id) }
-                ))
+            FolderMembershipMenuItems(parentID: nil, model: model) { setID in
+                Binding(
+                    get: { families.allSatisfy { model.isMember($0, of: setID) } },
+                    set: { model.setMembership($0, for: families, in: setID) }
+                )
             }
             if !model.data.sets.isEmpty { Divider() }
             Button("New Folder from Selection", systemImage: "plus") {
@@ -124,6 +124,26 @@ struct OrganizingMenus: View {
         Menu { RatingMenuItems(families: families, model: model) } label: { Label("Rating", systemImage: "star") }
         Menu { ClassificationMenuItems(families: families, model: model) } label: {
             Label("Classification", systemImage: SidebarSection.classifications.icon)
+        }
+    }
+}
+
+private struct FolderMembershipMenuItems: View {
+    let parentID: UUID?
+    let model: AppModel
+    let isMember: (UUID) -> Binding<Bool>
+
+    var body: some View {
+        ForEach(model.orderedSetRows(parentID: parentID), id: \.set.id) { entry in
+            if entry.children.isEmpty {
+                Toggle(entry.set.name, isOn: isMember(entry.set.id))
+            } else {
+                Menu(entry.set.name) {
+                    Toggle(entry.set.name, isOn: isMember(entry.set.id))
+                    Divider()
+                    FolderMembershipMenuItems(parentID: entry.set.id, model: model, isMember: isMember)
+                }
+            }
         }
     }
 }
@@ -156,11 +176,11 @@ struct StyleMenu: View {
             NSPasteboard.general.setString(face.face.postScriptName, forType: .string)
         }
         Menu {
-            ForEach(model.data.sets) { set in
-                Toggle(set.name, isOn: Binding(
-                    get: { model.isMember(face, of: family, in: set.id) },
-                    set: { model.setMembership($0, for: face, of: family, in: set.id) }
-                ))
+            FolderMembershipMenuItems(parentID: nil, model: model) { setID in
+                Binding(
+                    get: { model.isMember(face, of: family, in: setID) },
+                    set: { model.setMembership($0, for: face, of: family, in: setID) }
+                )
             }
             if !model.data.sets.isEmpty { Divider() }
             Button("New Folder with Style", systemImage: "plus") {

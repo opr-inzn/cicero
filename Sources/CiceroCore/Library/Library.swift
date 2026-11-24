@@ -88,10 +88,11 @@ public struct Library: Sendable {
     public let offlinePaths: Set<String>
     public let goneFiles: Set<String>
     public let hasFacesOnUntilQuit: Bool
+    public let folderTrees: [UUID: FolderTree]
 
     public init(families: [Family], unreadableFiles: [String], activePaths: Set<String>, fingerprint: Int, changedPaths: Set<String> = [],
                 unavailableFolders: [UUID: FolderAvailability] = [:], onlineOnlyFiles: [UUID: [String]] = [:], offlineFamilies: Set<String> = [],
-                offlinePaths: Set<String> = [], goneFiles: Set<String> = []) {
+                offlinePaths: Set<String> = [], goneFiles: Set<String> = [], folderTrees: [UUID: FolderTree] = [:]) {
         self.families = families
         self.unreadableFiles = unreadableFiles
         self.activePaths = activePaths
@@ -102,6 +103,7 @@ public struct Library: Sendable {
         self.offlineFamilies = offlineFamilies
         self.offlinePaths = offlinePaths
         self.goneFiles = goneFiles
+        self.folderTrees = folderTrees
         var index: [String: Int] = [:]
         var onUntilQuit = false
         for (position, family) in families.enumerated() {
@@ -140,6 +142,16 @@ public struct Library: Sendable {
     }
 
     public func position(of id: String) -> Int? { index[id] }
+
+    public func withFolderTrees(_ folders: [WatchedFolder]) -> Library {
+        guard !folders.isEmpty else { return self }
+        return Library(
+            families: families, unreadableFiles: unreadableFiles, activePaths: activePaths, fingerprint: fingerprint,
+            changedPaths: changedPaths, unavailableFolders: unavailableFolders, onlineOnlyFiles: onlineOnlyFiles,
+            offlineFamilies: offlineFamilies, offlinePaths: offlinePaths, goneFiles: goneFiles,
+            folderTrees: FolderTree.build(families: families, folders: folders)
+        )
+    }
 
     public func matches(_ family: Family, search query: SearchQuery, note: String? = nil, texts: [String] = [], terms: [String] = []) -> Bool {
         guard !query.isEmpty, let position = index[family.id] else { return true }
@@ -232,7 +244,7 @@ public final class LibraryScanner: Sendable {
         libraryURL = locations.caches.appendingPathComponent("library.cache", isDirectory: false)
     }
 
-    public func savedLibrary(records: ActivationRecords) -> Library? {
+    public func savedLibrary(records: ActivationRecords, folders: [WatchedFolder] = []) -> Library? {
         Signposts.library.withIntervalSignpost("Restore library") {
             guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
             let session = ActivationEngine.currentSession()
@@ -243,7 +255,7 @@ public final class LibraryScanner: Sendable {
                 asSaved = false
                 if let app, records.appFolderOrigins[path] == nil { return .appOnly(app) }
                 return .inactive
-            }
+            }?.withFolderTrees(folders)
             state.withLock { state in
                 state.restored = library
                 state.onDisk = asSaved ? library : nil
@@ -252,7 +264,7 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    public func savedLibraryAsNow(records: ActivationRecords) -> (library: Library, lastSaved: Date?)? {
+    public func savedLibraryAsNow(records: ActivationRecords, folders: [WatchedFolder] = []) -> (library: Library, lastSaved: Date?)? {
         guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
         let saved = (try? FileManager.default.attributesOfItem(atPath: libraryURL.path))?[.modificationDate] as? Date
         let listed = Set(registrar.activeFontURLs().map { $0.path(percentEncoded: false) })
@@ -272,7 +284,7 @@ public final class LibraryScanner: Sendable {
             }
             let file = FoundFile(stamp: FaceStamp(modified: .distantPast, size: 0), isActive: active, appName: app)
             return Self.faceState(of: path, file: file, locations: locations, records: records)
-        }
+        }?.withFolderTrees(folders)
         return library.map { ($0, saved) }
     }
 
@@ -412,7 +424,7 @@ public final class LibraryScanner: Sendable {
             for folder in folders where Self.isListed(path, in: folder.url, includingHidden: false) {
                 if Reachability.isOnlineOnly(path) { return nil }
                 file.folderIDs.append(folder.id)
-                if file.appName == nil { file.appName = folder.appName }
+                if file.appName == nil { file.appName = folder.policy(forPath: path).appName }
                 listed = true
             }
             if let adobe, Self.isListed(path, in: adobe, includingHidden: true) {
@@ -606,6 +618,7 @@ public final class LibraryScanner: Sendable {
         }
         let inactive = locations.inactiveFolders.map { WatchedFolder(id: WatchedFolder.inactiveFolderID, path: $0.path) }
         let inactivePaths = inactive.flatMap { [$0.path + "/", Self.realPath($0.path) + "/"] }
+        let fontLibraryPaths = input.folders.filter { $0.id == WatchedFolder.fontLibraryID }.flatMap { [$0.path + "/", Self.realPath($0.path) + "/"] }
         for folder in input.folders + inactive {
             if folder.id != WatchedFolder.adobeAppsID && folder.id != WatchedFolder.inactiveFolderID,
                let availability = FolderAvailability.of(folder.path) {
@@ -614,13 +627,14 @@ public final class LibraryScanner: Sendable {
                 reach.folderPaths.append(folder.path + "/")
                 continue
             }
-            let skipped = folder.id == WatchedFolder.inactiveFolderID ? [] : inactivePaths
+            let skipped = folder.id == WatchedFolder.inactiveFolderID ? []
+                : folder.id == WatchedFolder.fontLibraryID ? inactivePaths : inactivePaths + fontLibraryPaths
             let add = { (path: String, stamp: FaceStamp) in
                 if found[path] == nil {
                     found[path] = FoundFile(stamp: stamp, isActive: false)
                 }
                 found[path]!.folderIDs.append(folder.id)
-                if found[path]!.appName == nil { found[path]!.appName = folder.appName }
+                if found[path]!.appName == nil { found[path]!.appName = folder.policy(forPath: path).appName }
             }
             let onlineOnly = { (path: String) in reach.onlineOnly[folder.id, default: []].append(path) }
             if folder.id == WatchedFolder.inactiveFolderID {
@@ -652,9 +666,11 @@ public final class LibraryScanner: Sendable {
             found[path]!.folderIDs.append(WatchedFolder.addedFilesID)
         }
         for (path, origin) in input.records.appFolderOrigins where found[path] != nil {
-            guard let folder = input.folders.first(where: { $0.appName != nil && origin.hasPrefix($0.path + "/") }) else { continue }
+            guard let folder = input.folders.first(where: { origin.hasPrefix($0.path + "/") && $0.policy(forPath: origin).appName != nil }),
+                  let app = folder.policy(forPath: origin).appName
+            else { continue }
             found[path]!.folderIDs.append(folder.id)
-            found[path]!.appName = folder.appName
+            found[path]!.appName = app
         }
         reach.onlineOnlyPaths = Set(reach.onlineOnly.values.joined())
         return (found, reach, walks, replayed)
@@ -1006,9 +1022,10 @@ public final class LibraryScanner: Sendable {
             state.offlineKnown = offlineKnown
             return changed
         }
+        let folderTrees = FolderTree.build(families: families, folders: input.folders)
         return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: changed,
                        unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
-                       goneFiles: reach.goneFiles)
+                       goneFiles: reach.goneFiles, folderTrees: folderTrees)
     }
 
     private static func offlineKnown(in library: Library) -> [String: Set<String>] {

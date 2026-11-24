@@ -151,7 +151,7 @@ final class AppSetWatcher {
             for face in family.faces {
                 for app in apps[face.face.path] ?? [] {
                     let inSet = model.data.sets.contains { set in
-                        set.apps.contains { $0.bundleID == app } && set.contains(style: face.face.postScriptName, of: family.id)
+                        set.apps.contains { $0.bundleID == app } && model.data.contains(style: face.face.postScriptName, of: family.id, inSetSubtree: set.id)
                     }
                     if !inSet { requested[app, default: []].insert(face.face.postScriptName) }
                 }
@@ -174,9 +174,9 @@ final class AppSetWatcher {
         for set in model.data.sets where !set.apps.isEmpty {
             let apps = Set(set.apps.map(\.bundleID)).intersection(running)
             guard !apps.isEmpty else { continue }
-            for name in set.memberFamilies {
+            for name in model.data.members(ofSet: set.id).families {
                 guard let family = model.library.family(name) else { continue }
-                for face in family.faces where set.contains(style: face.face.postScriptName, of: name) { want(face, for: apps) }
+                for face in family.faces where model.data.contains(style: face.face.postScriptName, of: name, inSetSubtree: set.id) { want(face, for: apps) }
             }
         }
         if !requested.isEmpty {

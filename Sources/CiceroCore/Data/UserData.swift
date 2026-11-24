@@ -2,7 +2,7 @@ import Foundation
 
 public struct UserData: Codable, Equatable, Sendable {
     // Raised with each key an older build would drop when it saves: an older build then leaves the file alone, rather than lose what only newer ones know.
-    public static let currentVersion = 2
+    public static let currentVersion = 3
     public static let newerVersionMessage = "This library was saved by a newer version of Cicero. Update Cicero to make changes."
     public static let unreadableMessage = "Cicero can’t read its saved data, so it saves no changes. Check the disk, then open Cicero again"
 
@@ -133,6 +133,8 @@ public struct UserData: Codable, Equatable, Sendable {
         showCreativeCloudFonts = try value(.showCreativeCloudFonts, d.showCreativeCloudFonts)
         activatesDocumentFonts = try value(.activatesDocumentFonts, d.activatesDocumentFonts)
         records = try value(.records, d.records)
+        repairHierarchy()
+        absorbNestedFolders()
     }
 
     public static let missingFileGrace: TimeInterval = 30 * 24 * 60 * 60
@@ -247,11 +249,25 @@ public enum TagColor: String, Codable, CaseIterable, Sendable {
     }
 }
 
+public struct FolderPolicy: Codable, Hashable, Sendable {
+    public var isActive: Bool
+    public var appName: String?
+    public var fileID: UInt64?
+
+    public init(isActive: Bool = false, appName: String? = nil, fileID: UInt64? = nil) {
+        self.isActive = isActive
+        self.appName = appName
+        self.fileID = fileID
+    }
+}
+
 public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var path: String
     public var appName: String?
     public var isActive: Bool
+    public var subfolders: [String: FolderPolicy]
+    public var showsSubfolders: Bool?
     public var customName: String?
 
     public static let inactiveFolderID = UUID(uuidString: "00000000-0000-0000-0000-0000000DEAD0")!
@@ -260,14 +276,17 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
     public static let adobeFontsID = UUID(uuidString: "00000000-0000-0000-0000-0000AD0BEF00")!
     public static let addedFilesID = UUID(uuidString: "00000000-0000-0000-0000-0000000ADDED")!
 
-    public init(id: UUID = UUID(), path: String, appName: String? = nil, isActive: Bool = false) {
+    public init(id: UUID = UUID(), path: String, appName: String? = nil, isActive: Bool = false,
+                subfolders: [String: FolderPolicy] = [:], showsSubfolders: Bool? = nil) {
         self.id = id
         self.path = path
         self.appName = appName
         self.isActive = isActive
+        self.subfolders = subfolders
+        self.showsSubfolders = showsSubfolders
     }
 
-    private enum CodingKeys: String, CodingKey { case id, path, appName, isActive }
+    private enum CodingKeys: String, CodingKey { case id, path, appName, isActive, subfolders, showsSubfolders }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -275,6 +294,42 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
         path = try container.decode(String.self, forKey: .path)
         appName = try container.decodeIfPresent(String.self, forKey: .appName)
         isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? false
+        subfolders = try container.decodeIfPresent([String: FolderPolicy].self, forKey: .subfolders) ?? [:]
+        showsSubfolders = try container.decodeIfPresent(Bool.self, forKey: .showsSubfolders)
+    }
+
+    public func relativeSubfolder(ofPath filePath: String) -> String? {
+        for prefix in FolderPath.prefixes(of: self) where filePath.hasPrefix(prefix) {
+            let relative = String(filePath.dropFirst(prefix.count))
+            guard let slash = relative.lastIndex(of: "/") else { return "" }
+            return String(relative[..<slash])
+        }
+        return nil
+    }
+
+    public func policy(forPath filePath: String) -> (isActive: Bool, appName: String?) {
+        guard !subfolders.isEmpty, let dir = relativeSubfolder(ofPath: filePath), !dir.isEmpty else {
+            return (isActive, appName)
+        }
+        return policy(forSubfolder: dir)
+    }
+
+    public func policy(forSubfolder relativePath: String) -> (isActive: Bool, appName: String?) {
+        if let own = subfolders[relativePath] { return (own.isActive, own.appName) }
+        return inheritedPolicy(forSubfolder: relativePath)
+    }
+
+    public func inheritedPolicy(forSubfolder relativePath: String) -> (isActive: Bool, appName: String?) {
+        var current = relativePath
+        while let slash = current.lastIndex(of: "/") {
+            current = String(current[..<slash])
+            if let policy = subfolders[current] { return (policy.isActive, policy.appName) }
+        }
+        return (isActive, appName)
+    }
+
+    public var hasActivePolicy: Bool {
+        isActive || subfolders.values.contains(where: \.isActive)
     }
 
     public var url: URL { URL(fileURLWithPath: path, isDirectory: true) }
@@ -323,13 +378,15 @@ public struct WatchedFolder: Codable, Hashable, Identifiable, Sendable {
 public struct FontSet: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
+    public var parentID: UUID?
     public var families: [String]
     public var styles: [String: [String]]
     public var apps: [LinkedApp]
 
-    public init(id: UUID = UUID(), name: String, families: [String] = [], styles: [String: [String]] = [:], apps: [LinkedApp] = []) {
+    public init(id: UUID = UUID(), name: String, parentID: UUID? = nil, families: [String] = [], styles: [String: [String]] = [:], apps: [LinkedApp] = []) {
         self.id = id
         self.name = name
+        self.parentID = parentID
         self.families = families
         self.styles = styles
         self.apps = apps
@@ -339,6 +396,7 @@ public struct FontSet: Codable, Hashable, Identifiable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
+        parentID = try c.decodeIfPresent(UUID.self, forKey: .parentID)
         families = try c.decode([String].self, forKey: .families)
         styles = try c.decodeIfPresent([String: [String]].self, forKey: .styles) ?? [:]
         apps = try c.decodeIfPresent([LinkedApp].self, forKey: .apps) ?? []
@@ -398,12 +456,14 @@ public struct LinkedApp: Codable, Hashable, Identifiable, Sendable {
 public struct SmartSet: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
+    public var parentID: UUID?
     public var matchAll: Bool
     public var rules: [SmartRule]
 
-    public init(id: UUID = UUID(), name: String, matchAll: Bool = true, rules: [SmartRule] = [SmartRule()]) {
+    public init(id: UUID = UUID(), name: String, parentID: UUID? = nil, matchAll: Bool = true, rules: [SmartRule] = [SmartRule()]) {
         self.id = id
         self.name = name
+        self.parentID = parentID
         self.matchAll = matchAll
         self.rules = rules
     }
@@ -412,6 +472,7 @@ public struct SmartSet: Codable, Hashable, Identifiable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
+        parentID = try c.decodeIfPresent(UUID.self, forKey: .parentID)
         matchAll = try c.decode(Bool.self, forKey: .matchAll)
         rules = try c.decode([Readable<SmartRule>].self, forKey: .rules).compactMap(\.value)
     }
@@ -485,6 +546,7 @@ public struct CustomCharacterSet: Codable, Hashable, Identifiable, Sendable {
 public struct SidebarPreferences: Codable, Equatable, Sendable {
     public var hidden: Set<String> = []
     public var collapsed: Set<String> = ["foundries", "characterSets", "charsetgroup.unicode", "charsetgroup.google"]
+    public var expanded: Set<String> = []
     public var order: [String: [String]] = [:]
 
     public init() {}
@@ -494,6 +556,7 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
         let d = SidebarPreferences()
         hidden = try c.decodeIfPresent(Set<String>.self, forKey: .hidden) ?? d.hidden
         collapsed = try c.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? d.collapsed
+        expanded = try c.decodeIfPresent(Set<String>.self, forKey: .expanded) ?? d.expanded
         order = try c.decodeIfPresent([String: [String]].self, forKey: .order) ?? d.order
     }
 
@@ -529,6 +592,14 @@ public struct SidebarPreferences: Codable, Equatable, Sendable {
 
     public mutating func forget(_ key: String) {
         hidden.remove(key)
+        collapsed.remove(key)
+        expanded.remove(key)
+        if key.hasPrefix("folder.") {
+            let prefix = key + "/"
+            expanded = expanded.filter { !$0.hasPrefix(prefix) }
+        } else if key.hasPrefix("set.") {
+            order.removeValue(forKey: "sets.\(key.dropFirst(4))")
+        }
         for list in order.keys { order[list]?.removeAll { $0 == key } }
     }
 

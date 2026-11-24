@@ -49,13 +49,21 @@ enum Names {
     static func folder(_ typed: String, in data: UserData) throws -> FontSet {
         if let id = UUID(uuidString: typed), let set = data.sets.first(where: { $0.id == id }) { return set }
         let key = fold(typed)
-        let found = data.sets.filter { fold($0.name) == key }
-        if found.count == 1 { return found[0] }
-        if found.count > 1 {
-            throw CommandError(.ambiguous, "More than one folder is called “\(typed)”. Use its id.",
-                               suggestions: found.map { $0.id.uuidString })
+        let exactName = data.sets.filter { fold($0.name) == key }
+        if exactName.count == 1 { return exactName[0] }
+        let normalizedPath = typed.split(separator: "/").map { fold(String($0)) }.joined(separator: "/")
+        let byPath = data.sets.filter { set in
+            data.path(ofSet: set.id).split(separator: "/").map { fold(String($0)) }.joined(separator: "/") == normalizedPath
         }
-        throw CommandError(.notFound, "No folder is called “\(typed)”.", suggestions: suggestions(for: typed, among: data.sets.map(\.name)))
+        if byPath.count == 1 { return byPath[0] }
+        let ambiguous = !byPath.isEmpty ? byPath : exactName
+        if ambiguous.count > 1 {
+            let paths = ambiguous.map { data.path(ofSet: $0.id) }
+            let unique = Set(paths).count == paths.count
+            throw CommandError(.ambiguous, unique ? "More than one folder is called “\(typed)”. Use its full path." : "More than one folder is called “\(typed)”. Use its id.",
+                               suggestions: unique ? paths : ambiguous.map { $0.id.uuidString })
+        }
+        throw CommandError(.notFound, "No folder is called “\(typed)”.", suggestions: suggestions(for: typed, among: data.sets.map { data.path(ofSet: $0.id) }))
     }
 
     static func location(_ typed: String, in data: UserData) throws -> WatchedFolder {

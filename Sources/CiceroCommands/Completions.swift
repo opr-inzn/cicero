@@ -12,7 +12,7 @@ public enum CompletionNames {
         guard let saved = try? LibraryContext.loadUserData(environment) else { return [] }
         switch kind {
         case .tags: return saved.tags
-        case .folders: return saved.sets.map(\.name)
+        case .folders: return saved.sets.map { saved.path(ofSet: $0.id) }
         case .locations: return saved.namedFolders.map(\.displayName)
         case .classes: return saved.classificationNames
         case .coverage:

@@ -96,7 +96,10 @@ public enum ListCommand {
                 var object = JSONObject()
                 object.set("id", set.id.uuidString)
                 object.set("name", set.name)
-                object.set("familyCount", set.memberFamilies.count { listed.contains($0) })
+                object.set("parent", set.parentID?.uuidString)
+                object.set("path", context.data.path(ofSet: set.id))
+                object.set("familyCount", context.data.members(ofSet: set.id).families.count { listed.contains($0) })
+                object.set("ownFamilyCount", set.memberFamilies.count { listed.contains($0) })
                 return object.json
             })
         case .locations:

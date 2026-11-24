@@ -139,7 +139,7 @@ public enum WriteRunner {
         case .folderCreate(let name):
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { throw CommandError.invalid("A folder needs a name.") }
-            if let existing = writer.data.sets.first(where: { Names.fold($0.name) == Names.fold(trimmed) }) {
+            if let existing = writer.data.sets.first(where: { $0.parentID == nil && Names.fold($0.name) == Names.fold(trimmed) }) {
                 return changes(changed: [], unchanged: [existing.name])
             }
             writer.update { $0.addSet(named: trimmed) }
@@ -149,7 +149,7 @@ public enum WriteRunner {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { throw CommandError.invalid("A folder needs a name.") }
             if trimmed == set.name { return changes(changed: [], unchanged: [set.name]) }
-            if let other = writer.data.sets.first(where: { $0.id != set.id && Names.fold($0.name) == Names.fold(trimmed) }) {
+            if let other = writer.data.sets.first(where: { $0.id != set.id && $0.parentID == set.parentID && Names.fold($0.name) == Names.fold(trimmed) }) {
                 throw CommandError.invalid("There’s already a folder called “\(other.name)”. Nothing changed.")
             }
             writer.renameFolder(set.id, to: trimmed)
@@ -202,8 +202,9 @@ public enum WriteRunner {
         }
         if let folder {
             let set = try Names.folder(folder, in: context.data)
-            let members = context.listedFamilies.filter { set.families.contains($0.id) || set.styles[$0.id] != nil }
-            return (members.flatMap { family in family.faces.filter { set.contains(style: $0.face.postScriptName, of: family.id) } }, "“\(set.name)”")
+            let members = context.data.members(ofSet: set.id).families
+            let families = context.listedFamilies.filter { members.contains($0.id) }
+            return (families.flatMap { family in family.faces.filter { context.data.contains(style: $0.face.postScriptName, of: family.id, inSetSubtree: set.id) } }, "“\(set.name)”")
         }
         if let tag {
             let name = try Names.tag(tag, in: context.data)

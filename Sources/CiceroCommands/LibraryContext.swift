@@ -53,7 +53,7 @@ public final class LibraryContext: @unchecked Sendable {
             }
             lastScan = environment.now
         } else {
-            guard let saved = scanner.savedLibraryAsNow(records: data.records) else {
+            guard let saved = scanner.savedLibraryAsNow(records: data.records, folders: data.folders) else {
                 throw CommandError(.failed, "Cicero hasn't scanned the fonts yet. Open Cicero once, or run the command again with --rescan.")
             }
             library = saved.library
