@@ -45,7 +45,7 @@ public struct PDFEmbeddedFont: Sendable {
         var collector = EmbeddedCollector()
         for number in stride(from: 1, through: document.numberOfPages, by: 1) {
             guard let page = document.page(at: number)?.dictionary else { continue }
-            collector.resources(of: page)
+            collector.resources(of: DocumentFonts.resourcesOwner(of: page))
             var annotations: CGPDFArrayRef?
             if CGPDFDictionaryGetArray(page, "Annots", &annotations), let annotations {
                 for index in 0..<CGPDFArrayGetCount(annotations) {

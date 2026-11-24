@@ -80,7 +80,7 @@ public enum DocumentFonts {
         var collector = PDFFontCollector()
         for number in stride(from: 1, through: document.numberOfPages, by: 1) {
             guard let page = document.page(at: number)?.dictionary else { continue }
-            collector.resources(of: page)
+            collector.resources(of: resourcesOwner(of: page))
             var annotations: CGPDFArrayRef?
             if CGPDFDictionaryGetArray(page, "Annots", &annotations), let annotations {
                 for index in 0..<CGPDFArrayGetCount(annotations) {
@@ -97,6 +97,18 @@ public enum DocumentFonts {
             }
         }
         return collector.fonts
+    }
+
+    static func resourcesOwner(of page: CGPDFDictionaryRef) -> CGPDFDictionaryRef {
+        var owner = page
+        var resources: CGPDFDictionaryRef?
+        var parent: CGPDFDictionaryRef?
+        // A page can leave out its Resources and inherit them from a Pages node above it.
+        for _ in 0..<64 where !CGPDFDictionaryGetDictionary(owner, "Resources", &resources) {
+            guard CGPDFDictionaryGetDictionary(owner, "Parent", &parent), let parent else { break }
+            owner = parent
+        }
+        return owner
     }
 
     static func withoutSubsetTag(_ name: String) -> String {
