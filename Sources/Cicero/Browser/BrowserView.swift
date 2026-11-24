@@ -43,14 +43,9 @@ struct BrowserView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) { ScanCapsule() }
-        .onChange(of: model.selectedIDs, initial: true) { preparePage() }
+        .background { PagePreloader() }
         .navigationTitle(model.selectionTitle)
         .navigationSubtitle(subtitle(families))
-    }
-
-    private func preparePage() {
-        guard model.selectedIDs.count == 1, let id = model.selectedIDs.first, let family = model.family(id) else { return }
-        model.pageContents.prepare(model.previewStyle(of: family).face.face)
     }
 
     private func subtitle(_ families: [Family]) -> String {
@@ -70,6 +65,18 @@ struct BrowserView: View {
 
     private var dependsOnCoverage: Bool { model.listDependsOnCoverage }
 
+}
+
+private struct PagePreloader: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Color.clear
+            .onChange(of: model.selectedIDs, initial: true) {
+                guard model.selectedIDs.count == 1, let id = model.selectedIDs.first, let family = model.family(id) else { return }
+                model.pageContents.prepare(model.previewStyle(of: family).face.face)
+            }
+    }
 }
 
 struct BrowserToolbar: ToolbarContent {

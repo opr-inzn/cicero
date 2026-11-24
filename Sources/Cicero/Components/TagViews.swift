@@ -24,7 +24,9 @@ extension TagColor {
 
     var title: String { rawValue.capitalized }
 
-    var menuImage: NSImage { .menuDot(NSColor(color)) }
+    private static let menuImages: [TagColor: NSImage] = Dictionary(uniqueKeysWithValues: allCases.map { ($0, .menuDot(NSColor($0.color))) })
+
+    var menuImage: NSImage { Self.menuImages[self] ?? .menuDot(NSColor(color)) }
 }
 
 extension NSImage {

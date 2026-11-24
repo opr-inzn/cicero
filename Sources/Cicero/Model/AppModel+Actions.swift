@@ -354,7 +354,12 @@ extension AppModel {
             if result.failed.isEmpty { model.data.fontLibraryPath = destination.path }
             model.finish(result)
             // What the move wrote down goes only once the new path is on the disk, so a stop in between still has it.
-            if result.failed.isEmpty, model.store.flush(durably: true) { model.engine.forgetLibraryMove() }
+            if result.failed.isEmpty {
+                let store = model.store
+                if await Task.detached(priority: .utility, operation: { store.flush(durably: true) }).value {
+                    model.engine.forgetLibraryMove()
+                }
+            }
         }
     }
 
@@ -378,7 +383,7 @@ extension AppModel {
             let result = await model.engine.moveToTrash(plan, records: model.data.records)
             model.data.records = result.records
             if result.failed.isEmpty {
-                for name in plan.removedFamilies { model.forget(family: name) }
+                model.forget(families: plan.removedFamilies)
             }
             let trashed = result.trashed
             let unknown = result.succeeded - trashed.count
@@ -471,15 +476,21 @@ extension AppModel {
         }
     }
 
-    private func forget(family name: String) {
-        for index in data.sets.indices { data.sets[index].remove(families: [name]) }
-        data.familyTags[name] = nil
-        data.familyRatings[name] = nil
-        data.familyNotes[name] = nil
-        data.activations[name] = nil
-        data.foundryOverrides[name] = nil
-        selectedIDs.remove(name)
-        if openFamilyID == name { openFamilyID = nil }
+    private func forget(families names: [String]) {
+        guard !names.isEmpty else { return }
+        let removed = Set(names)
+        var data = data
+        for index in data.sets.indices { data.sets[index].remove(families: removed) }
+        for name in names {
+            data.familyTags[name] = nil
+            data.familyRatings[name] = nil
+            data.familyNotes[name] = nil
+            data.activations[name] = nil
+            data.foundryOverrides[name] = nil
+        }
+        self.data = data
+        selectedIDs.subtract(removed)
+        if let openFamilyID, removed.contains(openFamilyID) { self.openFamilyID = nil }
     }
 
     // MARK: Finder
@@ -803,17 +814,22 @@ extension AppModel {
     }
 
     func deleteSmartSets(_ ids: Set<UUID>) {
+        var data = data
         data.smartSets.removeAll { ids.contains($0.id) }
         for id in ids { data.sidebar.forget("smartset.\(id)") }
+        self.data = data
         deselect { if case .smartSet(let id) = $0 { ids.contains(id) } else { false } }
     }
 
     // MARK: Foundries
 
     func setFoundry(_ name: String?, for families: [Family]) {
+        let value = name?.isEmpty == false ? name : nil
+        var data = data
         for family in families {
-            data.foundryOverrides[family.id] = name?.isEmpty == false ? name : nil
+            data.foundryOverrides[family.id] = value
         }
+        self.data = data
     }
 
     func renameFoundry(_ old: String, to new: String) {
@@ -1291,7 +1307,11 @@ extension AppModel {
             }
         }
         enqueue { model in
-            for path in copies { model.data.records.installedCopies[path] = nil }
+            if !copies.isEmpty {
+                var data = model.data
+                for path in copies { data.records.installedCopies[path] = nil }
+                model.data = data
+            }
             if !inPlace.isEmpty {
                 model.data.records = await model.engine.forgetInPlace(inPlace, records: model.data.records)
                 model.rescan()

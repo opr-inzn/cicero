@@ -63,6 +63,12 @@ public final class LanguageCatalog: Sendable {
         return store.requirements.missing(position, in: scalars)
     }
 
+    public func missingCount(_ id: String, in scalars: ScalarRanges) -> Int {
+        let store = store
+        guard let position = store.order.positions[id] else { return 0 }
+        return store.requirements.missingCount(position, in: scalars)
+    }
+
     private var store: Storage {
         loaded.wait()
         return storage.withLock { $0! }
@@ -200,6 +206,12 @@ struct LanguageRequirements: Sendable {
         orthographies[position]
             .map { scalars.missing(sorted: $0.base.map { universe[Int($0)] }) }
             .min { $0.count < $1.count } ?? []
+    }
+
+    func missingCount(_ position: Int, in scalars: ScalarRanges) -> Int {
+        orthographies[position]
+            .map { scalars.missingCount(sorted: $0.base.map { universe[Int($0)] }) }
+            .min() ?? 0
     }
 
     func support(in scalars: ScalarRanges) -> LanguageBits {

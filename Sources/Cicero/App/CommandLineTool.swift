@@ -132,10 +132,12 @@ enum CommandLineTool {
                 "/bin/mkdir -p \(quoted($0.at.deletingLastPathComponent().path)) && /bin/ln -sfn \(quoted($0.to.path)) \(quoted($0.at.path))"
             }.joined(separator: " && ")
             let source = "do shell script \(literal(script)) with prompt \(literal("Cicero wants to install its CLI in \(prefix.path).")) with administrator privileges"
-            let cancelled = await MainActor.run {
-                var error: NSDictionary?
-                _ = NSAppleScript(source: source)?.executeAndReturnError(&error)
-                return error?[NSAppleScript.errorNumber] as? Int == -128
+            let cancelled = await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    var error: NSDictionary?
+                    _ = NSAppleScript(source: source)?.executeAndReturnError(&error)
+                    continuation.resume(returning: error?[NSAppleScript.errorNumber] as? Int == -128)
+                }
             }
             if cancelled { return .cancelled }
         }
@@ -147,6 +149,11 @@ enum CommandLineTool {
     }
 
     nonisolated private static func literal(_ text: String) -> String {
-        "\"" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+        let escaped = text
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\r", with: "\" & return & \"")
+            .replacingOccurrences(of: "\n", with: "\" & linefeed & \"")
+        return "\"" + escaped + "\""
     }
 }

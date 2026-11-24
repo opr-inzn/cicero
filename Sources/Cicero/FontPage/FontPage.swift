@@ -302,11 +302,17 @@ private struct TypeTester: View {
         }
     }
 
+    private static var longestStyleCache: [String: (count: Int, title: String)] = [:]
+
     private var longestStyleTitle: String {
+        if let cached = Self.longestStyleCache[family.id], cached.count == family.faces.count { return cached.title }
         let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         var titles = family.faces.map(\.face.styleName)
         if family.faces.contains(where: { !$0.face.axes.isEmpty }) { titles.append("Custom") }
-        return titles.max { ($0 as NSString).size(withAttributes: [.font: font]).width < ($1 as NSString).size(withAttributes: [.font: font]).width } ?? ""
+        let title = titles.max { ($0 as NSString).size(withAttributes: [.font: font]).width < ($1 as NSString).size(withAttributes: [.font: font]).width } ?? ""
+        if Self.longestStyleCache.count >= 64 { Self.longestStyleCache.removeAll(keepingCapacity: true) }
+        Self.longestStyleCache[family.id] = (family.faces.count, title)
+        return title
     }
 
     @ViewBuilder
@@ -685,11 +691,31 @@ private struct StyleRows: View {
     @Environment(AppModel.self) private var model
     let family: Family
     @State private var tableWidth: CGFloat?
+    @State private var metricsCache = MetricsCache()
     private static let gap: CGFloat = 24
     private static let narrowestPreview: CGFloat = 200
 
-    var body: some View {
-        let model = self.model
+    private struct Metrics {
+        let axes: [(tag: String, name: String, width: CGFloat)]
+        let statusWidth: CGFloat
+        let showsWeight: Bool
+        let showsFormat: Bool
+        let styleIdealWidth: CGFloat
+        let others: CGFloat
+        let gaps: CGFloat
+    }
+
+    private final class MetricsCache {
+        var key: (id: String, faces: [FaceID], states: [FaceState])?
+        var metrics: Metrics?
+    }
+
+    private func metrics() -> Metrics {
+        let ids = family.faces.map(\.id)
+        let states = family.faces.map(\.state)
+        if let key = metricsCache.key, key.id == family.id, key.faces == ids, key.states == states, let cached = metricsCache.metrics {
+            return cached
+        }
         let headerFont = NSFont.systemFont(ofSize: NSFont.preferredFont(forTextStyle: .subheadline).pointSize, weight: .semibold)
         let axes = family.styleAxes.map { (tag: $0.tag, name: $0.name, width: Self.width(fitting: [$0.name], in: headerFont)) }
         let statuses = family.faces.flatMap { style in
@@ -700,8 +726,23 @@ private struct StyleRows: View {
         let showsFormat = Set(family.faces.map { ($0.face.path as NSString).pathExtension.lowercased() }).count > 1
         let others = [statusWidth, showsWeight ? 56 : 0, showsFormat ? 56 : 0].reduce(0, +) + axes.map(\.width).reduce(0, +)
         let gaps = CGFloat(2 + (showsWeight ? 1 : 0) + (showsFormat ? 1 : 0) + axes.count) * Self.gap
-        let styleRoom = tableWidth.map { $0 - Self.narrowestPreview - others - gaps } ?? 240
-        let styleWidth = Self.width(fitting: family.faces.map(\.face.styleName), in: .preferredFont(forTextStyle: .body), minimum: 140, maximum: max(140, styleRoom))
+        let styleIdealWidth = Self.width(fitting: family.faces.map(\.face.styleName), in: .preferredFont(forTextStyle: .body), minimum: 140, maximum: .greatestFiniteMagnitude)
+        let result = Metrics(axes: axes, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat,
+                             styleIdealWidth: styleIdealWidth, others: others, gaps: gaps)
+        metricsCache.key = (family.id, ids, states)
+        metricsCache.metrics = result
+        return result
+    }
+
+    var body: some View {
+        let model = self.model
+        let m = metrics()
+        let axes = m.axes
+        let statusWidth = m.statusWidth
+        let showsWeight = m.showsWeight
+        let showsFormat = m.showsFormat
+        let styleRoom = tableWidth.map { $0 - Self.narrowestPreview - m.others - m.gaps } ?? 240
+        let styleWidth = min(m.styleIdealWidth, max(140, styleRoom))
         // Not lazy: in a lazy stack, rows each as high as their own font's line moved the page below, and with it the glyph row `TopRowKeeper` keeps at the top.
         VStack(spacing: 0) {
             row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat) {

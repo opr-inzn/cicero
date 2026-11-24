@@ -106,7 +106,8 @@ extension AppModel {
         // Web fonts are left out: Adobe apps don't see them in a Fonts folder, and set blank text in them used in place.
         var webFonts: Set<String> = []
         let imports = importFiles(among: urls.filter(\.isFileURL).map(\.standardizedFileURL))
-        let readFolders = readFolders
+        let lookup = pathLookup()
+        var seenFiles = Set<String>()
         for url in urls where url.isFileURL && !imports.contains(url.standardizedFileURL) {
             let url = url.standardizedFileURL
             var isDirectory: ObjCBool = false
@@ -114,8 +115,9 @@ extension AppModel {
             let pathExtension = url.pathExtension.lowercased()
             if isDirectory.boolValue {
                 if !NSWorkspace.shared.isFilePackage(atPath: url.path) { folders.append(url) }
-            } else if FontFormat.fileExtensions.contains(pathExtension), case let path = libraryPath(of: url.path, folders: readFolders), !files.contains(path) {
-                files.append(path)
+            } else if FontFormat.fileExtensions.contains(pathExtension) {
+                let path = lookup.libraryPath(of: url.path)
+                if seenFiles.insert(path).inserted { files.append(path) }
             } else if DocumentFonts.fileExtensions.contains(pathExtension) {
                 documents.append(url)
             } else if ["woff", "woff2"].contains(pathExtension) {
@@ -137,10 +139,15 @@ extension AppModel {
         guard (method ?? data.installMethod) != .inPlace, !opened.isEmpty else {
             return add(files, folders: folders, method: method, location: location, target: target)
         }
-        Task { [files] in
+        Task { [files, seenFiles] in
             var files = files
+            var seen = seenFiles
             let found = await Task.detached(priority: .userInitiated) { opened.flatMap(LibraryScanner.fontFiles(in:)) }.value
-            for path in found.map({ libraryPath(of: $0, folders: readFolders) }) where !files.contains(path) { files.append(path) }
+            let lookup = pathLookup()
+            for raw in found {
+                let path = lookup.libraryPath(of: raw)
+                if seen.insert(path).inserted { files.append(path) }
+            }
             guard !files.isEmpty || opened.count < folders.count else {
                 return showToast(opened.count == 1 ? "There are no fonts Cicero can read in “\(opened[0].lastPathComponent)”" : "There are no fonts Cicero can read in those folders")
             }
@@ -163,7 +170,8 @@ extension AppModel {
 
     func addCheckingDuplicates(_ paths: [String], method: InstallMethod? = nil, into location: DropLocation? = nil,
                                then: @escaping (AppModel, Set<String>, AddNote) -> Void) {
-        let new = paths.filter { !isListed($0) }
+        let lookup = pathLookup()
+        let new = paths.filter { !lookup.isListed($0) }
         guard !new.isEmpty, data.duplicateHandling != .addCopy else { return addFontFiles(paths, method: method, into: location, then: then) }
         let library = library
         Task {
@@ -216,10 +224,11 @@ extension AppModel {
         }
         let left = Set(skipped.flatMap(\.paths)).subtracting(duplicates.filter { choices[$0.id] != .skip }.flatMap(\.paths))
             .union(replacements.map(\.added))
-        let offAdded = movableFiles(among: paths).filter { !library.activePaths.contains($0) }
+        let lookup = pathLookup()
+        let offAdded = lookup.movableFiles(among: paths).filter { !library.activePaths.contains($0) }
         if method == nil, data.installMethod == .ask,
-           case let asked = paths.filter({ !left.contains($0) && (!isListed($0) || offAdded.contains($0)) }), !asked.isEmpty {
-            let prompt = InstallPrompt(files: asked, offersMove: asked.contains { !isInReadFolder($0) }, location: location) { model, method in
+           case let asked = paths.filter({ !left.contains($0) && (!lookup.isListed($0) || offAdded.contains($0)) }), !asked.isEmpty {
+            let prompt = InstallPrompt(files: asked, offersMove: asked.contains { !lookup.isInReadFolder($0) }, location: location) { model, method in
                 model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, into: location, then: then,
                                    askedAboutOpenApps: true)
             }
@@ -230,12 +239,12 @@ extension AppModel {
         let paths = paths.filter { !left.contains($0) }
         let existing = Set(skipped.flatMap { $0.styles.map(\.face.path) })
         let skipNote = Self.skipNote(skipped)
-        let movable = movableFiles(among: paths)
+        let movable = lookup.movableFiles(among: paths)
         let installing = !installs ? [] : paths.filter { path in
-            !isListed(path) || movable.contains(path) && !library.activePaths.contains(path)
+            !lookup.isListed(path) || movable.contains(path) && !library.activePaths.contains(path)
         }
         let moving = method == .move
-        let new = installs ? [] : paths.filter { !isListed($0) }
+        let new = installs ? [] : paths.filter { !lookup.isListed($0) }
         if !new.isEmpty {
             data.fontFiles += new
             data.sidebar.hidden.remove(SidebarSection.folders.key)
@@ -318,15 +327,45 @@ extension AppModel {
         return skipped.count > 2 ? "Skipped \(names) already in your library" : "Skipped \(names), already in your library"
     }
 
-    private func isListed(_ path: String) -> Bool {
-        if data.fontFiles.contains(path) || isInReadFolder(path) { return true }
-        return library.families.contains { $0.faces.contains { $0.face.path == path || $0.otherCopies.contains(path) } }
+    private struct PathLookup {
+        let addedFiles: Set<String>
+        let libraryPaths: Set<String>
+        let folders: [String]
+        let realFolders: [(folder: String, real: String)]
+
+        func libraryPath(of path: String) -> String {
+            guard !folders.contains(where: { path.hasPrefix($0 + "/") }), let real = AppModel.realPath(path) else { return path }
+            for (folder, realFolder) in realFolders where real.hasPrefix(realFolder + "/") {
+                return folder + real.dropFirst(realFolder.count)
+            }
+            return path
+        }
+
+        func isInReadFolder(_ path: String) -> Bool {
+            let normalized = libraryPath(of: path)
+            return folders.contains { normalized.hasPrefix($0 + "/") }
+        }
+
+        func isListed(_ path: String) -> Bool {
+            addedFiles.contains(path) || libraryPaths.contains(path) || isInReadFolder(path)
+        }
+
+        func movableFiles(among paths: [String]) -> Set<String> {
+            Set(paths.filter { addedFiles.contains($0) && !isInReadFolder($0) })
+        }
     }
 
-    private func isInReadFolder(_ path: String) -> Bool {
+    private func pathLookup() -> PathLookup {
         let folders = readFolders
-        let path = libraryPath(of: path, folders: folders)
-        return folders.contains { path.hasPrefix($0 + "/") }
+        let realFolders = folders.compactMap { folder in Self.realPath(folder).map { (folder, $0) } }
+        var libraryPaths = Set<String>()
+        for family in library.families {
+            for face in family.faces {
+                libraryPaths.insert(face.face.path)
+                libraryPaths.formUnion(face.otherCopies)
+            }
+        }
+        return PathLookup(addedFiles: Set(data.fontFiles), libraryPaths: libraryPaths, folders: folders, realFolders: realFolders)
     }
 
     private var readFolders: [String] {
@@ -349,8 +388,7 @@ extension AppModel {
     }
 
     func movableFiles(among paths: [String]) -> Set<String> {
-        let added = Set(data.fontFiles)
-        return Set(paths.filter { added.contains($0) && !isInReadFolder($0) })
+        pathLookup().movableFiles(among: paths)
     }
 
     func showOpenedFiles(after id: Int) {

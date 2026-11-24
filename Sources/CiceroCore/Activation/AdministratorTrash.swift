@@ -18,9 +18,12 @@ enum AdministratorTrash {
             ? "Cicero wants to move “\((moves[0].source as NSString).lastPathComponent)” to the Trash."
             : "Cicero wants to move \(moves.count) files to the Trash."
         let source = "do shell script \(literal(script)) with prompt \(literal(prompt)) with administrator privileges"
-        await MainActor.run {
-            var error: NSDictionary?
-            _ = NSAppleScript(source: source)?.executeAndReturnError(&error)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var error: NSDictionary?
+                _ = NSAppleScript(source: source)?.executeAndReturnError(&error)
+                continuation.resume()
+            }
         }
         return Set(moves.filter { !fm.fileExists(atPath: $0.source) && fm.fileExists(atPath: $0.destination) }.map(\.source))
     }
@@ -43,6 +46,11 @@ enum AdministratorTrash {
     }
 
     private static func literal(_ text: String) -> String {
-        "\"" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+        let escaped = text
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\r", with: "\" & return & \"")
+            .replacingOccurrences(of: "\n", with: "\" & linefeed & \"")
+        return "\"" + escaped + "\""
     }
 }

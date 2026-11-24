@@ -241,6 +241,7 @@ private struct FolderRow: View {
                 FixButtons(fixes: fixes, kind: kind, family: family).controlSize(.small)
             }
             if isExpanded {
+                let filesDiffer = self.filesDiffer
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(folder.files, id: \.path) { file in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {

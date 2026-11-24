@@ -117,7 +117,6 @@ private struct TextTab: View {
 
     private var table: some View {
         let model = self.model
-        let preview = self.preview
         let sample = query.text
         let matches = sample.isEmpty ? [] : self.matches
         let missing = Dictionary(matches.map { ($0.family.id, $0.missing) }) { first, _ in first }
@@ -159,6 +158,7 @@ private struct TextTab: View {
 
     private func search(_ query: Query) async {
         guard !query.text.isEmpty else {
+            isSearching = false
             matches = []
             unindexed = 0
             return
@@ -173,9 +173,10 @@ private struct TextTab: View {
         let index = model.coverage
         let text = query.text
         let maxMissing = query.maxMissing
-        let result = await Task.detached(priority: .userInitiated) {
+        let work = Task.detached(priority: .userInitiated) {
             CoverageSearch.families(having: text, in: families, maxMissing: maxMissing, index: index)
-        }.value
+        }
+        let result = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
         guard !Task.isCancelled else { return }
         matches = result.matches
         unindexed = result.unindexed
@@ -192,8 +193,15 @@ private struct LanguagesTab: View {
     @State private var search = ""
     @State private var support = LanguageSupport()
     @State private var selection: Set<String> = []
+    @State private var languageCache = LanguageListCache()
+
+    private final class LanguageListCache {
+        var key: (search: String, sortByName: Bool, count: Int)?
+        var languages: [Language] = []
+    }
 
     private struct LanguageSupport {
+        var languageID = ""
         var full: [Family] = []
         var base: [Family] = []
         var unindexed = 0
@@ -222,15 +230,21 @@ private struct LanguagesTab: View {
     private var languages: [Language] {
         let query = search.trimmingCharacters(in: .whitespaces)
         let all = model.languages.languages
+        if let cached = languageCache.key, cached.search == query, cached.sortByName == sortByName, cached.count == all.count {
+            return languageCache.languages
+        }
         let found = query.isEmpty ? all : all.filter { language in
             language.name.localizedCaseInsensitiveContains(query)
                 || (language.autonym?.localizedCaseInsensitiveContains(query) ?? false)
                 || language.scripts.contains { $0.localizedCaseInsensitiveContains(query) }
         }
-        return found.sorted { a, b in
+        let sorted = found.sorted { a, b in
             if sortByName || a.speakers == b.speakers { return a.name.localizedStandardCompare(b.name) == .orderedAscending }
             return a.speakers > b.speakers
         }
+        languageCache.key = (query, sortByName, all.count)
+        languageCache.languages = sorted
+        return sorted
     }
 
     private var list: some View {
@@ -276,9 +290,10 @@ private struct LanguagesTab: View {
         if let language = model.languages.language(languageID) {
             let query = Query(id: language.id, showSystem: model.data.showSystemFonts, showCreativeCloud: model.data.showCreativeCloudFonts,
                               fingerprint: model.library.fingerprint, coverageRevision: model.coverageRevision)
+            let shown = support.languageID == language.id ? support : LanguageSupport(languageID: language.id)
             FamilyRowList(sections: [
-                FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.plain))", families: support.full, emptyText: "None"),
-                FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.plain))", families: support.base, emptyText: "None"),
+                FamilyRowSection(id: "full", title: "Fully Supported (\(shown.full.count.plain))", families: shown.full, emptyText: "None"),
+                FamilyRowSection(id: "base", title: "Base Characters Only (\(shown.base.count.plain))", families: shown.base, emptyText: "None"),
             ], selection: $selection) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
@@ -332,10 +347,11 @@ private struct LanguagesTab: View {
         let families = model.library.families.filter { data.lists($0) }
         let index = model.coverage
         let id = query.id
-        let result = await Task.detached(priority: .userInitiated) {
+        let work = Task.detached(priority: .userInitiated) {
             CoverageSearch.families(supporting: id, in: families, index: index)
-        }.value
+        }
+        let result = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
         guard !Task.isCancelled else { return }
-        support = LanguageSupport(full: result.full, base: result.base, unindexed: result.unindexed)
+        support = LanguageSupport(languageID: id, full: result.full, base: result.base, unindexed: result.unindexed)
     }
 }

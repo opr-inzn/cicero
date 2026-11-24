@@ -288,17 +288,18 @@ extension AppModel {
     func searchSuggestions(for typed: String) -> [Family] {
         let query = SearchQuery(typed)
         guard !query.isEmpty else { return [] }
-        var ranks: [String: Int] = [:]
-        let found = listedFamilies { family in
-            guard let rank = query.suggestionRank(of: family.name.lowercased()) else { return false }
-            ranks[family.id] = rank
-            return true
+        var prefix: [Family] = []
+        var other: [Family] = []
+        for family in listedFamilies(where: { _ in true }) {
+            guard let rank = query.suggestionRank(of: family.name.lowercased()) else { continue }
+            if rank == 0 {
+                prefix.append(family)
+                if prefix.count >= 8 { return prefix }
+            } else if other.count < 8 {
+                other.append(family)
+            }
         }
-        let sorted = found.sorted { a, b in
-            let ranked = (ranks[a.id] ?? 1, ranks[b.id] ?? 1)
-            return ranked.0 != ranked.1 ? ranked.0 < ranked.1 : a.name.localizedStandardCompare(b.name) == .orderedAscending
-        }
-        return Array(sorted.prefix(8))
+        return Array((prefix + other).prefix(8))
     }
 
     func compareCandidates(for typed: String) -> [Family] {

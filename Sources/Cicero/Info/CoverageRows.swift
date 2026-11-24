@@ -4,8 +4,13 @@ import SwiftUI
 struct LanguagesRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
-    @State private var loaded: Loaded<FaceCoverage>?
+    @State private var loaded: Loaded<Prepared>?
     @State private var showsAll = false
+
+    private struct Prepared {
+        let coverage: FaceCoverage
+        let languages: [Language]
+    }
 
     private static let preferred: [String] = Locale.preferredLanguages.compactMap {
         Locale(identifier: $0).language.languageCode?.identifier(.alpha3)
@@ -14,8 +19,8 @@ struct LanguagesRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Languages").font(.caption).foregroundStyle(.secondary)
-            if let coverage = loaded?.value {
-                let languages = ranked(coverage.supportedLanguages.compactMap(model.languages.language))
+            if let prepared = loaded?.value {
+                let languages = prepared.languages
                 if languages.isEmpty {
                     Text("None").font(.callout)
                 } else {
@@ -24,16 +29,22 @@ struct LanguagesRow: View {
                         .controlSize(.small)
                         .padding(.top, 2)
                         .popover(isPresented: $showsAll, arrowEdge: .leading) {
-                            LanguageList(languages: languages, coverage: coverage)
+                            LanguageList(languages: languages, coverage: prepared.coverage)
                         }
                 }
             } else {
                 SamplePlaceholder(size: 13).frame(width: 180)
             }
         }
-        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id) }) { [face] in
-            await model.coverage.coverage(computing: face)
+        .loading($loaded, for: FileFace(face), cached: { [face] in
+            model.coverage.coverage(of: face.id).map(prepare)
+        }) { [face] in
+            prepare(await model.coverage.coverage(computing: face))
         }
+    }
+
+    private func prepare(_ coverage: FaceCoverage) -> Prepared {
+        Prepared(coverage: coverage, languages: ranked(coverage.supportedLanguages.compactMap(model.languages.language)))
     }
 
     private func ranked(_ languages: [Language]) -> [Language] {
@@ -85,7 +96,7 @@ private struct LanguageList: View {
             if !unsupported.isEmpty {
                 Section("Not Supported (\(unsupported.count.plain))") {
                     ForEach(unsupported, id: \.language.id) { entry in
-                        unsupportedRow(entry.language, missing: entry.missing)
+                        unsupportedRow(entry.language, missingCount: entry.missingCount)
                     }
                 }
             }
@@ -106,14 +117,14 @@ private struct LanguageList: View {
             || language.scripts.contains { $0.localizedCaseInsensitiveContains(query) }
     }
 
-    private var unsupportedMatches: [(language: Language, missing: [UInt32])] {
+    private var unsupportedMatches: [(language: Language, missingCount: Int)] {
         model.languages.languages
             .filter { coverage.support(for: $0.id) == nil && matches($0) }
             .sorted { $0.speakers > $1.speakers }
-            .map { ($0, model.languages.missing($0.id, in: coverage.scalars)) }
+            .map { ($0, model.languages.missingCount($0.id, in: coverage.scalars)) }
     }
 
-    private func unsupportedRow(_ language: Language, missing: [UInt32]) -> some View {
+    private func unsupportedRow(_ language: Language, missingCount: Int) -> some View {
         let shows = Binding(get: { showsMissing == language.id }, set: { if !$0 { showsMissing = nil } })
         return HStack {
             Text(language.name)
@@ -121,14 +132,14 @@ private struct LanguageList: View {
                 Text(autonym).foregroundStyle(.secondary)
             }
             Spacer()
-            Text("\(missing.count.plain) missing").foregroundStyle(.secondary)
+            Text("\(missingCount.plain) missing").foregroundStyle(.secondary)
             Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
         }
         .contentShape(.rect)
         .onTapGesture { showsMissing = language.id }
         .help("Show the characters the font needs for \(language.name)")
         .popover(isPresented: shows, arrowEdge: .trailing) {
-            MissingCharacterList(missing: missing)
+            MissingCharacterList(missing: model.languages.missing(language.id, in: coverage.scalars))
         }
     }
 }
@@ -136,28 +147,39 @@ private struct LanguageList: View {
 struct CharacterSetsRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
-    @State private var loaded: Loaded<ScalarRanges>?
+    @State private var loaded: Loaded<Prepared>?
     @State private var showsMissing: CharacterSetDefinition?
 
+    private struct Key: Hashable {
+        let face: FileFace
+        let customSets: [CharacterSetDefinition]
+    }
+
+    private struct Prepared {
+        let ranges: ScalarRanges
+        let supported: [CharacterSetDefinition]
+        let nextLatin: (name: String, missing: Int)?
+        let incomplete: [(name: String, sets: [(set: CharacterSetDefinition, missing: Int)])]
+    }
+
     var body: some View {
+        let key = Key(face: FileFace(face), customSets: model.customCharacterSets)
         VStack(alignment: .leading, spacing: 2) {
             Text("Coverage").font(.caption).foregroundStyle(.secondary)
-            if let ranges = loaded?.value {
-                let has = supported(by: ranges)
+            if let prepared = loaded?.value {
+                let has = prepared.supported
                 Text(has.isEmpty ? "None" : has.map(\.name).listed())
                     .font(.callout)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-                if let next = nextLatin(after: has) {
-                    let missing = ranges.missingCount(sorted: next.scalars)
-                    Text(missing == 1 ? "\(next.name) needs 1 more character" : "\(next.name) needs \(missing.plain) more characters")
+                if let next = prepared.nextLatin {
+                    Text(next.missing == 1 ? "\(next.name) needs 1 more character" : "\(next.name) needs \(next.missing.plain) more characters")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                let incomplete = incompleteSets(in: ranges)
-                if !incomplete.isEmpty {
+                if !prepared.incomplete.isEmpty {
                     Menu {
-                        ForEach(incomplete, id: \.name) { group in
+                        ForEach(prepared.incomplete, id: \.name) { group in
                             Section(group.name) {
                                 ForEach(group.sets, id: \.set.id) { entry in
                                     Button("\(entry.set.name) (\(entry.missing.plain) missing)") { showsMissing = entry.set }
@@ -174,16 +196,24 @@ struct CharacterSetsRow: View {
                     .fixedSize()
                     .padding(.top, 2)
                     .popover(item: $showsMissing, arrowEdge: .leading) { set in
-                        MissingCharacterList(missing: ranges.missing(sorted: set.scalars))
+                        MissingCharacterList(missing: prepared.ranges.missing(sorted: set.scalars))
                     }
                 }
             } else {
                 SamplePlaceholder(size: 13).frame(width: 180)
             }
         }
-        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id)?.scalars }) { [face] in
-            await model.coverage.coverage(computing: face).scalars
+        .loading($loaded, for: key, cached: { [face] in
+            model.coverage.coverage(of: face.id).map { prepare($0.scalars) }
+        }) { [face] in
+            prepare(await model.coverage.coverage(computing: face).scalars)
         }
+    }
+
+    private func prepare(_ ranges: ScalarRanges) -> Prepared {
+        let has = supported(by: ranges)
+        let next = nextLatin(after: has).map { (name: $0.name, missing: ranges.missingCount(sorted: $0.scalars)) }
+        return Prepared(ranges: ranges, supported: has, nextLatin: next, incomplete: incompleteSets(in: ranges))
     }
 
     private func supported(by ranges: ScalarRanges) -> [CharacterSetDefinition] {

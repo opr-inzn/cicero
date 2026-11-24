@@ -92,8 +92,13 @@ final class SampleWidths {
         measuredLog.append((measured.new, measured.used.count))
         #endif
         if measured.new > 0 || measured.used.count != known.count {
-            saved = measured.used
-            save(measured.used)
+            let defaultSuffix = "|\(PreviewSettings.tileSample)"
+            var kept = known.filter { $0.key.hasSuffix(defaultSuffix) }
+            kept.merge(measured.used) { _, new in new }
+            if kept != saved {
+                saved = kept
+                save(kept)
+            }
         }
         guard let ratio = measured.ratio else { return listRatio }
         measuredInputs = inputs
@@ -206,7 +211,7 @@ final class SampleWidths {
             if !measured.isEmpty { ratios.withLock { ratios in for (text, found) in measured { ratios.add(found, text: text) } } }
         }
         for (index, sample) in samples.enumerated() {
-            if index % 32 == 0, Task.isCancelled { return nil }
+            if index % 8 == 0, Task.isCancelled { return nil }
             let path = sample.face.path
             // Not a file on a server, which asking anything could hold up, unless it was read already.
             var file = stat()

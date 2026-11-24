@@ -23,9 +23,24 @@ struct FontGrid: View {
     static let sampleHeightPerWidth: CGFloat = 0.36
 
     struct Measure {
+        private struct Key: Hashable {
+            var sample: String
+            var size: Double
+        }
+        private static var cache: [Key: Measure] = [:]
+
         var above: CGFloat
         var below: CGFloat
         var width: CGFloat
+
+        static func of(_ sample: String, size: Double) -> Measure {
+            let key = Key(sample: sample, size: size)
+            if let cached = cache[key] { return cached }
+            let value = Measure(sample, size: size)
+            if cache.count >= 32 { cache.removeAll(keepingCapacity: true) }
+            cache[key] = value
+            return value
+        }
 
         init(_ sample: String, size: Double) {
             let line = CTLineCreateWithAttributedString(NSAttributedString(string: sample, attributes: [.font: NSFont.systemFont(ofSize: size)]))
@@ -60,7 +75,7 @@ struct FontGrid: View {
 
     var body: some View {
         let shown = shown ?? Shown(text: sampleText, ratio: SampleWidths.shared.listRatio)
-        let measure = Measure(shown.text, size: preview.size)
+        let measure = Measure.of(shown.text, size: preview.size)
         let ratio = shown.ratio
         let (count, tile, restingTile) = layout(minimum: measure.minimumWidth(size: preview.size, ratio: ratio))
         let sampleHeight = max(measure.height(size: preview.size), restingTile * Self.sampleHeightPerWidth)
@@ -77,7 +92,7 @@ struct FontGrid: View {
                     ForEach(groups) { group in
                         Section {
                             ForEach(group.families) { family in
-                                Tile(family: family, sampleText: shown.text, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit, isSelected: model.selectedIDs.contains(family.id), model: model)
+                                Tile(family: family, sampleText: shown.text, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit, model: model)
                                     .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                                     .onAppear { ReadAhead.around(family, in: families) }
                             }
@@ -96,7 +111,7 @@ struct FontGrid: View {
             }
             .modifier(PinnedBar(isShown: pinned != nil, infoShown: infoShown, scale: scale) {
                 if let pinned {
-                    Tile(family: pinned, sampleText: shown.text, sampleHeight: measure.height(size: preview.size), baselineBelowCentre: measure.baselineBelowCentre, fit: fit, isSelected: model.selectedIDs.contains(pinned.id), model: model)
+                    Tile(family: pinned, sampleText: shown.text, sampleHeight: measure.height(size: preview.size), baselineBelowCentre: measure.baselineBelowCentre, fit: fit, model: model)
                         .modifier(FamilyItem(family: pinned, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                         .frame(width: rowWidth)
                 }
@@ -134,6 +149,10 @@ struct FontGrid: View {
         if SampleWidths.shared.hasMeasured(inputs) {
             shown = Shown(text: text, ratio: SampleWidths.shared.listRatio)
             return
+        }
+        if !preview.sampleText.isEmpty {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
         }
         let families = model.library.families, data = model.data
         let axes = model.familyAxes.mapValues { (face: $0.face, values: $0.values) }
@@ -314,10 +333,10 @@ private struct Tile: View {
     let sampleHeight: CGFloat
     let baselineBelowCentre: CGFloat
     let fit: SampleFit
-    let isSelected: Bool
     let model: AppModel
 
     var body: some View {
+        let isSelected = model.selectedIDs.contains(family.id)
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
                 StatusTag(family: family)

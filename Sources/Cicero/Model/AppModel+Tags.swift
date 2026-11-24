@@ -26,7 +26,9 @@ extension AppModel {
     }
 
     func setColor(_ color: TagColor?, forTags names: [String]) {
+        var data = data
         for name in names { data.tagColors[name] = color }
+        self.data = data
     }
 
     func hasTag(_ tag: String, _ family: Family) -> Bool {

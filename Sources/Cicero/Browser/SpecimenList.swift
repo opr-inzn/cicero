@@ -20,7 +20,7 @@ struct SpecimenList: View {
                     ForEach(groups) { group in
                         Section {
                             ForEach(group.families) { family in
-                                Specimen(family: family, isSelected: model.selectedIDs.contains(family.id), model: model)
+                                Specimen(family: family, model: model)
                                     .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                                     .onAppear { prefetchStyles(near: family) }
                             }
@@ -35,7 +35,7 @@ struct SpecimenList: View {
             }
             .modifier(PinnedBar(isShown: pinned != nil, infoShown: infoShown, scale: scale) {
                 if let pinned {
-                    Specimen(family: pinned, isSelected: model.selectedIDs.contains(pinned.id), model: model)
+                    Specimen(family: pinned, model: model)
                         .modifier(FamilyItem(family: pinned, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                 }
             })
@@ -60,12 +60,12 @@ struct SpecimenList: View {
 private struct Specimen: View {
     @Environment(PreviewSettings.self) private var preview
     let family: Family
-    let isSelected: Bool
     let model: AppModel
 
     static let styleLimit = 14
 
     var body: some View {
+        let isSelected = model.selectedIDs.contains(family.id)
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {

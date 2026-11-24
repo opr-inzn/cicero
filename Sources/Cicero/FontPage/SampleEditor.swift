@@ -392,6 +392,12 @@ nonisolated private final class SampleLayoutManager: NSTextLayoutManager {
 
 nonisolated private final class UnclippedFragment: NSTextLayoutFragment {
     private var raise: CGFloat { (textLayoutManager as? SampleLayoutManager)?.raise ?? 0 }
+    private var cachedSurface: (raise: CGFloat, lines: Int, base: CGRect, bounds: CGRect)?
+
+    override func invalidateLayout() {
+        cachedSurface = nil
+        super.invalidateLayout()
+    }
 
     override func draw(at point: CGPoint, in context: CGContext) {
         super.draw(at: CGPoint(x: point.x, y: point.y - raise), in: context)
@@ -399,7 +405,12 @@ nonisolated private final class UnclippedFragment: NSTextLayoutFragment {
 
     override var renderingSurfaceBounds: CGRect {
         let raise = raise
-        return textLineFragments.reduce(super.renderingSurfaceBounds.offsetBy(dx: 0, dy: -raise)) { bounds, line in
+        let base = super.renderingSurfaceBounds
+        let lines = textLineFragments
+        if let cached = cachedSurface, cached.raise == raise, cached.lines == lines.count, cached.base == base {
+            return cached.bounds
+        }
+        let bounds = lines.reduce(base.offsetBy(dx: 0, dy: -raise)) { bounds, line in
             let string = line.attributedString.attributedSubstring(from: line.characterRange)
             let ink = CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(string), .useGlyphPathBounds)
             guard !ink.isNull, !ink.isEmpty else { return bounds }
@@ -408,5 +419,7 @@ nonisolated private final class UnclippedFragment: NSTextLayoutFragment {
             let glyphs = CGRect(x: x + ink.minX, y: baseline - ink.maxY, width: ink.width, height: ink.height)
             return bounds.union(glyphs.insetBy(dx: -2, dy: -2))
         }
+        cachedSurface = (raise, lines.count, base, bounds)
+        return bounds
     }
 }

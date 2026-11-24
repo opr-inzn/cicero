@@ -87,7 +87,7 @@ final class AppModel {
             }
             store.save(data)
             // The activation records at once: macOS has the change already, and a Cicero that stopped in that moment (killed, crashed, the Mac switched off) would find fonts on that it didn't know it had turned on, and those on until it quits left on.
-            if data.records != oldValue.records { store.flush() }
+            if data.records != oldValue.records { store.flushAsync() }
             if data.sidebar == oldValue.sidebar || data.differs(besidesSidebar: oldValue) { dataRevision &+= 1 }
             if data.foundryOverrides != oldValue.foundryOverrides || data.foundryRenames != oldValue.foundryRenames
                 || data.classifications != oldValue.classifications || data.classificationOverrides != oldValue.classificationOverrides
@@ -398,10 +398,15 @@ final class AppModel {
 
     private func moveFormerInactiveFolders() async {
         let moved = await engine.moveFormerInactiveFolders(data.records)
+        var data = self.data
         data.records = moved.records
         data.fontFiles = ActivationEngine.paths(data.fontFiles, following: moved.moves)
+        self.data = data
         // The notes on the moves go only once they're saved, so a launch that stops in between, or a save that fails, still has them.
-        if store.flush(durably: true) { engine.forgetInactiveFolderMoves() }
+        let store = store
+        if await Task.detached(priority: .utility, operation: { store.flush(durably: true) }).value {
+            engine.forgetInactiveFolderMoves()
+        }
     }
 
     private var needsFontLibraryMigration: Bool {
@@ -415,9 +420,14 @@ final class AppModel {
         var engine = self.engine
         engine.fontLibrary = data.fontLibraryLocation == nil ? URL(fileURLWithPath: data.fontLibraryPath, isDirectory: true) : nil
         if let moved = await engine.moveFromFormerPlace(records: data.records) {
+            var data = self.data
             data.records = moved.records
             data.fontLibraryPath = locations.defaultFontLibrary.path
-            if store.flush(durably: true) { engine.forgetLibraryMove() }
+            self.data = data
+            let store = store
+            if await Task.detached(priority: .utility, operation: { store.flush(durably: true) }).value {
+                engine.forgetLibraryMove()
+            }
         }
         var checked = data
         checked.keepFormerFontLibraryAsLocation(hasFonts: fontLibraryHasFonts)

@@ -79,6 +79,13 @@ public final class UserDataStore: Sendable {
         queue.sync { writePending(for: nil) && (!durably || Self.syncToDisk(fileURL)) }
     }
 
+    public func flushAsync(durably: Bool = false, completion: (@Sendable (Bool) -> Void)? = nil) {
+        queue.async { [self] in
+            let saved = writePending(for: nil) && (!durably || Self.syncToDisk(fileURL))
+            completion?(saved)
+        }
+    }
+
     public static func syncToDisk(_ url: URL) -> Bool {
         let file = open(url.path, O_RDONLY)
         guard file >= 0 else { return false }

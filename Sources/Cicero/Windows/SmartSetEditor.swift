@@ -7,6 +7,12 @@ struct SmartSetEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SmartSet
     @State private var openedAsNew: Bool?
+    @State private var summaryCache = MatchSummaryCache()
+
+    private final class MatchSummaryCache {
+        var key: (matchAll: Bool, rules: [SmartRule], fingerprint: Int, revision: Int)?
+        var summary = ""
+    }
 
     init(original: SmartSet) {
         self.original = original
@@ -67,10 +73,18 @@ struct SmartSetEditor: View {
     }
 
     private var matchSummary: String {
+        let key = (draft.matchAll, draft.rules, model.library.fingerprint, model.dataRevision)
+        if let cached = summaryCache.key, cached.matchAll == key.0, cached.rules == key.1,
+           cached.fingerprint == key.2, cached.revision == key.3 {
+            return summaryCache.summary
+        }
         let test = model.matcher(for: draft)
         let data = model.data
         let count = model.library.families.count { data.lists($0) && test($0) }
-        return count == 1 ? "1 family matches" : "\(count.plain) families match"
+        let summary = count == 1 ? "1 family matches" : "\(count.plain) families match"
+        summaryCache.key = key
+        summaryCache.summary = summary
+        return summary
     }
 }
 

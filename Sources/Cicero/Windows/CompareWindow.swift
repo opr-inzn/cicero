@@ -505,7 +505,7 @@ private struct TintMenu: View {
             .frame(width: 8, height: 8)
             .padding(3)
             .overlay {
-                TintMenuArea(tints: CompareSample.tints.map { (title: $0.title, image: NSImage.menuDot(resolved($0.color))) },
+                TintMenuArea(tints: CompareSample.tints.map { (title: $0.title, color: resolved($0.color)) },
                              chosen: sample.tintIndex) { model.setCompareTint($0, of: sample.id) }
             }
             .padding(-3)
@@ -518,7 +518,7 @@ private struct TintMenu: View {
 }
 
 private struct TintMenuArea: NSViewRepresentable {
-    let tints: [(title: String, image: NSImage)]
+    let tints: [(title: String, color: NSColor)]
     let chosen: Int
     let choose: (Int) -> Void
 
@@ -532,7 +532,7 @@ private struct TintMenuArea: NSViewRepresentable {
 }
 
 private final class TintMenuView: NSView {
-    var tints: [(title: String, image: NSImage)] = []
+    var tints: [(title: String, color: NSColor)] = []
     var chosen = 0
     var choose: (Int) -> Void = { _ in }
 
@@ -553,7 +553,7 @@ private final class TintMenuView: NSView {
             let item = NSMenuItem(title: tint.title, action: #selector(chooseTint(_:)), keyEquivalent: "")
             item.target = self
             item.tag = index
-            item.image = tint.image
+            item.image = NSImage.menuDot(tint.color)
             item.state = index == chosen ? .on : .off
             menu.addItem(item)
         }

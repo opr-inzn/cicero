@@ -45,20 +45,37 @@ struct FamilyGroup: Identifiable {
         }
     }
 
+    private struct MonthKey: Hashable {
+        var year: Int
+        var month: Int
+        var currentYear: Int
+        var locale: String
+    }
+
+    private static var monthTitles: [MonthKey: String] = [:]
+
     private static func dateTitle() -> (Family) -> String {
         let calendar = Calendar.current, now = Date.now
         let today = calendar.startOfDay(for: now)
         let yesterday = calendar.date(byAdding: .day, value: -1, to: today) ?? today
         let week = calendar.date(byAdding: .day, value: -6, to: today) ?? today
-        let year = calendar.component(.year, from: now)
+        let currentYear = calendar.component(.year, from: now)
+        let locale = Locale.current.identifier
         return { family in
             guard let date = family.dateAdded else { return "Unknown Date" }
             if date >= today { return "Today" }
             if date >= yesterday { return "Yesterday" }
             if date >= week { return "Previous 7 Days" }
-            return calendar.component(.year, from: date) == year
+            let components = calendar.dateComponents([.year, .month], from: date)
+            let year = components.year ?? 0, month = components.month ?? 0
+            let key = MonthKey(year: year, month: month, currentYear: currentYear, locale: locale)
+            if let cached = monthTitles[key] { return cached }
+            let title = year == currentYear
                 ? date.formatted(.dateTime.month(.wide))
                 : date.formatted(.dateTime.month(.wide).year())
+            if monthTitles.count > 256 { monthTitles.removeAll(keepingCapacity: true) }
+            monthTitles[key] = title
+            return title
         }
     }
 

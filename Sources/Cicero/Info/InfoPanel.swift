@@ -484,10 +484,12 @@ extension View {
         return onAppear(perform: useCached)
             .onChange(of: id) { useCached() }
             .task(id: id) {
+                guard state.wrappedValue?.id != AnyHashable(id) else { return }
                 let value = await work()
                 if !Task.isCancelled { state.wrappedValue = Loaded(id: id, value: value) }
             }
             .task(id: id) {
+                guard state.wrappedValue?.id != AnyHashable(id) else { return }
                 try? await Task.sleep(for: .milliseconds(250))
                 if !Task.isCancelled, state.wrappedValue?.id != AnyHashable(id) { state.wrappedValue = nil }
             }

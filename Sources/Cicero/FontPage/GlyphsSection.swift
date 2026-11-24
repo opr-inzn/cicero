@@ -18,8 +18,36 @@ struct GlyphsSection: View {
     let generation: Int
     @Binding var query: String
     let open: OpenCell
+    @State private var layoutCache = LayoutCache()
 
     private typealias Cell = GlyphCell
+
+    private struct PreparedSection {
+        let section: GlyphSection
+        let rows: [(label: String?, cells: [Cell])]
+        let total: Int
+    }
+
+    private struct LayoutKey: Equatable {
+        let faceID: FaceID
+        let generation: Int
+        let query: String
+        let columns: Int
+        let sectionCount: Int
+        let ligatureCount: Int
+    }
+
+    private struct PreparedLayout {
+        let items: [Item]
+        let lifted: Set<Int>
+        let isShort: Bool
+        let isEmpty: Bool
+    }
+
+    private final class LayoutCache {
+        var key: LayoutKey?
+        var layout: PreparedLayout?
+    }
 
     private struct Style {
         let face: FontFace
@@ -65,10 +93,7 @@ struct GlyphsSection: View {
         let (chosen, weight) = model.previewStyle(of: family)
         let style = chosen.id == face.id ? Style(face: face, weight: weight, variations: model.variations(for: family, face: face.id))
             : Style(face: face, weight: face.styleWeight, variations: [:])
-        let shown = filtered(sections)
-        let shownLigatures = filtered(ligatures)
-        let items = items(shown, shownLigatures)
-        let lifted = Set(items.indices.filter { items[$0].isLocalizedForms })
+        let prepared = preparedLayout()
         HStack(spacing: 12) {
             Text("Glyphs").font(.title2.weight(.semibold))
             Text(count)
@@ -82,72 +107,87 @@ struct GlyphsSection: View {
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(TopRowKeeper.space)).minY } action: { [title] y in if title?.y != y { title?.y = y } }
         .padding(.horizontal, Self.inset)
         .padding(.top, Self.titleGap)
-        .padding(.bottom, lifted.contains(0) ? 4 - GlyphHeader.labelLift : 4)
-        if shown.isEmpty && shownLigatures.isEmpty {
+        .padding(.bottom, prepared.lifted.contains(0) ? 4 - GlyphHeader.labelLift : 4)
+        if prepared.isEmpty {
             EmptyState(query.isEmpty ? "No Characters" : "No Matching Characters", systemImage: "character",
                        description: Text(query.isEmpty ? "Cicero couldn’t read the characters in this font." : "Try a character, part of its name, or a code like U+00E9."))
                 .padding(.vertical, 40)
-        } else if isShort(shown, shownLigatures) {
+        } else if prepared.isShort {
             // In one stack: as rows of the page's lazy stack under the tall title, a few rows made it lay the page out again and again at full CPU.
             VStack(alignment: .leading, spacing: 0) {
-                groups(items, style: style, lifted: lifted)
+                groups(prepared.items, style: style, lifted: prepared.lifted)
             }
             .environment(\.pinsHeadings, false)
         } else {
-            groups(items, style: style, lifted: lifted)
+            groups(prepared.items, style: style, lifted: prepared.lifted)
         }
     }
 
-    private func isShort(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup]) -> Bool {
-        guard !query.isEmpty else { return false }
+    private func preparedLayout() -> PreparedLayout {
+        let key = LayoutKey(faceID: face.id, generation: generation, query: query, columns: columns,
+                            sectionCount: sections.count, ligatureCount: ligatures.count)
+        if layoutCache.key == key, let cached = layoutCache.layout { return cached }
         let filter = Filter(query)
-        var rows = shownLigatures.reduce(0) { $0 + ($1.ligatures.count + columns - 1) / columns }
-        for section in shown {
-            for run in section.labeledRuns(alternates: { shownAlternates(of: $0, filter) }) {
-                rows += (run.cells.count + columns - 1) / columns
-                if rows > Self.shortRows { return false }
+        let shown = filtered(sections)
+        let shownLigatures = filtered(ligatures)
+        var totalRows = shownLigatures.reduce(0) { $0 + ($1.ligatures.count + columns - 1) / columns }
+        let preparedSections: [PreparedSection] = shown.map { section in
+            let runs = section.labeledRuns { shownAlternates(of: $0, filter) }
+            let rows = runs.flatMap { run in
+                stride(from: 0, to: run.cells.count, by: columns).map { start in
+                    (label: start == 0 ? run.label : nil, cells: Array(run.cells[start ..< min(start + columns, run.cells.count)]))
+                }
             }
+            totalRows += rows.count
+            let total = runs.reduce(0) { $0 + $1.cells.count }
+            return PreparedSection(section: section, rows: rows, total: total)
         }
-        return true
+        let items = items(preparedSections, shownLigatures)
+        let lifted = Set(items.indices.filter { items[$0].isLocalizedForms })
+        let layout = PreparedLayout(items: items, lifted: lifted, isShort: !query.isEmpty && totalRows <= Self.shortRows,
+                                    isEmpty: shown.isEmpty && shownLigatures.isEmpty)
+        layoutCache.key = key
+        layoutCache.layout = layout
+        return layout
     }
 
     private static let shortRows = 60
 
     private enum Item: Identifiable {
-        case section(GlyphSection)
+        case section(PreparedSection)
         case ligatures(LigatureGroup, category: String)
 
         var id: String {
             switch self {
-            case .section(let section): "section \(section.id)"
+            case .section(let prepared): "section \(prepared.section.id)"
             case .ligatures(let group, _): "ligatures \(group.id)"
             }
         }
 
         var category: String {
             switch self {
-            case .section(let section): section.category
+            case .section(let prepared): prepared.section.category
             case .ligatures(_, let category): category
             }
         }
 
         var isLocalizedForms: Bool {
-            if case .section(let section) = self { section.group.isLocalizedForms } else { false }
+            if case .section(let prepared) = self { prepared.section.group.isLocalizedForms } else { false }
         }
     }
 
-    private func items(_ shown: [GlyphSection], _ shownLigatures: [LigatureGroup]) -> [Item] {
-        let lead = GlyphSection.beforeLigatures(shown, of: sections)
-        let common = lead > 0 ? shown[lead - 1].category : "Latin"
+    private func items(_ shown: [PreparedSection], _ shownLigatures: [LigatureGroup]) -> [Item] {
+        let lead = GlyphSection.beforeLigatures(shown.map(\.section), of: sections)
+        let common = lead > 0 ? shown[lead - 1].section.category : "Latin"
         var items = shown.map(Item.section)
         let others = shownLigatures.filter { $0.script == nil }
         items.insert(contentsOf: others.map { .ligatures($0, category: common) }, at: lead)
         var scripts: [String] = []
         for script in shownLigatures.compactMap(\.script) where !scripts.contains(script) { scripts.append(script) }
         for script in scripts {
-            let own = items.indices.filter { if case .section(let section) = items[$0] { section.group.scriptName == script } else { false } }
+            let own = items.indices.filter { if case .section(let prepared) = items[$0] { prepared.section.group.scriptName == script } else { false } }
             let after = own.first { index in
-                guard case .section(let section) = items[index], case .scriptPart(_, let part) = section.group else { return false }
+                guard case .section(let prepared) = items[index], case .scriptPart(_, let part) = prepared.section.group else { return false }
                 return part.rawValue >= GlyphGroup.ScriptPart.localizedForms.rawValue
             }
             let at = after ?? own.last.map { $0 + 1 } ?? lead + others.count
@@ -163,8 +203,8 @@ struct GlyphsSection: View {
         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
             let previous = index > 0 ? categories[index - 1] : nil
             switch item {
-            case .section(let section):
-                self.section(section, style: style, index: index, after: previous, categories: categories, lifted: lifted)
+            case .section(let prepared):
+                self.section(prepared, style: style, index: index, after: previous, categories: categories, lifted: lifted)
             case .ligatures(let group, let category):
                 LigaturesSection(family: family.id, face: style.face, weight: style.weight, variations: style.variations,
                                  columns: columns, groups: [group], characters: ligatureCharacters, generation: generation,
@@ -179,15 +219,10 @@ struct GlyphsSection: View {
         return lifted.contains(index + 1) ? bottom - GlyphHeader.labelLift : bottom
     }
 
-    private func section(_ section: GlyphSection, style: Style, index: Int, after previous: String?, categories: [String], lifted: Set<Int>) -> some View {
-        let filter = Filter(query)
-        let runs = section.labeledRuns { shownAlternates(of: $0, filter) }
-        let rows = runs.flatMap { run in
-            stride(from: 0, to: run.cells.count, by: columns).map { start in
-                (label: start == 0 ? run.label : nil, cells: Array(run.cells[start ..< min(start + columns, run.cells.count)]))
-            }
-        }
-        let total = runs.reduce(0) { $0 + $1.cells.count }
+    private func section(_ prepared: PreparedSection, style: Style, index: Int, after previous: String?, categories: [String], lifted: Set<Int>) -> some View {
+        let section = prepared.section
+        let rows = prepared.rows
+        let total = prepared.total
         let heading = GlyphHeading(index: index, category: section.category, name: section.name,
                                    detail: (section.kind.map { "(\($0)) " } ?? "") + "– \(total.plain)", after: previous,
                                    labelFollows: section.group.isLocalizedForms)

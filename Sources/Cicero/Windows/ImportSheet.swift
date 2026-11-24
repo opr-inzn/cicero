@@ -13,6 +13,7 @@ struct ImportSheet: View {
     @State private var isRereading = false
     @State private var rereading: Task<Void, Never>?
     @State private var copies: Copies?
+    @State private var candidates: [(path: String, source: String)] = []
     @State private var isLooking = true
     @State private var estimate = CopyTimeEstimate(intoFontsFolder: true)
     @State private var choseFontLibrary = false
@@ -379,14 +380,6 @@ struct ImportSheet: View {
         return Set(candidates.map(\.path)).subtracting(copies.inAlready).subtracting(copies.sameAs.keys)
     }
 
-    private var candidates: [(path: String, source: String)] {
-        var data = model.data
-        var all = choices
-        all.fontFolder = true
-        all.otherFiles = true
-        return LibraryImport.fontFiles(library, choices: all, data: &data, locations: model.locations)
-    }
-
     private struct Copies {
         var inAlready: Set<String> = []
         var sameAs: [String: String] = [:]
@@ -395,10 +388,22 @@ struct ImportSheet: View {
     private func findCopies() async {
         isLooking = true
         let engine = model.importEngine
-        let files = candidates
-        let work = Task.detached(priority: .userInitiated) { engine.copyPlan(files.map(\.source)) }
-        let plan = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+        let library = library
+        let baseData = model.data
+        let locations = model.locations
+        var all = choices
+        all.fontFolder = true
+        all.otherFiles = true
+        let work = Task.detached(priority: .userInitiated) {
+            var data = baseData
+            let files = LibraryImport.fontFiles(library, choices: all, data: &data, locations: locations)
+            let plan = engine.copyPlan(files.map(\.source))
+            return (files: files, plan: plan)
+        }
+        let result = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
         guard !Task.isCancelled else { return }
+        let files = result.files, plan = result.plan
+        candidates = files
         let paths = Dictionary(files.map { ($0.source, $0.path) }, uniquingKeysWith: { first, _ in first })
         copies = Copies(inAlready: Set(files.filter { plan.inAlready[$0.source] != nil }.map(\.path)),
                         sameAs: Dictionary(files.compactMap { file in plan.sameAs[file.source].flatMap { paths[$0] }.map { (file.path, $0) } },
