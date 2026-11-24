@@ -40,6 +40,7 @@ struct MainWindow: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { fitSidebar(width: $0) }
         .onChange(of: model.isInfoPresented) { fitSidebar(width: autoHide.windowWidth) }
+        .onChange(of: SidebarRoom.shared.isCollapsed) { growWindow(sidebarCollapsed: $1) }
         // On the split view: on the stack, the search field doesn't show at all.
         .searchable(text: searchText, tokens: searchTokens, placement: .toolbar, prompt: "Search", token: tokenLabel)
         .searchSuggestions { SearchSuggestions() }
@@ -75,17 +76,17 @@ struct MainWindow: View {
         .backupSheet(isPresented: $model.showsBackupSheet)
         .restoreSheet(contents: $model.restorePrompt)
         .alert(
-            "Turn Off Other Styles Too?",
+            "Deactivate Other Styles Too?",
             isPresented: Binding(get: { model.copySwitchPrompt != nil }, set: { if !$0 { model.copySwitchPrompt = nil } }),
             presenting: model.copySwitchPrompt
         ) { request in
-            Button("Use \(request.source)’s Copies") { model.confirmCopySwitch(request) }
+            Button("Use Copies from \(request.source)") { model.confirmCopySwitch(request) }
             Button("Cancel", role: .cancel) {}
         } message: { request in
             let styles = request.plan.alsoTurnsOff
             let shown = styles.count > 6 ? Array(styles.prefix(5)) + ["\(styles.count - 5) more"] : styles
             let named = shown.listed()
-            Text("The file that turns off also holds \(named). \(styles.count == 1 ? "It turns" : "They turn") off too.")
+            Text("The file being deactivated also contains \(named). \(styles.count == 1 ? "It will be deactivated" : "They will be deactivated") too.")
         }
         .alert(
             model.trashPlan.map { "Move \($0.title) to the Trash?" } ?? "",
@@ -103,7 +104,7 @@ struct MainWindow: View {
                 .keyboardShortcut(.defaultAction)
             Button("Not Now", role: .cancel) { model.answerGuessing(false) }
         } message: {
-            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters" + (ClassificationGuesser.readsNames ? " and, with Apple Intelligence, from their names" : "") + ", on this Mac. Otherwise they stay Unclassified until you choose one. You can change this in Preferences → General.")
+            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters" + (ClassificationGuesser.readsNames ? " and, with Apple Intelligence, from their names" : "") + ", on this Mac. Otherwise they stay Unclassified until you choose a classification. You can change this in Preferences → General.")
         }
         .alert(
             model.textPrompt?.title ?? "",
@@ -167,16 +168,16 @@ struct MainWindow: View {
 
     static func trashMessage(_ plan: TrashPlan) -> String {
         var parts = [plan.paths.count == 1
-            ? "1 font file will be removed from your Mac and turned off in every app."
-            : "\(plan.paths.count) font files\(plan.includesCopies ? ", including copies in other folders," : "") will be removed from your Mac and turned off in every app."]
+            ? "1 font file will be moved to the Trash and deactivated in every app."
+            : "\(plan.paths.count.plain) font files\(plan.includesCopies ? ", including copies in other folders," : "") will be moved to the Trash and deactivated in every app."]
         if !plan.otherFamilies.isEmpty {
             let names = plan.otherFamilies.count > 3 ? plan.otherFamilies.prefix(3).joined(separator: ", ") + " and others" : plan.otherFamilies.listed()
+            let files = plan.paths.count == 1 ? "The file also contains" : "Some files also contain"
             if plan.spareCopiesOf != nil {
-                let files = plan.paths.count == 1 ? "The file also contains" : "Some files also contain"
                 let keep = plan.otherFamilies.count == 1 ? "which keeps its other copies" : "which keep their other copies"
                 parts.append("\(files) \(names), \(keep).")
             } else {
-                parts.append("Some files also contain \(names), which will be removed too.")
+                parts.append("\(files) \(names), which will be removed too.")
             }
         }
         if plan.protectedCount > 0 { parts.append("Files that come with macOS or an app stay where they are.") }
@@ -286,8 +287,8 @@ private struct ReplaceAlerts: ViewModifier {
 
     static func openAppsMessage(_ prompt: OpenAppsReplacePrompt) -> String {
         prompt.apps.count == 1
-            ? "\(prompt.apps[0]) keeps the old version until it restarts, and documents open in it can show wrong letters. Quit it first, or restart it afterwards."
-            : "\(prompt.apps.listed()) keep the old version until they restart, and documents open in them can show wrong letters. Quit them first, or restart them afterwards."
+            ? "\(prompt.apps[0]) will keep using the old version until it restarts, and open documents may show the wrong characters. Quit it first, or restart it afterward."
+            : "\(prompt.apps.listed()) will keep using the old version until they restart, and open documents may show the wrong characters. Quit them first, or restart them afterward."
     }
 
     private func replaceTitle(_ prompt: DuplicatePrompt) -> String {
@@ -311,8 +312,8 @@ private struct ReplaceAlerts: ViewModifier {
         }
         let families = spare.map(\.0)
         let spares = spare.reduce(0) { $0 + $1.1 } == 1
-            ? "Cicero’s copy of \(families[0]) in your Fonts folder only goes to the Trash, as the added one in Cicero’s Library takes over."
-            : "Cicero’s copies of \(families.listed()) in your Fonts folder only go to the Trash, as the added ones in Cicero’s Library take over."
+            ? "Cicero’s copy of \(families[0]) in your Fonts folder will be moved to the Trash, since the new copy in Cicero’s library takes over."
+            : "Cicero’s copies of \(families.listed()) in your Fonts folder will be moved to the Trash, since the new copies in Cicero’s library take over."
         return (lines + ["Each of these files goes to the Trash, and the added one takes its place.", spares]).joined(separator: " ")
     }
 }
@@ -324,6 +325,8 @@ private struct SidebarAutoHide {
     var windowWidth: CGFloat = 0
     var fits: Bool?
     var hidSidebar = false
+    var grownFrom: NSRect?
+    var grownTo: NSRect?
 }
 
 private extension MainWindow {
@@ -341,6 +344,26 @@ private extension MainWindow {
             DispatchQueue.main.async { SidebarRoom.shared.setCollapsed(false) }
             autoHide.hidSidebar = false
         }
+    }
+
+    func growWindow(sidebarCollapsed collapsed: Bool) {
+        guard let window = TextEditingKeys.mainWindow, !window.styleMask.contains(.fullScreen) else { return }
+        if collapsed {
+            if let from = autoHide.grownFrom, window.frame == autoHide.grownTo { window.animator().setFrame(from, display: true) }
+            autoHide.grownFrom = nil
+            autoHide.grownTo = nil
+            return
+        }
+        guard let screen = window.screen?.visibleFrame, let width = window.contentView?.bounds.width else { return }
+        let info = model.isInfoPresented ? InfoPanelOverlay.room(shown: 1, scale: 1) : 0
+        guard width - autoHide.sidebarEdge - SidebarAutoHide.gap - info < SidebarAutoHide.narrowestPage else { return }
+        var frame = window.frame
+        frame.size.width = min(frame.width + autoHide.sidebarEdge, screen.width)
+        frame.origin.x = max(screen.minX, min(frame.minX, screen.maxX - frame.width))
+        guard frame != window.frame else { return }
+        autoHide.grownFrom = window.frame
+        autoHide.grownTo = frame
+        window.animator().setFrame(frame, display: true)
     }
 }
 
