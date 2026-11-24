@@ -327,7 +327,8 @@ private struct SidebarAutoHide {
 }
 
 private extension MainWindow {
-    func fitSidebar(width: CGFloat) {
+    func fitSidebar(width measured: CGFloat) {
+        let width = min(measured, TextEditingKeys.mainWindow?.contentView?.bounds.width ?? measured)
         autoHide.windowWidth = width
         let info = model.isInfoPresented ? InfoPanelOverlay.room(shown: 1, scale: 1) : 0
         let fits = width - autoHide.sidebarEdge - SidebarAutoHide.gap - info >= SidebarAutoHide.narrowestPage
