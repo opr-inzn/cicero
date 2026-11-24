@@ -361,10 +361,16 @@ private struct Reader {
             guard let container = containers[id] else { return [] }
             return faces[id] ?? [ImportedFont(path: container.path)]
         }
+        var labelledSeen: [Int: Set<ImportedFont>] = [:]
         for id in order {
             guard let container = containers[id] else { continue }
             if FontExplorerImport.labels[container.label] != nil {
-                labelled[container.label, default: []] += fonts(id).filter { !(labelled[container.label] ?? []).contains($0) }
+                var seen = labelledSeen[container.label] ?? []
+                let added = fonts(id).filter { seen.insert($0).inserted }
+                if !added.isEmpty {
+                    labelled[container.label, default: []] += added
+                    labelledSeen[container.label] = seen
+                }
             }
             if let comment = container.comment, !(faceComments[id] ?? []).contains(comment) {
                 library.comments.append(ImportedComment(fonts: fonts(id), text: comment))
@@ -380,6 +386,7 @@ private struct Reader {
         var inLibrary: [String] = []
         var absentLibrary: (path: String, files: Int)?
         let libraryIsHere = backupFolder == nil && newLibrary.map { fm.fileExists(atPath: $0) } == true
+        var seenOtherFiles = Set(library.otherFiles)
         for id in order {
             guard let container = containers[id], !container.isSystem, !container.isCloud else { continue }
             if let newLibrary, container.path.hasPrefix(newLibrary + "/") {
@@ -390,7 +397,7 @@ private struct Reader {
                 library.fontFolderCount += 1
                 inLibrary.append(String(container.path.dropFirst(newLibrary.count + 1)))
             } else if fm.fileExists(atPath: container.path) {
-                if !library.otherFiles.contains(container.path) { library.otherFiles.append(container.path) }
+                if seenOtherFiles.insert(container.path).inserted { library.otherFiles.append(container.path) }
             } else {
                 missing += 1
             }
@@ -444,13 +451,14 @@ private struct Reader {
             case 31:
                 let children = items.filter { $0.int("parentSerialID") == serial }
                 var fonts: [ImportedFont] = []
+                var seenAppFonts = Set<ImportedFont>()
                 var hadFonts = false
                 for child in children {
                     switch child.int("type") {
                     case 32:
                         setIDs[child.int("serialID")] = String(serial)
                         hadFonts = hadFonts || !(members[child.int("serialID")] ?? []).isEmpty
-                        fonts += setFonts(child.int("serialID")).filter { !fonts.contains($0) }
+                        fonts += setFonts(child.int("serialID")).filter { seenAppFonts.insert($0).inserted }
                     case 33:
                         if !(members[child.int("serialID")] ?? []).isEmpty { deactivating += 1 }
                     default: break

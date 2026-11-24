@@ -135,7 +135,10 @@ extension AppModel {
             }
         }
         if !result.message.isEmpty { showToast(result.message, undo: undo) }
-        let scan = rescan()
+        var except: Set<String> = [locations.userFonts.path, locations.allUsersFonts.path]
+        except.formUnion(locations.inactiveFolders.map(\.path))
+        if let libraryFolder = data.fontLibrary?.path { except.insert(libraryFolder) }
+        let scan = rescanFontd(except: except)
         for operation in [operation].compactMap(\.self) + operations { settle(operation, after: scan) }
     }
 
@@ -765,7 +768,8 @@ extension AppModel {
         let families = families(in: item)
         if item == .temporary { return families.flatMap { $0.faces.filter(\.isOnUntilQuit) } }
         guard case .set(let id) = item, let set = data.sets.first(where: { $0.id == id }) else { return families.flatMap(\.faces) }
-        return families.flatMap { family in family.faces.filter { set.contains(style: $0.face.postScriptName, of: family.id) } }
+        let lookup = set.lookup()
+        return families.flatMap { family in family.faces.filter { lookup.contains(style: $0.face.postScriptName, of: family.id) } }
     }
 
     func families(in item: SidebarItem) -> [Family] {

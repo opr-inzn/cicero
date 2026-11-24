@@ -53,6 +53,7 @@ public final class CoverageIndex: Sendable {
         var entries: [FaceID: Entry] = [:]
         var loaded = false
         var dirty = false
+        var generation = 0
     }
 
     public init(caches: URL, languages: LanguageCatalog) {
@@ -65,6 +66,10 @@ public final class CoverageIndex: Sendable {
         let signpost = Signposts.library.beginInterval("Coverage")
         defer { Signposts.library.endInterval("Coverage", signpost) }
         loadIfNeeded(removingOldFile: saves)
+        let run = state.withLock { state -> Int in
+            state.generation += 1
+            return state.generation
+        }
         let stamped = families.map { ($0.regular.face, CoverageStamp.of(path: $0.regular.face.path)) }
         let work = state.withLock { state in
             stamped.filter { face, stamp in state.entries[face.id]?.stamp != stamp }
@@ -81,17 +86,24 @@ public final class CoverageIndex: Sendable {
                 }
                 for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
                 for await (id, stamp, coverage) in group {
-                    state.withLock {
-                        $0.entries[id] = Entry(stamp: stamp, coverage: coverage)
-                        $0.dirty = true
+                    let checkpoint: [FaceID: Entry]? = state.withLock { state in
+                        guard state.generation == run else { return nil }
+                        state.entries[id] = Entry(stamp: stamp, coverage: coverage)
+                        state.dirty = true
+                        done += 1
+                        if saves, done % 200 == 0 {
+                            state.dirty = false
+                            return state.entries
+                        }
+                        return nil
                     }
-                    done += 1
+                    if let checkpoint { saveQueue.async { self.write(checkpoint) } }
                     progress(done, total)
                     addNext()
                 }
             }
         }
-        if saves, !Task.isCancelled, let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) })) {
+        if saves, !Task.isCancelled, let entries = entriesToSave(keeping: Set(families.flatMap { $0.faces.map(\.id) }), generation: run) {
             saveQueue.async { self.write(entries) }
         }
     }
@@ -120,11 +132,25 @@ public final class CoverageIndex: Sendable {
 
     public func clearCache() {
         state.withLock {
+            $0.generation += 1
             $0.entries = [:]
             $0.dirty = false
             $0.loaded = true
         }
         saveQueue.async { try? FileManager.default.removeItem(at: self.file) }
+    }
+
+    public func flush() {
+        let entries: [FaceID: Entry]? = state.withLock { state in
+            guard state.dirty else { return nil }
+            state.dirty = false
+            return state.entries
+        }
+        if let entries {
+            saveQueue.sync { self.write(entries) }
+        } else {
+            saveQueue.sync {}
+        }
     }
 
     public func waitForSave() {
@@ -171,8 +197,9 @@ public final class CoverageIndex: Sendable {
         }
     }
 
-    private func entriesToSave(keeping known: Set<FaceID>) -> [FaceID: Entry]? {
+    private func entriesToSave(keeping known: Set<FaceID>, generation: Int) -> [FaceID: Entry]? {
         state.withLock { state in
+            guard state.generation == generation else { return nil }
             let kept = state.entries.filter { known.contains($0.key) }
             guard state.dirty || kept.count != state.entries.count else { return nil }
             state.entries = kept

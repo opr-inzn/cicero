@@ -179,10 +179,18 @@ extension AppModel {
                 case .finding: break
                 }
             }
-            var updated = model.data
+            let found = scanned ?? model.library
             let copiedInOn = Set(on.compactMap { installed.placed[$0] })
-            var (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: scanned ?? model.library,
-                                                      paths: paths, copiedInOn: copiedInOn)
+            let baseData = model.data
+            let copiedPaths = paths
+            let applied = await Task.detached(priority: .userInitiated) {
+                var updated = baseData
+                let (result, faces) = LibraryImport.apply(imported, choices: choices, to: &updated, library: found,
+                                                          paths: copiedPaths, copiedInOn: copiedInOn)
+                return (updated: updated, result: result, faces: faces)
+            }.value
+            var updated = applied.updated
+            var (result, faces) = (applied.result, applied.faces)
             let copies = Set(installed.placed.values)
             faces = faces.map { $0.copy(among: copies) }
             let copiedInOnNow = copiedInOn.intersection(installed.new)
@@ -196,14 +204,23 @@ extension AppModel {
             model.rescan()
             let takingOver = Set(stale.compactMap { installed.placed[$0] }).subtracting(faces.map(\.face.path))
             let more = takingOver.isEmpty ? []
-                : (scanned ?? model.library).families.flatMap(\.faces).filter { takingOver.contains($0.face.path) && $0.canActivate }
+                : found.families.flatMap(\.faces).filter { takingOver.contains($0.face.path) && $0.canActivate }
             if !faces.isEmpty || !more.isEmpty { model.performActivation(faces + more, named: turnedOn + more) }
             result.activated = turnedOn.count
             if choices.removeCopies {
-                let found = scanned ?? model.library
-                result.removedCopies = LibraryImport.removeCopies(imported) { origin in
-                    installed.placed[origin] != nil || !found.faces(inFiles: [origin]).isEmpty
-                }
+                let placed = installed.placed
+                result.removedCopies = await Task.detached(priority: .userInitiated) {
+                    var knownPaths = Set<String>()
+                    for family in found.families {
+                        for face in family.faces {
+                            knownPaths.insert(face.face.path)
+                            knownPaths.formUnion(face.otherCopies)
+                        }
+                    }
+                    return LibraryImport.removeCopies(imported) { origin in
+                        placed[origin] != nil || knownPaths.contains(origin)
+                    }
+                }.value
             }
             summary = result
         }

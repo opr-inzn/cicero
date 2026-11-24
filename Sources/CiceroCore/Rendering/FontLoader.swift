@@ -128,7 +128,10 @@ public final class FontLoader: Sendable {
                              minimum: minimum, maximum: maximum, defaultValue: defaultValue,
                              isHidden: entry[kCTFontVariationAxisHiddenKey as String] as? Bool == true)
         }
-        state.withLock { $0.axes[key] = axes }
+        state.withLock { state in
+            if state.axes.count >= 512 { state.axes.removeAll(keepingCapacity: true) }
+            state.axes[key] = axes
+        }
         return axes
     }
 
@@ -138,6 +141,8 @@ public final class FontLoader: Sendable {
         }
     }
 
+    private static let prefetchLimit = 64
+
     public func prefetch(_ faces: [FontFace]) {
         let lanes: Int = state.withLock { state in
             var paths: [String] = []
@@ -145,6 +150,11 @@ public final class FontLoader: Sendable {
                 paths.append(face.path)
             }
             state.queue += paths.reversed()
+            if state.queue.count > Self.prefetchLimit {
+                let drop = state.queue.count - Self.prefetchLimit
+                for stale in state.queue.prefix(drop) { state.pending.remove(stale) }
+                state.queue.removeFirst(drop)
+            }
             let added = min(Self.prefetchLanes - state.lanes, state.queue.count)
             state.lanes += max(added, 0)
             return max(added, 0)
@@ -217,11 +227,15 @@ public final class FontLoader: Sendable {
     }
 
     public func invalidate(paths: Set<String>) {
+        guard !paths.isEmpty else { return }
         state.withLock { state in
             for path in paths {
                 state.forget(path)
                 state.pending.remove(path)
                 state.changed(path)
+            }
+            state.axes = state.axes.filter { key, _ in
+                !paths.contains { key.hasPrefix($0 + "#") || key.hasPrefix($0 + "|") }
             }
         }
     }

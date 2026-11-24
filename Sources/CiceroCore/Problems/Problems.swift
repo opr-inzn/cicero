@@ -178,6 +178,18 @@ public enum ProblemDetector {
             self.fileForName = fileForName
             folders = data.scannedFolders().map(data.named)
             copies = SpareCopies(library)
+            var knownVersions: [String: String?] = [:]
+            for family in library.families {
+                for face in family.faces {
+                    if knownVersions.index(forKey: face.face.path) == nil {
+                        knownVersions.updateValue(face.face.version, forKey: face.face.path)
+                    }
+                    for copy in face.copies where knownVersions.index(forKey: copy.face.path) == nil {
+                        knownVersions.updateValue(copy.face.version, forKey: copy.face.path)
+                    }
+                }
+            }
+            versions = knownVersions
         }
 
         mutating func file(_ path: String) -> ProblemFile {
@@ -185,9 +197,9 @@ public enum ProblemDetector {
         }
 
         mutating func version(of path: String) -> String? {
-            if let known = versions[path] { return known }
+            if let index = versions.index(forKey: path) { return versions.values[index] }
             let version = FontFileReader.faces(atPath: path).first?.version
-            versions[path] = version
+            versions.updateValue(version, forKey: path)
             return version
         }
 
@@ -315,11 +327,11 @@ public enum ProblemDetector {
         }
         // The copy each style keeps, of every family: a collection one family keeps can be another's extra copy.
         let kept = Set(styles.joined().map { context.keeper(of: $0) })
-        var extras: [String] = []
+        var removed = Set<String>()
+        var removedIDs = Set<SpareCopies.FileID>()
         for index in problems.indices {
             for path in problems[index].files.map(\.path) where !kept.contains(path) && !ActivationEngine.isProtected(path) {
-                guard context.copies.areSpare(Set(extras + [path])) else { continue }
-                extras.append(path)
+                guard context.copies.takeIfSpare(path, removed: &removed, removedIDs: &removedIDs) else { continue }
                 problems[index].extraCopies.append(path)
             }
         }
@@ -517,8 +529,10 @@ public enum ProblemDetector {
             paths.sort()
             // A file goes only when every face in it keeps a copy without it and the extras before it: a collection can also hold styles, or other families, that have no duplicate.
             var extras: [String] = []
+            var removed = Set<String>()
+            var removedIDs = Set<SpareCopies.FileID>()
             for path in paths where !keep.contains(path) && !ActivationEngine.isProtected(path) {
-                if context.copies.areSpare(Set(extras + [path])) { extras.append(path) }
+                if context.copies.takeIfSpare(path, removed: &removed, removedIDs: &removedIDs) { extras.append(path) }
             }
             problems.append(Problem(
                 id: "duplicate.\(family.id)", kind: .duplicates, title: family.name, family: family.id,
@@ -640,7 +654,7 @@ struct SpareCopies: Sendable {
         }
     }
 
-    private struct FileID: Hashable {
+    struct FileID: Hashable {
         var device: Int32
         var inode: UInt64
     }
@@ -682,6 +696,36 @@ struct SpareCopies: Sendable {
         return true
     }
 
+    mutating func takeIfSpare(_ path: String, removed: inout Set<String>, removedIDs: inout Set<FileID>) -> Bool {
+        guard !removed.contains(path) else { return false }
+        let known = faces[path]
+        if let known, !known.isEmpty {
+            guard faceCount(of: path) <= known.count else { return false }
+        } else {
+            guard unreadable.contains(path) && faceCount(of: path) == 0 else { return false }
+            removed.insert(path)
+            if let id = fileID(of: path) { removedIDs.insert(id) }
+            return true
+        }
+        let id = fileID(of: path)
+        var nextRemoved = removed
+        nextRemoved.insert(path)
+        var nextIDs = removedIDs
+        let isNewID = id.map { nextIDs.insert($0).inserted } ?? false
+        for key in known! where !hasCopy(of: key, outside: nextRemoved, removed: nextIDs) { return false }
+        if isNewID, let id {
+            for other in removed {
+                guard let otherKeys = faces[other] else { continue }
+                for key in otherKeys where (files[key] ?? []).contains(where: { fileID(of: $0) == id }) {
+                    guard hasCopy(of: key, outside: nextRemoved, removed: nextIDs) else { return false }
+                }
+            }
+        }
+        removed = nextRemoved
+        removedIDs = nextIDs
+        return true
+    }
+
     private mutating func hasCopy(of key: FaceKey, outside paths: Set<String>, removed: Set<FileID>) -> Bool {
         for other in files[key] ?? [] where !paths.contains(other) {
             // The other copy must still be there, and be another file rather than the same one by another path.
@@ -698,10 +742,10 @@ struct SpareCopies: Sendable {
     }
 
     private mutating func fileID(of path: String) -> FileID? {
-        if let known = fileIDs[path] { return known }
+        if let index = fileIDs.index(forKey: path) { return fileIDs.values[index] }
         var info = stat()
         let id = stat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFREG ? FileID(device: info.st_dev, inode: info.st_ino) : nil
-        fileIDs[path] = id
+        fileIDs.updateValue(id, forKey: path)
         return id
     }
 }

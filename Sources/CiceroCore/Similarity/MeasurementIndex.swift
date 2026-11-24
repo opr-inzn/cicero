@@ -23,6 +23,7 @@ public final class MeasurementIndex: Sendable {
         var entries: [FaceID: Entry] = [:]
         var loaded = false
         var dirty = false
+        var generation = 0
     }
 
     public init(caches: URL, embedder: LetterEmbedding? = nil, weights: Bool = false) {
@@ -35,6 +36,10 @@ public final class MeasurementIndex: Sendable {
         let signpost = Signposts.library.beginInterval("Letters")
         defer { Signposts.library.endInterval("Letters", signpost) }
         loadIfNeeded()
+        let run = state.withLock { state -> Int in
+            state.generation += 1
+            return state.generation
+        }
         let faces = Self.measuredFaces(of: families, weights: weights)
         let stamped = faces.map { ($0, CoverageStamp.of(path: $0.path)) }
         let retries = embedder.map { !$0.hasFailed } ?? false
@@ -46,34 +51,49 @@ public final class MeasurementIndex: Sendable {
         }
         if !work.isEmpty, !Task.isCancelled {
             let total = work.count
+            let byFile = Dictionary(grouping: work, by: { $0.0.path }).values.map { $0 }
             progress(0, total)
             var done = 0
             let embedder = embedder
-            await withTaskGroup(of: (FaceID, CoverageStamp, LetterMeasurements?, LetterEmbedding.Outcome?).self) { group in
-                var pending = work.makeIterator()
+            await withTaskGroup(of: [(FaceID, CoverageStamp, LetterMeasurements?, LetterEmbedding.Outcome?)].self) { group in
+                var pending = byFile.makeIterator()
                 func addNext() {
-                    guard !Task.isCancelled, let (face, stamp) = pending.next() else { return }
+                    guard !Task.isCancelled, let fileWork = pending.next() else { return }
                     group.addTask(priority: .utility) {
-                        let font = Self.font(face)
-                        return (face.id, stamp, font.flatMap(LetterMeasurements.measure), font.flatMap { embedder?.outcome($0) })
+                        let descriptors = FontFiles.descriptors(at: fileWork[0].0.path)
+                        return fileWork.map { face, stamp in
+                            let font = Self.font(face, in: descriptors)
+                            return (face.id, stamp, font.flatMap(LetterMeasurements.measure), font.flatMap { embedder?.outcome($0) })
+                        }
                     }
                 }
                 for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
-                for await (id, stamp, measurements, outcome) in group {
-                    let reading: LetterEmbedding.Reading? = if case .read(let reading) = outcome { reading } else { nil }
-                    let undrawable = if case .undrawable = outcome { true } else { false }
-                    state.withLock {
-                        $0.entries[id] = Entry(stamp: stamp, measurements: measurements, embedding: reading?.embedding,
-                                               classification: reading?.classification, undrawable: undrawable)
-                        $0.dirty = true
+                for await results in group {
+                    let checkpoint: [FaceID: Entry]? = state.withLock { state in
+                        guard state.generation == run else { return nil }
+                        var shouldCheckpoint = false
+                        for (id, stamp, measurements, outcome) in results {
+                            let reading: LetterEmbedding.Reading? = if case .read(let reading) = outcome { reading } else { nil }
+                            let undrawable = if case .undrawable = outcome { true } else { false }
+                            state.entries[id] = Entry(stamp: stamp, measurements: measurements, embedding: reading?.embedding,
+                                                      classification: reading?.classification, undrawable: undrawable)
+                            state.dirty = true
+                            done += 1
+                            if done % 200 == 0 { shouldCheckpoint = true }
+                        }
+                        if shouldCheckpoint {
+                            state.dirty = false
+                            return state.entries
+                        }
+                        return nil
                     }
-                    done += 1
+                    if let checkpoint { saveQueue.async { self.write(checkpoint) } }
                     progress(done, total)
                     addNext()
                 }
             }
         }
-        if !Task.isCancelled, let entries = entriesToSave(keeping: Set(faces.map(\.id))) {
+        if !Task.isCancelled, let entries = entriesToSave(keeping: Set(faces.map(\.id)), generation: run) {
             saveQueue.async { self.write(entries) }
         }
     }
@@ -113,11 +133,25 @@ public final class MeasurementIndex: Sendable {
 
     public func clearCache() {
         state.withLock {
+            $0.generation += 1
             $0.entries = [:]
             $0.dirty = false
             $0.loaded = true
         }
         saveQueue.async { try? FileManager.default.removeItem(at: self.file) }
+    }
+
+    public func flush() {
+        let entries: [FaceID: Entry]? = state.withLock { state in
+            guard state.dirty else { return nil }
+            state.dirty = false
+            return state.entries
+        }
+        if let entries {
+            saveQueue.sync { self.write(entries) }
+        } else {
+            saveQueue.sync {}
+        }
     }
 
     func waitForSave() {
@@ -128,9 +162,9 @@ public final class MeasurementIndex: Sendable {
         font(face).flatMap(LetterMeasurements.measure)
     }
 
-    static func font(_ face: FontFace) -> CTFont? {
+    static func font(_ face: FontFace, in descriptors: [CTFontDescriptor]? = nil) -> CTFont? {
         // From the file's own descriptors, never those kept for drawing, so what CoreText works out for measuring goes with the font.
-        var descriptor = FontFiles.descriptor(for: face, in: FontFiles.descriptors(at: face.path))
+        var descriptor = FontFiles.descriptor(for: face, in: descriptors ?? FontFiles.descriptors(at: face.path))
             ?? FontFiles.installedDescriptor(named: face.postScriptName)
         guard CTFontCopyPostScriptName(CTFontCreateWithFontDescriptor(descriptor, 0, nil)) as String == face.postScriptName else { return nil }
         if let axis = face.weightAxis {
@@ -166,8 +200,9 @@ public final class MeasurementIndex: Sendable {
         }
     }
 
-    private func entriesToSave(keeping known: Set<FaceID>) -> [FaceID: Entry]? {
+    private func entriesToSave(keeping known: Set<FaceID>, generation: Int) -> [FaceID: Entry]? {
         state.withLock { state in
+            guard state.generation == generation else { return nil }
             let kept = state.entries.filter { known.contains($0.key) }
             guard state.dirty || kept.count != state.entries.count else { return nil }
             state.entries = kept

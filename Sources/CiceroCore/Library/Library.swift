@@ -378,13 +378,12 @@ public final class LibraryScanner: Sendable {
             return library
         }
         guard let library = newest else { return built }
-        let save = { [self] in
+        saving.async { [self] in
             signposter.withIntervalSignpost("Save cache") {
                 saveCacheIfNeeded()
                 saveLibraryIfNeeded(library)
             }
         }
-        if changes != nil { saving.async(execute: save) } else { saving.sync(execute: save) }
         return library
     }
 
@@ -614,7 +613,7 @@ public final class LibraryScanner: Sendable {
         }
         // macOS's own fonts are on, whether or not CoreText's list has them; its hidden ones (".SFNS") have names starting with a dot, which the library leaves out.
         for folder in locations.systemFonts {
-            Self.enumerate(folder) { path, stamp in
+            walk(folder) { path, stamp in
                 found[path] = FoundFile(stamp: stamp, isActive: true)
             }
         }

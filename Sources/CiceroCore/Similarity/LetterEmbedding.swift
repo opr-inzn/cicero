@@ -6,11 +6,19 @@ import Synchronization
 
 public final class LetterEmbedding: Sendable {
     private let url: URL
-    private let model = Mutex(Model.unloaded)
+    private let state = Mutex(ModelState.unloaded)
+    private let loadQueue = DispatchQueue(label: "Cicero.LetterEmbedding.load", qos: .utility)
 
-    private enum Model {
+    private struct LoadedModel: @unchecked Sendable {
+        let model: MLModel
+        let takesStrips: Bool
+        let takesDetails: Bool
+        let takesAdvances: Bool
+    }
+
+    private enum ModelState: Sendable {
         case unloaded
-        case loaded(MLModel)
+        case loaded(LoadedModel)
         case failed
     }
 
@@ -38,7 +46,7 @@ public final class LetterEmbedding: Sendable {
     }
 
     var hasFailed: Bool {
-        model.withLock { if case .failed = $0 { true } else { false } }
+        state.withLock { if case .failed = $0 { true } else { false } }
     }
 
     public func read(_ font: CTFont) -> Reading? {
@@ -46,15 +54,33 @@ public final class LetterEmbedding: Sendable {
         return nil
     }
 
-    func outcome(_ font: CTFont) -> Outcome {
-        let inputs = model.withLock { state -> (strips: Bool, details: Bool)? in
-            if case .unloaded = state { state = (try? MLModel(contentsOf: url)).map(Model.loaded) ?? .failed }
-            guard case .loaded(let model) = state else { return nil }
-            let inputs = model.modelDescription.inputDescriptionsByName
-            return (inputs["strips"] != nil, inputs["details"] != nil)
+    private func loadedModel() -> LoadedModel? {
+        switch state.withLock({ $0 }) {
+        case .loaded(let loaded): return loaded
+        case .failed: return nil
+        case .unloaded: break
         }
-        guard let (takesStrips, takesDetails) = inputs else { return .failed }
-        guard let drawn = LetterImages.draw(font, strips: takesStrips, details: takesDetails) else { return .undrawable }
+        return loadQueue.sync {
+            switch state.withLock({ $0 }) {
+            case .loaded(let loaded): return loaded
+            case .failed: return nil
+            case .unloaded: break
+            }
+            guard let mlModel = try? MLModel(contentsOf: url) else {
+                state.withLock { $0 = .failed }
+                return nil
+            }
+            let inputs = mlModel.modelDescription.inputDescriptionsByName
+            let loaded = LoadedModel(model: mlModel, takesStrips: inputs["strips"] != nil,
+                                     takesDetails: inputs["details"] != nil, takesAdvances: inputs["advances"] != nil)
+            state.withLock { $0 = .loaded(loaded) }
+            return loaded
+        }
+    }
+
+    func outcome(_ font: CTFont) -> Outcome {
+        guard let loaded = loadedModel() else { return .failed }
+        guard let drawn = LetterImages.draw(font, strips: loaded.takesStrips, details: loaded.takesDetails) else { return .undrawable }
         var letters = [Float](repeating: 0, count: drawn.pixels.count)
         vDSP.convertElements(of: drawn.pixels, to: &letters)
         letters = vDSP.divide(letters, 255)
@@ -64,35 +90,32 @@ public final class LetterEmbedding: Sendable {
         var large = [Float](repeating: 0, count: drawn.details.count)
         vDSP.convertElements(of: drawn.details, to: &large)
         large = vDSP.divide(large, 255)
-        let found = model.withLock { state -> Reading? in
-            guard case .loaded(let model) = state else { return nil }
-            let shape = [1, LetterImages.letters.count, LetterImages.size, LetterImages.size] as [NSNumber]
-            guard let input = try? MLMultiArray(shape: shape, dataType: .float32),
-                  let advances = try? MLMultiArray(shape: [1, LetterImages.letters.count] as [NSNumber], dataType: .float32)
-            else { return nil }
-            input.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: letters) }
-            advances.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: drawn.advances) }
-            var inputs: [String: Any] = ["letters": input]
-            if model.modelDescription.inputDescriptionsByName["advances"] != nil { inputs["advances"] = advances }
-            if takesStrips {
-                let shape = [1, LetterImages.words.count, LetterImages.size, LetterImages.stripWidth] as [NSNumber]
-                guard let strips = try? MLMultiArray(shape: shape, dataType: .float32) else { return nil }
-                strips.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: lines) }
-                inputs["strips"] = strips
-            }
-            if takesDetails {
-                let shape = [1, LetterImages.detailLetters.count, LetterImages.detailSize, LetterImages.detailSize] as [NSNumber]
-                guard let details = try? MLMultiArray(shape: shape, dataType: .float32) else { return nil }
-                details.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: large) }
-                inputs["details"] = details
-            }
-            guard let features = try? MLDictionaryFeatureProvider(dictionary: inputs),
-                  let output = try? model.prediction(from: features),
-                  let embedding = output.featureValue(for: "embedding")?.multiArrayValue.map(Self.values)
-            else { return nil }
-            return Reading(embedding: embedding, classification: output.featureValue(for: "classification")?.multiArrayValue.map(Self.values))
+        let shape = [1, LetterImages.letters.count, LetterImages.size, LetterImages.size] as [NSNumber]
+        guard let input = try? MLMultiArray(shape: shape, dataType: .float32),
+              let advances = try? MLMultiArray(shape: [1, LetterImages.letters.count] as [NSNumber], dataType: .float32)
+        else { return .failed }
+        input.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: letters) }
+        advances.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: drawn.advances) }
+        var inputs: [String: Any] = ["letters": input]
+        if loaded.takesAdvances { inputs["advances"] = advances }
+        if loaded.takesStrips {
+            let shape = [1, LetterImages.words.count, LetterImages.size, LetterImages.stripWidth] as [NSNumber]
+            guard let strips = try? MLMultiArray(shape: shape, dataType: .float32) else { return .failed }
+            strips.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: lines) }
+            inputs["strips"] = strips
         }
-        guard var reading = found, reading.embedding.count == Self.dimensions, reading.embedding.allSatisfy(\.isFinite) else { return .failed }
+        if loaded.takesDetails {
+            let shape = [1, LetterImages.detailLetters.count, LetterImages.detailSize, LetterImages.detailSize] as [NSNumber]
+            guard let details = try? MLMultiArray(shape: shape, dataType: .float32) else { return .failed }
+            details.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in _ = buffer.update(from: large) }
+            inputs["details"] = details
+        }
+        guard let features = try? MLDictionaryFeatureProvider(dictionary: inputs),
+              let output = try? loaded.model.prediction(from: features),
+              let embedding = output.featureValue(for: "embedding")?.multiArrayValue.map(Self.values)
+        else { return .failed }
+        var reading = Reading(embedding: embedding, classification: output.featureValue(for: "classification")?.multiArrayValue.map(Self.values))
+        guard reading.embedding.count == Self.dimensions, reading.embedding.allSatisfy(\.isFinite) else { return .failed }
         if let classification = reading.classification, classification.count != Self.classifications.count || !classification.allSatisfy(\.isFinite) {
             reading.classification = nil
         }

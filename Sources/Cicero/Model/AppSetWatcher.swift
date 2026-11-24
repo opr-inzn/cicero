@@ -93,7 +93,11 @@ final class AppSetWatcher {
         let current = Self.onForAppSets(model.data.records)
         for (path, names) in managed where !current.contains(path) { dismissed.formUnion(names) }
         managed = managed.filter { current.contains($0.key) }
-        for path in current where managed[path]?.isEmpty ?? true { managed[path] = Set(names(in: path)) }
+        let missingManaged = current.filter { managed[$0]?.isEmpty ?? true }
+        if !missingManaged.isEmpty {
+            let namesByPath = Self.namesByPath(for: missingManaged, in: model.library)
+            for path in missingManaged { managed[path] = namesByPath[path] ?? [] }
+        }
         let (wanted, faces) = plan()
         let records = model.data.records
         let turningOn = Set(wanted.keys.filter { records.temporary[$0] == nil && !(faces[$0]?.state.isActive ?? true) })
@@ -123,8 +127,11 @@ final class AppSetWatcher {
             let (wanted, faces) = self.plan()
             let result = await model.engine.syncAppSets(wanted, faces: faces, records: model.data.records)
             model.data.records = result.records
-            self.managed = Dictionary(uniqueKeysWithValues: Self.onForAppSets(result.records).map { path in
-                (path, self.managed[path] ?? Set(self.names(in: path)))
+            let activeForAppSets = Self.onForAppSets(result.records)
+            let uncached = activeForAppSets.filter { self.managed[$0] == nil }
+            let namesByPath = uncached.isEmpty ? [:] : Self.namesByPath(for: uncached, in: model.library)
+            self.managed = Dictionary(uniqueKeysWithValues: activeForAppSets.map { path in
+                (path, self.managed[path] ?? namesByPath[path] ?? [])
             })
             for path in result.failed { self.failed[path] = wanted[path] }
             if !result.failed.isEmpty {
@@ -132,7 +139,7 @@ final class AppSetWatcher {
             } else if result.succeeded > 0 {
                 model.showToast("\(FontNames.describe(on) ?? "Fonts") activated for \(self.appNames(wanting: wanted))")
             }
-            let scan = model.rescan()
+            let scan = model.rescanFontd()
             for operation in operations { model.settle(operation, after: scan) }
         }
     }
@@ -147,11 +154,12 @@ final class AppSetWatcher {
             if !open.isEmpty { apps[path] = open }
         }
         guard !apps.isEmpty else { return }
+        let appSets = model.data.sets.filter { !$0.apps.isEmpty }.map { (apps: Set($0.apps.map(\.bundleID)), lookup: $0.lookup()) }
         for family in model.library.families {
             for face in family.faces {
                 for app in apps[face.face.path] ?? [] {
-                    let inSet = model.data.sets.contains { set in
-                        set.apps.contains { $0.bundleID == app } && set.contains(style: face.face.postScriptName, of: family.id)
+                    let inSet = appSets.contains { entry in
+                        entry.apps.contains(app) && entry.lookup.contains(style: face.face.postScriptName, of: family.id)
                     }
                     if !inSet { requested[app, default: []].insert(face.face.postScriptName) }
                 }
@@ -174,9 +182,10 @@ final class AppSetWatcher {
         for set in model.data.sets where !set.apps.isEmpty {
             let apps = Set(set.apps.map(\.bundleID)).intersection(running)
             guard !apps.isEmpty else { continue }
+            let lookup = set.lookup()
             for name in set.memberFamilies {
                 guard let family = model.library.family(name) else { continue }
-                for face in family.faces where set.contains(style: face.face.postScriptName, of: name) { want(face, for: apps) }
+                for face in family.faces where lookup.contains(style: face.face.postScriptName, of: name) { want(face, for: apps) }
             }
         }
         if !requested.isEmpty {
@@ -196,9 +205,12 @@ final class AppSetWatcher {
         return model.library.families.flatMap(\.faces).filter { paths.contains($0.face.path) }
     }
 
-    private func names(in path: String) -> [String] {
-        guard let model else { return [] }
-        return model.library.families.lazy.flatMap(\.faces).filter { $0.face.path == path }.map(\.face.postScriptName)
+    private static func namesByPath(for paths: Set<String>, in library: Library) -> [String: Set<String>] {
+        var result: [String: Set<String>] = [:]
+        for face in library.families.lazy.flatMap(\.faces) where paths.contains(face.face.path) {
+            result[face.face.path, default: []].insert(face.face.postScriptName)
+        }
+        return result
     }
 
     private func appNames(wanting wanted: [String: Set<String>]) -> String {

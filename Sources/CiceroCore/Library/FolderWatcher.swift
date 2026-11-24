@@ -9,6 +9,8 @@ public final class FolderWatcher {
     private var folders: [String] = []
     private var fileFolders: [String] = []
     private var files: Set<String> = []
+    private var rawFiles: [String] = []
+    private var rawHidden: [String] = []
     private var hiddenFolders: [String] = []
     private var aliases: [(resolved: String, given: String)] = []
 
@@ -25,8 +27,14 @@ public final class FolderWatcher {
         let parents = Set(files.map { ($0 as NSString).deletingLastPathComponent }).filter { !(home + "/").hasPrefix($0 + "/") }
         let watched = paths + hidden + parents.sorted()
         // Every symlink resolved, as FSEvents reports paths (e.g. /private/var for /var).
-        self.files = Set(files.map(LibraryScanner.realPath))
-        hiddenFolders = hidden.map { LibraryScanner.realPath($0) + "/" }
+        if files != rawFiles {
+            rawFiles = files
+            self.files = Set(files.map(LibraryScanner.realPath))
+        }
+        if hidden != rawHidden {
+            rawHidden = hidden
+            hiddenFolders = hidden.map { LibraryScanner.realPath($0) + "/" }
+        }
         guard watched != self.watched else { return }
         stop()
         self.watched = watched

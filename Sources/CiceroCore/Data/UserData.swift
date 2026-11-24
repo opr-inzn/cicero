@@ -344,8 +344,22 @@ public struct FontSet: Codable, Hashable, Identifiable, Sendable {
         apps = try c.decodeIfPresent([LinkedApp].self, forKey: .apps) ?? []
     }
 
+    public struct Lookup: Sendable {
+        public let families: Set<String>
+        public let styles: [String: Set<String>]
+
+        public func contains(style: String, of family: String) -> Bool {
+            families.contains(family) || (styles[family]?.contains(style) ?? false)
+        }
+    }
+
+    public func lookup() -> Lookup {
+        Lookup(families: Set(families), styles: styles.mapValues(Set.init))
+    }
+
     public var memberFamilies: [String] {
-        families + styles.filter { !$0.value.isEmpty && !families.contains($0.key) }.keys.sorted()
+        let existing = Set(families)
+        return families + styles.filter { !$0.value.isEmpty && !existing.contains($0.key) }.keys.sorted()
     }
 
     public func contains(style: String, of family: String) -> Bool {
@@ -353,7 +367,8 @@ public struct FontSet: Codable, Hashable, Identifiable, Sendable {
     }
 
     public mutating func add(families names: [String]) {
-        for name in names where !families.contains(name) { families.append(name) }
+        var existing = Set(families)
+        for name in names where existing.insert(name).inserted { families.append(name) }
         for name in names { styles[name] = nil }
     }
 

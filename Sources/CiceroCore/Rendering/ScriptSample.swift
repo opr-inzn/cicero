@@ -17,11 +17,11 @@ struct ScriptSample: Hashable, Sendable {
         return hasLetters
     }
 
-    init?(characters: ScalarRanges, languages: [Language]) {
+    init?(characters: ScalarRanges, currentBySpeakers: [Language]) {
         let scripts = GlyphGroup.scripts(of: characters).filter { $0.key != "Latin" && $0.value >= Self.minimumLetters }
         guard let script = scripts.max(by: { ($0.value, $1.key) < ($1.value, $0.key) })?.key else { return nil }
         var names: [String] = []
-        for language in languages.filter(\.isCurrent).sorted(by: { $0.speakers > $1.speakers }) {
+        for language in currentBySpeakers {
             // Without the comma some names end in, like Punjabi's "ਪੰਜਾਬੀ,".
             guard let name = language.autonym?.trimmingCharacters(in: .punctuationCharacters.union(.whitespaces)), !name.isEmpty,
                   !names.contains(name),
@@ -50,11 +50,15 @@ struct ScriptSample: Hashable, Sendable {
         short = String(String.UnicodeScalarView(letters.prefix(4)))
         long = String(String.UnicodeScalarView(letters))
     }
+    init?(characters: ScalarRanges, languages: [Language]) {
+        self.init(characters: characters, currentBySpeakers: languages.filter(\.isCurrent).sorted { $0.speakers > $1.speakers })
+    }
 }
 
 public final class ScriptSamples: Sendable {
     private let languages: LanguageCatalog
     private let samples = Mutex<[FaceID: (generation: Int, sample: ScriptSample?)]>([:])
+    private static let cacheLimit = 4096
 
     public init(languages: LanguageCatalog) {
         self.languages = languages
@@ -72,8 +76,11 @@ public final class ScriptSamples: Sendable {
 
     private func sample(for face: FontFace, generation: Int, font: CTFont) -> ScriptSample? {
         if let known = samples.withLock({ $0[face.id] }), known.generation == generation { return known.sample }
-        let sample = ScriptSample(characters: CharacterMap.characters(of: font), languages: languages.languages)
-        samples.withLock { $0[face.id] = (generation, sample) }
+        let sample = ScriptSample(characters: CharacterMap.characters(of: font), currentBySpeakers: languages.currentBySpeakers)
+        samples.withLock {
+            if $0.count >= Self.cacheLimit { $0.removeAll(keepingCapacity: true) }
+            $0[face.id] = (generation, sample)
+        }
         return sample
     }
 }

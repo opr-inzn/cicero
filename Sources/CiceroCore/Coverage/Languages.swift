@@ -43,6 +43,7 @@ public final class LanguageCatalog: Sendable {
 
     public var languages: [Language] { store.languages }
     public var version: String? { store.version }
+    var currentBySpeakers: [Language] { store.currentBySpeakers }
 
     public func language(_ id: String) -> Language? {
         let store = store
@@ -76,6 +77,7 @@ public final class LanguageCatalog: Sendable {
 
     private struct Storage: Sendable {
         let languages: [Language]
+        let currentBySpeakers: [Language]
         let version: String?
         let order: LanguageOrder
         let requirements: LanguageRequirements
@@ -86,7 +88,7 @@ public final class LanguageCatalog: Sendable {
                 file = try? JSONDecoder().decode(LanguageFile.self, from: data)
             }
             let rows = (file?.languages ?? []).sorted { $0.iso < $1.iso }
-            languages = rows.map { row in
+            let languages = rows.map { row in
                 var scripts: [String] = []
                 for orthography in row.orthographies where !scripts.contains(orthography.script) {
                     scripts.append(orthography.script)
@@ -97,6 +99,8 @@ public final class LanguageCatalog: Sendable {
                     sampleCharacters: (row.orthographies.first?.base ?? "").map(String.init).joined(separator: " ")
                 )
             }
+            self.languages = languages
+            currentBySpeakers = languages.filter(\.isCurrent).sorted { $0.speakers > $1.speakers }
             version = file?.version
             order = LanguageOrder(ids: languages.map(\.id))
             requirements = LanguageRequirements(rows: rows)

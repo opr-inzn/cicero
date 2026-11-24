@@ -679,16 +679,30 @@ public struct GlyphSection: Identifiable, Sendable {
     }
 
     public func runs(alternates: (UInt32) -> [FeatureAlternate]) -> [[GlyphCell]] {
-        var left = glyphs
         let owned = Set(glyphs.lazy.filter { !$0.isAlternate }.map(\.character))
+        var byCharacter: [UInt32: [Int]] = [:]
+        for (index, glyph) in glyphs.enumerated() where glyph.isAlternate && !owned.contains(glyph.character) {
+            byCharacter[glyph.character, default: []].append(index)
+        }
+        var used = [Bool](repeating: false, count: glyphs.count)
         func withAlternates(_ scalars: [UInt32]) -> [GlyphCell] {
             scalars.flatMap { scalar -> [GlyphCell] in
                 let plain = Unicode.Scalar(scalar).map { Array(String(Character($0)).decomposedStringWithCompatibilityMapping.unicodeScalars) } ?? []
                 let base = plain.count == 1 ? plain[0].value : scalar
-                let own = left.filter { $0.isAlternate && !owned.contains($0.character) && ($0.character == scalar || $0.character == base) }
-                left.removeAll { own.contains($0) }
+                var indices: [Int] = []
+                if let direct = byCharacter[scalar] { indices.append(contentsOf: direct) }
+                if base != scalar, let compat = byCharacter[base] { indices.append(contentsOf: compat) }
+                if indices.count > 1 { indices.sort() }
+                var own: [FeatureGlyph] = []
+                for idx in indices where !used[idx] {
+                    used[idx] = true
+                    own.append(glyphs[idx])
+                }
                 return [.character(scalar)] + alternates(scalar).map(GlyphCell.alternate) + own.map(GlyphCell.feature)
             }
+        }
+        var left: [FeatureGlyph] {
+            glyphs.indices.compactMap { used[$0] ? nil : glyphs[$0] }
         }
         if group.isLocalizedForms {
             var runs: [[GlyphCell]] = []

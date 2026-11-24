@@ -28,16 +28,20 @@ extension AppModel {
         guard job == nil, importing == nil,
               let folder = FontExplorerImport.earlierImportLocation(in: data), !Self.declinedEarlierImport(folder)
         else { return mayOfferEarlierImportCopy = false }
-        let files = earlierImportFiles(in: folder)
-        guard !files.isEmpty else { return mayOfferEarlierImportCopy = false }
-        let onCount = library.faces(inFiles: Set(files)).filter { isOnWhereItIs($0) }.count
+        let candidates = earlierImportCandidates(in: folder)
+        guard !candidates.isEmpty else { return mayOfferEarlierImportCopy = false }
         let smartSets = data.smartSets.filter { $0.rules.contains { $0.field == .folder && $0.value == folder.id.uuidString } }.map(\.name)
         let engine = importEngine
         let intoFontLibrary = data.installsIntoFontLibrary
         Task {
             defer { mayOfferEarlierImportCopy = false }
-            let copying = await Task.detached(priority: .userInitiated) { engine.copyPlan(files).toCopy.count }.value
-            guard job == nil, importing == nil, FontExplorerImport.earlierImportLocation(in: data)?.id == folder.id else { return }
+            let (files, copying) = await Task.detached(priority: .userInitiated) {
+                let existing = candidates.filter { FileManager.default.fileExists(atPath: $0) }
+                let copying = existing.isEmpty ? 0 : engine.copyPlan(existing).toCopy.count
+                return (existing, copying)
+            }.value
+            guard !files.isEmpty, job == nil, importing == nil, FontExplorerImport.earlierImportLocation(in: data)?.id == folder.id else { return }
+            let onCount = library.faces(inFiles: Set(files)).filter { isOnWhereItIs($0) }.count
             let prompt = EarlierImportPrompt(folder: folder, name: data.folderNames[folder.id.uuidString] ?? folder.displayName,
                                              files: files, copying: copying, countedForFontLibrary: intoFontLibrary,
                                              onCount: onCount, smartSets: smartSets)
@@ -48,10 +52,14 @@ extension AppModel {
         }
     }
 
-    private func earlierImportFiles(in folder: WatchedFolder) -> [String] {
+    private func earlierImportCandidates(in folder: WatchedFolder) -> [String] {
         let prefix = folder.path + "/"
         return Set(faces(in: [folder]).flatMap { [$0.face.path] + $0.otherCopies })
-            .filter { $0.hasPrefix(prefix) && FileManager.default.fileExists(atPath: $0) }.sorted()
+            .filter { $0.hasPrefix(prefix) }.sorted()
+    }
+
+    private func earlierImportFiles(in folder: WatchedFolder) -> [String] {
+        earlierImportCandidates(in: folder).filter { FileManager.default.fileExists(atPath: $0) }
     }
 
     func isOnWhereItIs(_ face: LibraryFace) -> Bool {

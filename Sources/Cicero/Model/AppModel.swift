@@ -442,12 +442,9 @@ final class AppModel {
 
     private func restoreLibrary() {
         let scanner = scanner, records = data.records, coverage = coverage
+        DispatchQueue.global(qos: .userInitiated).async { coverage.loadSaved(removingOldFile: true) }
         restoring = SavedLibraryRead {
-            let coverageRead = DispatchGroup()
-            DispatchQueue.global(qos: .userInteractive).async(group: coverageRead) { coverage.loadSaved(removingOldFile: true) }
-            let library = scanner.savedLibrary(records: records)
-            coverageRead.wait()
-            return library
+            scanner.savedLibrary(records: records)
         }
     }
 
@@ -483,6 +480,8 @@ final class AppModel {
         #endif
         store.flush()
         scanner.flush()
+        coverage.flush()
+        measurements.flush()
         appLock?.release()
     }
 
@@ -495,6 +494,11 @@ final class AppModel {
     @discardableResult
     func rescan(changes: Set<String>? = nil, check: Bool = false) -> Int {
         rescan(changes.map(ScanScope.files) ?? .everything, check: check)
+    }
+
+    @discardableResult
+    func rescanFontd(except: Set<String> = []) -> Int {
+        rescan(.fontd(except: except), check: false)
     }
 
     @discardableResult
@@ -628,6 +632,10 @@ final class AppModel {
     }
 
     func rebuildFontList() {
+        coverageTask?.cancel()
+        measurementTask?.cancel()
+        coverageProgress = nil
+        measurementProgress = nil
         scanner.clearCache()
         coverage.clearCache()
         measurements.clearCache()
@@ -648,6 +656,7 @@ final class AppModel {
         // Looking for gone added files every time touches their folder, which may be one macOS asks about, like Downloads.
         if !store.isReadOnly, !new.goneFiles.isEmpty || !data.missingFontFiles.isEmpty { data.noteGoneFiles(new.goneFiles) }
         guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
+        let previousFaces = first ? [] : library.families.map(\.regular.face.id)
         let known = Set(library.families.lazy.flatMap(\.faces).map(\.face.path))
         if !store.isReadOnly { data.recordActivations(from: library, to: new) }
         let offline = library.offlinePaths
@@ -667,7 +676,9 @@ final class AppModel {
         pageContents.forget(paths: new.changedPaths)
         scanner.tookChanges(new.changedPaths)
         FontLoader.shared.prefetch(visibleFamilies.prefix(Self.readAheadFirst).map(\.regular.face))
-        updateCoverage()
+        if first || !new.changedPaths.isEmpty || previousFaces != new.families.map(\.regular.face.id) {
+            updateCoverage()
+        }
         updateProblems()
     }
 

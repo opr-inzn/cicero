@@ -19,6 +19,7 @@ final class DocumentFontWatcher {
     private var files: [String: (saved: Date?, fonts: [DocumentFont])] = [:]
     private static let interval: Duration = .milliseconds(500)
     private static let busyInterval: Duration = .seconds(10)
+    nonisolated private static let eventQueue = DispatchQueue(label: "Cicero.DocumentFontWatcher.events", qos: .utility)
 
     func start(_ model: AppModel) {
         guard self.model == nil else { return }
@@ -46,15 +47,13 @@ final class DocumentFontWatcher {
     }
 
     private func frontmostChanged() {
-        let previous = polling
-        previous?.cancel()
+        polling?.cancel()
         guard let model, model.data.activatesDocumentFonts, !isAsleep, let running = NSWorkspace.shared.frontmostApplication,
               let app = running.bundleIdentifier.flatMap(App.init)
         else { return }
         lastFonts[app] = nil
         let pid = running.processIdentifier
         polling = Task { [weak self] in
-            await previous?.value
             guard !Task.isCancelled, await Self.mayAsk(pid) else { return }
             while !Task.isCancelled, let answered = await self?.ask(app, pid) {
                 try? await Task.sleep(for: answered ? Self.interval : Self.busyInterval, tolerance: .milliseconds(100))
@@ -79,8 +78,17 @@ final class DocumentFontWatcher {
         }
         guard !Task.isCancelled, answer != lastFonts[app], let model, model.hasScanned else { return true }
         lastFonts[app] = answer
-        if matcher?.fingerprint != model.library.fingerprint { matcher = (model.library.fingerprint, FontMatcher(model.library)) }
-        let wanted = DocumentFonts.match(answer, using: matcher!.matcher).compactMap(\.face).filter { face in
+        let library = model.library
+        let activeMatcher: FontMatcher
+        if let cached = matcher, cached.fingerprint == library.fingerprint {
+            activeMatcher = cached.matcher
+        } else {
+            let built = await Task.detached(priority: .utility) { FontMatcher(library) }.value
+            guard !Task.isCancelled else { return true }
+            matcher = (library.fingerprint, built)
+            activeMatcher = built
+        }
+        let wanted = DocumentFonts.match(answer, using: activeMatcher).compactMap(\.face).filter { face in
             let forApps = model.data.records.temporary[face.face.path]?.scope == .whileAppsRun
             let parked = model.data.records.appFolderOrigins[face.face.path] != nil
             return (forApps || !face.state.isActive) && (face.app == nil || parked) && !face.isAdobeFonts
@@ -90,24 +98,26 @@ final class DocumentFontWatcher {
     }
 
     private func fonts(inFiles paths: [String]) async -> [DocumentFont] {
-        var fonts: [DocumentFont] = []
-        for path in paths {
-            let saved = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
-            if let file = files[path], file.saved == saved {
-                fonts += file.fonts
-            } else {
-                let read = await Self.read(path)
-                files[path] = (saved, read)
-                fonts += read
+        let cached = files
+        let loaded = await Task.detached(priority: .utility) { () -> (fonts: [DocumentFont], updated: [String: (saved: Date?, fonts: [DocumentFont])]) in
+            var fonts: [DocumentFont] = []
+            var updated: [String: (saved: Date?, fonts: [DocumentFont])] = [:]
+            for path in paths {
+                let saved = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
+                if let file = cached[path], file.saved == saved {
+                    updated[path] = file
+                    fonts += file.fonts
+                } else {
+                    let read = (try? DocumentFonts.read(URL(fileURLWithPath: path))) ?? []
+                    updated[path] = (saved, read)
+                    fonts += read
+                }
             }
-        }
-        files = files.filter { paths.contains($0.key) }
-        return fonts
-    }
-
-    @concurrent
-    private static func read(_ path: String) async -> [DocumentFont] {
-        (try? DocumentFonts.read(URL(fileURLWithPath: path))) ?? []
+            return (fonts, updated)
+        }.value
+        guard !Task.isCancelled else { return [] }
+        files = loaded.updated
+        return loaded.fonts
     }
 
     nonisolated private enum Answer {
@@ -116,15 +126,29 @@ final class DocumentFontWatcher {
         case busy
     }
 
-    @concurrent
-    private static func mayAsk(_ pid: pid_t) async -> Bool {
-        // The first time, macOS asks the user whether Cicero may, and this waits for the answer: the event itself would give up after its timeout and take the question away with it.
-        guard let address = NSAppleEventDescriptor(processIdentifier: pid).aeDesc else { return true }
-        return AEDeterminePermissionToAutomateTarget(address, AEEventClass(kAECoreSuite), AEEventID(kAEGetData), true) != errAEEventNotPermitted
+    nonisolated private static func mayAsk(_ pid: pid_t) async -> Bool {
+        await withCheckedContinuation { continuation in
+            eventQueue.async {
+                // The first time, macOS asks the user whether Cicero may, and this waits for the answer: the event itself would give up after its timeout and take the question away with it.
+                guard let address = NSAppleEventDescriptor(processIdentifier: pid).aeDesc else {
+                    continuation.resume(returning: true)
+                    return
+                }
+                let allowed = AEDeterminePermissionToAutomateTarget(address, AEEventClass(kAECoreSuite), AEEventID(kAEGetData), true) != errAEEventNotPermitted
+                continuation.resume(returning: allowed)
+            }
+        }
     }
 
-    @concurrent
-    private static func ask(_ app: App, _ pid: pid_t) async -> Answer? {
+    nonisolated private static func ask(_ app: App, _ pid: pid_t) async -> Answer? {
+        await withCheckedContinuation { continuation in
+            eventQueue.async {
+                continuation.resume(returning: askSync(app, pid))
+            }
+        }
+    }
+
+    nonisolated private static func askSync(_ app: App, _ pid: pid_t) -> Answer? {
         let documents = every("docu", of: .null())
         do {
             switch app {
