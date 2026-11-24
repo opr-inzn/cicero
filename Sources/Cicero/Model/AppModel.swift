@@ -117,6 +117,7 @@ final class AppModel {
             }
             if guessesClassifications {
                 guessClassifications()
+                refreshLetterGuesses()
             } else {
                 guesser.forget()
             }
@@ -260,6 +261,9 @@ final class AppModel {
     @ObservationIgnored private var rescanTask: Task<Void, Never>?
     @ObservationIgnored private var coverageTask: Task<Void, Never>?
     @ObservationIgnored private var measurementTask: Task<Void, Never>?
+    @ObservationIgnored private var letterGuessTask: Task<Void, Never>?
+    @ObservationIgnored private var letterGuessesPending = false
+    @ObservationIgnored private var measuredAtRefresh = 0
     @ObservationIgnored private var coverageRun = 0
     @ObservationIgnored private var measurementRun = 0
     @ObservationIgnored private var pendingPrompts: [(overActivationSheets: Bool, show: (AppModel) -> Void)] = []
@@ -743,12 +747,14 @@ final class AppModel {
         let run = measurementRun
         let families = library.families
         let measurements = measurements
+        measuredAtRefresh = 0
         let report: @Sendable (Int, Int) -> Void = { [weak self] done, total in
             guard let self else { return }
             Task { @MainActor in
                 guard self.measurementRun == run else { return }
                 self.measurementProgress = WorkProgress(done: done, total: total)
-                if done == total || done % 200 == 0 {
+                if done == total || done - self.measuredAtRefresh >= 200 {
+                    self.measuredAtRefresh = done
                     self.measurementRevision &+= 1
                     self.refreshLetterGuesses()
                 }
@@ -1059,12 +1065,27 @@ final class AppModel {
     }
 
     private func refreshLetterGuesses() {
-        let found = ClassificationGuesses.letters(of: library.families, measurements: measurements)
-        guard found != letterGuesses else { return }
-        letterGuesses = found
         guard guessesClassifications else { return }
-        guessRevision &+= 1
-        refreshGroups()
+        guard letterGuessTask == nil else {
+            letterGuessesPending = true
+            return
+        }
+        letterGuessesPending = false
+        let families = library.families
+        let measurements = measurements
+        letterGuessTask = Task { [weak self] in
+            let found = await Task.detached(priority: .utility) {
+                ClassificationGuesses.letters(of: families, measurements: measurements)
+            }.value
+            guard let self else { return }
+            self.letterGuessTask = nil
+            if self.guessesClassifications, found != self.letterGuesses {
+                self.letterGuesses = found
+                self.guessRevision &+= 1
+                self.refreshGroups()
+            }
+            if self.letterGuessesPending { self.refreshLetterGuesses() }
+        }
     }
 
     private func refreshGroups() {

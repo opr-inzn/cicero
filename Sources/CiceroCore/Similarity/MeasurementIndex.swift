@@ -54,6 +54,7 @@ public final class MeasurementIndex: Sendable {
         var saveScheduled = false
         var generation = 0
         var active = 0
+        var tagNames: [String]?
     }
 
     public init(caches: URL, embedder: LetterEmbedding? = nil, weights: Bool = false) {
@@ -79,57 +80,61 @@ public final class MeasurementIndex: Sendable {
                 return retries && entry.embedding == nil && entry.measurements != nil && !entry.undrawable
             }
         }
-        if !work.isEmpty, !Task.isCancelled {
-            state.withLock { $0.active += 1 }
-            defer {
-                let done = state.withLock { state -> Bool in
-                    state.active -= 1
-                    return state.active == 0
-                }
-                if done { embedder?.unload { self.state.withLock { $0.active == 0 } } }
-            }
+        let needsTagNames = retries && state.withLock { $0.tagNames == nil }
+        if !work.isEmpty || needsTagNames, !Task.isCancelled {
+            beginEmbedderUse()
+            defer { endEmbedderUse() }
             await embedder?.prepare()
             guard !Task.isCancelled else { return }
-            let total = work.count
-            let byFile = Dictionary(grouping: work, by: { $0.0.path }).values.map { $0 }
-            progress(0, total)
-            var done = 0
-            var lastSave = ContinuousClock.now
-            let embedder = embedder
-            await withTaskGroup(of: [(FaceID, CoverageStamp, LetterMeasurements?, LetterEmbedding.Outcome?)].self) { group in
-                var pending = byFile.makeIterator()
-                func addNext() {
-                    guard !Task.isCancelled, let fileWork = pending.next() else { return }
-                    group.addTask(priority: .utility) {
-                        let descriptors = FontFiles.descriptors(at: fileWork[0].0.path)
-                        return fileWork.map { face, stamp in
-                            let font = Self.font(face, in: descriptors)
-                            return (face.id, stamp, font.flatMap { LetterMeasurements.measure($0) }, font.flatMap { embedder?.outcome($0) })
-                        }
-                    }
+            if let names = embedder?.tagNames {
+                state.withLock { state in
+                    guard state.generation == run, state.tagNames != names else { return }
+                    state.tagNames = names
+                    state.dirty = true
                 }
-                for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
-                for await results in group {
-                    let shouldCheckpoint = state.withLock { state -> Bool in
-                        guard state.generation == run else { return false }
-                        var hit = false
-                        for (id, stamp, measurements, outcome) in results {
-                            let reading: LetterEmbedding.Reading? = if case .read(let reading) = outcome { reading } else { nil }
-                            let undrawable = if case .undrawable = outcome { true } else { false }
-                            state.entries[id] = Entry(stamp: stamp, measurements: measurements, embedding: reading?.embedding,
-                                                      classification: reading?.classification, tags: reading?.tags, undrawable: undrawable)
-                            state.dirty = true
-                            done += 1
-                            if done % 200 == 0 { hit = true }
+            }
+            if !work.isEmpty {
+                let total = work.count
+                let byFile = Dictionary(grouping: work, by: { $0.0.path }).values.map { $0 }
+                progress(0, total)
+                var done = 0
+                var lastSave = ContinuousClock.now
+                let embedder = embedder
+                await withTaskGroup(of: [(FaceID, CoverageStamp, LetterMeasurements?, LetterEmbedding.Outcome?)].self) { group in
+                    var pending = byFile.makeIterator()
+                    func addNext() {
+                        guard !Task.isCancelled, let fileWork = pending.next() else { return }
+                        group.addTask(priority: .utility) {
+                            let descriptors = FontFiles.descriptors(at: fileWork[0].0.path)
+                            return fileWork.map { face, stamp in
+                                let font = Self.font(face, in: descriptors)
+                                return (face.id, stamp, font.flatMap { LetterMeasurements.measure($0) }, font.flatMap { embedder?.outcome($0) })
+                            }
                         }
-                        return hit
                     }
-                    if shouldCheckpoint, ContinuousClock.now - lastSave >= .seconds(5) {
-                        lastSave = .now
-                        scheduleSave()
+                    for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
+                    for await results in group {
+                        let shouldCheckpoint = state.withLock { state -> Bool in
+                            guard state.generation == run else { return false }
+                            var hit = false
+                            for (id, stamp, measurements, outcome) in results {
+                                let reading: LetterEmbedding.Reading? = if case .read(let reading) = outcome { reading } else { nil }
+                                let undrawable = if case .undrawable = outcome { true } else { false }
+                                state.entries[id] = Entry(stamp: stamp, measurements: measurements, embedding: reading?.embedding,
+                                                          classification: reading?.classification, tags: reading?.tags, undrawable: undrawable)
+                                state.dirty = true
+                                done += 1
+                                if done % 200 == 0 { hit = true }
+                            }
+                            return hit
+                        }
+                        if shouldCheckpoint, ContinuousClock.now - lastSave >= .seconds(5) {
+                            lastSave = .now
+                            scheduleSave()
+                        }
+                        progress(done, total)
+                        addNext()
                     }
-                    progress(done, total)
-                    addNext()
                 }
             }
         }
@@ -171,11 +176,25 @@ public final class MeasurementIndex: Sendable {
     }
 
     public var tagNames: [String] {
-        embedder?.tagNames ?? []
+        state.withLock { $0.tagNames } ?? []
     }
 
     public func inspect(_ font: CTFont, glyphMap: ((Character) -> CGGlyph?)? = nil) -> (measurements: LetterMeasurements?, reading: LetterEmbedding.Reading?) {
-        (LetterMeasurements.measure(font, glyphMap: glyphMap), embedder?.read(font, glyphMap: glyphMap))
+        beginEmbedderUse()
+        defer { endEmbedderUse() }
+        return (LetterMeasurements.measure(font, glyphMap: glyphMap), embedder?.read(font, glyphMap: glyphMap))
+    }
+
+    private func beginEmbedderUse() {
+        state.withLock { $0.active += 1 }
+    }
+
+    private func endEmbedderUse() {
+        let done = state.withLock { state -> Bool in
+            state.active -= 1
+            return state.active == 0
+        }
+        if done { embedder?.unload { self.state.withLock { $0.active == 0 } } }
     }
 
     public func classifications(of face: FaceID) -> [Float]? {
@@ -200,6 +219,7 @@ public final class MeasurementIndex: Sendable {
         state.withLock {
             $0.generation += 1
             $0.entries = [:]
+            $0.tagNames = nil
             $0.dirty = false
             $0.saveScheduled = false
             $0.loaded = true
@@ -237,11 +257,13 @@ public final class MeasurementIndex: Sendable {
         loadLock.withLock { _ in
             guard let startGeneration = state.withLock({ $0.loaded ? nil : $0.generation }) else { return }
             var decoded: [FaceID: Entry] = [:]
+            var tagNames: [String]?
             if let data = try? Data(contentsOf: file),
                let cache = try? PropertyListDecoder().decode(CacheFile.self, from: data),
                cache.version == Self.version {
                 let count = LetterMeasurements.Measure.allCases.count
                 decoded.reserveCapacity(cache.entries.count)
+                tagNames = cache.tagNames
                 for entry in cache.entries {
                     let values = entry.values.array(of: Float.self), embedding = entry.embedding.array(of: Float.self)
                     let classification = entry.classification.array(of: Float.self)
@@ -261,6 +283,7 @@ public final class MeasurementIndex: Sendable {
             state.withLock { state in
                 guard !state.loaded, state.generation == startGeneration else { return }
                 for (id, entry) in decoded where state.entries[id] == nil { state.entries[id] = entry }
+                if state.tagNames == nil { state.tagNames = tagNames }
                 state.loaded = true
             }
         }
@@ -288,14 +311,14 @@ public final class MeasurementIndex: Sendable {
     }
 
     private func saveIfNeeded() {
-        let snapshot: (entries: [FaceID: Entry], generation: Int)? = state.withLock { state in
+        let snapshot: (entries: [FaceID: Entry], tagNames: [String]?, generation: Int)? = state.withLock { state in
             state.saveScheduled = false
             guard state.dirty else { return nil }
             state.dirty = false
-            return (state.entries, state.generation)
+            return (state.entries, state.tagNames, state.generation)
         }
         guard let snapshot else { return }
-        if !write(snapshot.entries) {
+        if !write(snapshot.entries, tagNames: snapshot.tagNames) {
             state.withLock { state in
                 if state.generation == snapshot.generation { state.dirty = true }
             }
@@ -303,7 +326,7 @@ public final class MeasurementIndex: Sendable {
     }
 
     @discardableResult
-    private func write(_ entries: [FaceID: Entry]) -> Bool {
+    private func write(_ entries: [FaceID: Entry], tagNames: [String]?) -> Bool {
         let signpost = Signposts.library.beginInterval("Save letters")
         defer { Signposts.library.endInterval("Save letters", signpost) }
         let cache = CacheFile(version: Self.version, entries: entries.map { id, entry in
@@ -311,7 +334,7 @@ public final class MeasurementIndex: Sendable {
                        values: Data(array: entry.measurements?.values ?? []), embedding: Data(array: entry.embedding ?? []),
                        classification: Data(array: entry.classification ?? []), tags: entry.tags.map { Data(array: $0) },
                        undrawable: entry.undrawable ? true : nil)
-        })
+        }, tagNames: tagNames)
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
         guard let data = try? encoder.encode(cache) else { return false }
@@ -322,6 +345,7 @@ public final class MeasurementIndex: Sendable {
     private struct CacheFile: Codable {
         var version: Int
         var entries: [CacheEntry]
+        var tagNames: [String]?
     }
 
     private struct CacheEntry: Codable {

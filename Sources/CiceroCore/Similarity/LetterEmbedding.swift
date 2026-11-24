@@ -39,9 +39,8 @@ public final class LetterEmbedding: Sendable {
         self.url = url
     }
 
-    public var tagNames: [String] {
-        if let names = loadedTagNames.withLock({ $0 }) { return names }
-        return loadedModel()?.tagNames ?? []
+    public var tagNames: [String]? {
+        loadedTagNames.withLock { $0 }
     }
 
     public func embedding(of font: CTFont) -> [Float]? {
