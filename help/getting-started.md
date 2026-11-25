@@ -131,19 +131,9 @@ Click the switch next to a family. It’s on in every app as soon as the switch 
 
 Cicero follows macOS. To choose for Cicero alone, open **Cicero → Preferences** (⌘,), click **General** and pick **System**, **Light** or **Dark** next to **Appearance**.
 
-## Cicero in the menu bar
+## Close Cicero’s windows
 
-Cicero has an icon in the menu bar, a ¶. Click it to open Cicero’s window. Drop font files on it to add them, or a PDF, InDesign, Illustrator or Photoshop file to see the fonts it uses. Right-click it, or click it with two fingers, for a menu with:
-
-- The fonts that are on for open apps, because of their [app folders](activating.md#turn-fonts-on-with-an-app) or a document open in an Adobe app, and the ones on [until Cicero quits](activating.md#turn-a-font-on-just-for-now)
-- Your folders, as the sidebar lists them. A checkmark means all of a folder’s fonts are on, a dash that some are. Choose a folder to turn its fonts on, or off when it has a checkmark
-- **Add Fonts**, as in the File menu, and **Find Fonts in Current Document**, which shows the fonts of the document you have open in the app you’re in: a PDF in Preview or Acrobat, or a file in InDesign, Illustrator or Photoshop. The first time, macOS asks whether Cicero may control that app. With no document Cicero can read there, you pick a file instead. Cicero’s window opens too, so you see what they bring
-- **Preferences** and **Quit Cicero**
-
-Closing Cicero’s windows doesn’t quit it, so app folders keep working.
-
-- To do without the icon, open **Preferences → General** and turn off **Show Cicero in the menu bar**
-- With the icon there, you can turn off **Show Cicero in the Dock**. Cicero is then in the Dock and the app switcher only while one of its windows is open
+Closing Cicero’s windows doesn’t quit it, so app folders keep working. Click Cicero in the Dock to open its window again.
 
 ## Keep Cicero up to date
 

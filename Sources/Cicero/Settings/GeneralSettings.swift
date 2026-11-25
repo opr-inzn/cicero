@@ -7,8 +7,6 @@ struct GeneralSettings: View {
     @Environment(Updates.self) private var updates
     @AppStorage(Appearance.defaultsKey) private var appearance: Appearance = .system
     @AppStorage(UsageStatistics.defaultsKey) private var sharesUsageStatistics = true
-    @AppStorage(MenuBarItem.showsIconKey) private var showsMenuBarIcon = true
-    @AppStorage(MenuBarItem.showsDockIconKey) private var showsDockIcon = true
     @State private var isClearingCaches = false
     @State private var loginItem = LoginItem.status
     @State private var isBackingUp = false
@@ -23,19 +21,6 @@ struct GeneralSettings: View {
                 }
                 .pickerStyle(.segmented)
                 .formRowCentered()
-            }
-            Section("Menu Bar and Dock") {
-                Toggle(isOn: $showsMenuBarIcon) {
-                    Text("Show Cicero in the menu bar")
-                    Text("Click its icon to open Cicero, or drop fonts or a document on it. Right-click it to add fonts, find the fonts of the document you have open, turn folders on and off, see which fonts are on for apps, or quit Cicero.")
-                }
-                Toggle(isOn: Binding(get: { showsDockIcon || !showsMenuBarIcon }, set: { showsDockIcon = $0 })) {
-                    Text("Show Cicero in the Dock")
-                    Text(showsMenuBarIcon
-                        ? "When this is off, Cicero is in the Dock only while one of its windows is open."
-                        : "Cicero can leave the Dock only while it’s in the menu bar.")
-                }
-                .disabled(!showsMenuBarIcon)
             }
             Section("Installation") {
                 Toggle(isOn: Binding(get: { model.data.installsIntoFontLibrary }, set: { model.setInstallsIntoFontLibrary($0) })) {

@@ -8,7 +8,7 @@ struct CiceroApp: App {
     @State private var model: AppModel
     @State private var preview = PreviewSettings()
     @State private var updates: Updates
-    @State private var menuBarItem: MenuBarItem
+    @State private var promptWatcher: PromptWatcher
 
     init() {
         UserDefaults.standard.register(defaults: ["NSUseAnimatedFocusRing": false])
@@ -19,10 +19,10 @@ struct CiceroApp: App {
         #endif
         let model = AppModel()
         let updates = Updates()
-        let menuBarItem = MenuBarItem(model: model)
+        let promptWatcher = PromptWatcher(model: model)
         _model = State(initialValue: model)
         _updates = State(initialValue: updates)
-        _menuBarItem = State(initialValue: menuBarItem)
+        _promptWatcher = State(initialValue: promptWatcher)
         AppDelegate.launchModel = model
         NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
@@ -31,10 +31,10 @@ struct CiceroApp: App {
                 LibraryFocus.shared.start()
                 model.appSets.start(model)
                 model.openDocumentFonts.start(model)
-                menuBarItem.start()
+                promptWatcher.start()
                 // After the lock's message, SwiftUI doesn't open the Library window at launch by itself.
                 if LaunchWait.showedMessage {
-                    DispatchQueue.main.async { menuBarItem.openWindow?(id: WindowID.main) }
+                    DispatchQueue.main.async { promptWatcher.openWindow?(id: WindowID.main) }
                 }
             }
         }
@@ -62,7 +62,7 @@ struct CiceroApp: App {
         }
         .defaultSize(width: 1440, height: 900)
         .handlesExternalEvents(matching: ["*"])
-        .commands { CiceroCommands(model: model, updates: updates, menuBarItem: menuBarItem) }
+        .commands { CiceroCommands(model: model, updates: updates, promptWatcher: promptWatcher) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -104,9 +104,8 @@ struct CiceroApp: App {
 struct CiceroCommands: Commands {
     let model: AppModel
     let updates: Updates
-    let menuBarItem: MenuBarItem
+    let promptWatcher: PromptWatcher
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
     @FocusedValue(\.focusSearch) private var focusSearch
 
@@ -114,7 +113,7 @@ struct CiceroCommands: Commands {
 
     var body: some Commands {
         // The menu bar's commands are made at launch and have these even while no window is open.
-        let _ = menuBarItem.connect(openWindow: openWindow, openSettings: openSettings)
+        let _ = promptWatcher.connect(openWindow: openWindow)
         CommandGroup(replacing: .appInfo) {
             Button("About Cicero", systemImage: "info.circle") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
