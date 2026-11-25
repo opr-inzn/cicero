@@ -98,6 +98,7 @@ private struct TextTab: View {
                 if !query.text.isEmpty && !(matches.isEmpty && !isSearching) { columnTitles }
             }
         }
+        .hardTopScrollEdge()
         .task(id: query) { await search(query) }
     }
 
@@ -105,6 +106,7 @@ private struct TextTab: View {
         HStack(spacing: 16) {
             TextField("Text", text: $savedText.value, prompt: Text("Type or paste text"))
                 .textFieldStyle(.roundedBorder)
+                .noAutoFill()
                 .frame(minWidth: 160, maxWidth: 400)
             Stepper(value: $maxMissing, in: 0...20) {
                 Text("Missing characters allowed: \(maxMissing.plain)")
@@ -281,16 +283,19 @@ private struct LanguagesTab: View {
             HStack(spacing: 8) {
                 TextField("Search", text: $search, prompt: Text("Language or script"))
                     .textFieldStyle(.roundedBorder)
+                    .noAutoFill()
                 Picker("Sort", selection: $sortByName) {
-                    Text("Speakers").tag(false)
                     Text("Name").tag(true)
+                    Text("Speakers").tag(false)
                 }
                 .labelsHidden()
                 .fixedSize()
-                .help("Sort by speakers or by name")
+                .help("Sort by name or by speakers")
             }
             .padding(10)
+            .overlay(alignment: .bottom) { Divider() }
         }
+        .hardTopScrollEdge()
     }
 
     private static func subtitle(_ language: Language) -> String {
@@ -344,6 +349,7 @@ private struct LanguagesTab: View {
                 .padding(.top, 14)
                 .padding(.bottom, 10)
             }
+            .hardTopScrollEdge()
             .task(id: query) { await load(query) }
         } else {
             EmptyState("No Language Selected", systemImage: "globe",
