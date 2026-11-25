@@ -96,6 +96,7 @@ extension AppModel {
             externalSimilar = DocumentList(name: font.displayName, families: nearest)
             openFamilyID = nil
             selectedIDs = []
+            scrollsToTop += 1
         }
     }
 
@@ -116,6 +117,7 @@ extension AppModel {
         documentList = DocumentList(name: report.name, families: libraryFamilies(of: report))
         openFamilyID = nil
         selectedIDs = []
+        scrollsToTop += 1
     }
 
     func endDocumentList() {

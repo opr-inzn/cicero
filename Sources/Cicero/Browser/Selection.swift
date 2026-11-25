@@ -130,6 +130,7 @@ struct FamilyKeys: ViewModifier {
     @State private var lastTyped = Date.distantPast
     @State private var pendingQuickLook: Task<Void, Never>?
     @State private var lastJump: (id: String, date: Date)?
+    @State private var lastTop = Date.distantPast
     private static var lastJumpDate = Date.distantPast
     static var jumpedRecently: Bool { Date.now.timeIntervalSince(lastJumpDate) < 1 }
 
@@ -213,6 +214,7 @@ struct FamilyKeys: ViewModifier {
                 model.jumpTargets = nil
             }
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.top } action: { _, _ in
+                if Date.now.timeIntervalSince(lastTop) < 1 { return proxy.scrollTo(ScrollTop.id, anchor: .top) }
                 guard let jump = lastJump, Date.now.timeIntervalSince(jump.date) < 1 else { return }
                 scrollToTop(jump.id)
             }
@@ -227,6 +229,7 @@ struct FamilyKeys: ViewModifier {
 
     private func startAtTop() {
         guard model.jumpTargets == nil, lastJump.map({ Date.now.timeIntervalSince($0.date) >= 1 }) ?? true else { return }
+        lastTop = .now
         proxy.scrollTo(ScrollTop.id, anchor: .top)
     }
 
