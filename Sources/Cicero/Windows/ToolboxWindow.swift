@@ -14,19 +14,28 @@ enum ToolboxTab: String, CaseIterable {
 
 struct ToolboxWindow: View {
     @AppStorage("toolbox.tab") private var tab: ToolboxTab = .text
+    @State private var opened: Set<ToolboxTab> = []
 
     var body: some View {
-        Group {
-            switch tab {
-            case .text: TextTab()
-            case .languages: LanguagesTab()
-            }
+        ZStack {
+            if opened.contains(.text) || tab == .text { shown(TextTab(), for: .text) }
+            if opened.contains(.languages) || tab == .languages { shown(LanguagesTab(), for: .languages) }
         }
+        .onChange(of: tab, initial: true) { opened.insert(tab) }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 ToolbarPicker("View", values: ToolboxTab.allCases, selection: $tab, title: \.title)
             }
         }
+    }
+
+    private func shown(_ content: some View, for tab: ToolboxTab) -> some View {
+        let isShown = self.tab == tab
+        return content
+            .opacity(isShown ? 1 : 0)
+            .allowsHitTesting(isShown)
+            .disabled(!isShown)
+            .accessibilityHidden(!isShown)
     }
 }
 
@@ -83,7 +92,7 @@ private struct TextTab: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .fadingTopBar {
+        .topBar {
             VStack(spacing: 0) {
                 controls
                 if !query.text.isEmpty && !(matches.isEmpty && !isSearching) { columnTitles }
@@ -106,7 +115,8 @@ private struct TextTab: View {
             Spacer(minLength: 0)
             Text(summary).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
         }
-        .padding(12)
+        .padding([.horizontal, .top], 12)
+        .padding(.bottom, 6)
     }
 
     private var summary: String {
@@ -144,15 +154,19 @@ private struct TextTab: View {
     }
 
     private var columnTitles: some View {
-        HStack(spacing: 12) {
+        let divider = Rectangle().fill(.separator).frame(width: 1, height: 16).frame(width: 12)
+        return HStack(spacing: 0) {
             Text("Name").frame(width: 220, alignment: .leading)
-            Text("Sample").frame(maxWidth: .infinity, alignment: .leading)
+            divider
+            Text("Preview").frame(maxWidth: .infinity, alignment: .leading)
+            divider
             Text("Missing").frame(width: 160, alignment: .leading)
         }
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, ListRowBackground.contentInset)
         .frame(height: 28)
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     private static func characters(_ scalars: [UInt32]) -> String {
@@ -263,7 +277,7 @@ private struct LanguagesTab: View {
                     .monospacedDigit()
             }
         }
-        .fadingTopBar {
+        .topBar {
             HStack(spacing: 8) {
                 TextField("Search", text: $search, prompt: Text("Language or script"))
                     .textFieldStyle(.roundedBorder)
@@ -310,7 +324,7 @@ private struct LanguagesTab: View {
                         .frame(height: 22)
                 }
             }
-            .fadingTopBar {
+            .topBar {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(language.name).font(.title2.bold())

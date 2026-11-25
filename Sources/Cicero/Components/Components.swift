@@ -885,28 +885,6 @@ final class SegmentTarget: NSObject {
 }
 
 extension View {
-    @ViewBuilder func fadingTopBar(@ViewBuilder _ bar: () -> some View) -> some View {
-        let fade: CGFloat = 18
-        let fadingBar = bar()
-            .background(.background)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(.background)
-                    .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
-                    .frame(height: fade)
-                    .offset(y: fade)
-                    .allowsHitTesting(false)
-            }
-        if #available(macOS 26, *) {
-            scrollEdgeEffectHidden(true, for: .top)
-                .contentMargins(.top, fade, for: .scrollContent)
-                .safeAreaBar(edge: .top, spacing: 0) { fadingBar }
-        } else {
-            contentMargins(.top, fade, for: .scrollContent)
-                .safeAreaInset(edge: .top, spacing: 0) { fadingBar }
-        }
-    }
-
     func formFooter() -> some View {
         padding(.top, -4)
     }
