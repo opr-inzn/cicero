@@ -56,7 +56,6 @@ struct RenderLetters {
         print("drew \(drawn.count(where: { $0 })) of \(entries.count)")
     }
 
-    /// The file's first face, its axes at their defaults but for the entry's.
     static func font(_ entry: Entry) -> CTFont? {
         let url = URL(fileURLWithPath: entry.file) as CFURL
         guard var descriptor = (CTFontManagerCreateFontDescriptorsFromURL(url) as? [CTFontDescriptor])?.first else { return nil }

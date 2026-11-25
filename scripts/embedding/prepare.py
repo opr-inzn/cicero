@@ -36,7 +36,6 @@ SMALL, LARGE = 8, 96
 
 
 def parse_metadata(text):
-    """A text-format protobuf as nested dicts; repeated fields as lists."""
     root, stack = {}, []
     current = root
     for line in text.splitlines():
@@ -83,7 +82,6 @@ def axis_range(axes, tag):
 
 
 def widths(axes):
-    """The widths besides the normal one to draw a variable font at."""
     found = axis_range(axes, "wdth")
     if not found:
         return []
@@ -94,7 +92,6 @@ def widths(axes):
 
 
 def optical_sizes(axes):
-    """The optical sizes besides its own to draw a variable font at."""
     found = axis_range(axes, "opsz")
     if not found:
         return []
@@ -103,7 +100,6 @@ def optical_sizes(axes):
 
 
 def instances(fonts, axes, italic):
-    """(file, variations, weight, width, optical size) for the styles to draw."""
     fonts = [font for font in fonts if (first(font, "style") == "italic") == italic]
     if not fonts:
         return []
@@ -128,7 +124,6 @@ def instances(fonts, axes, italic):
 
 
 def tags(root):
-    """Google's tags for each family, 0 to 1."""
     found = {}
     path = root / "tags" / "all" / "families.csv"
     with path.open(newline="") as file:
@@ -144,12 +139,10 @@ def tags(root):
 
 
 def extra_families(extra_dir, inspect_bin, known_names, manifest):
-    """Extra verified open-license (OFL, Apache, MIT, UFL) font folders, inspected with inspect-fonts.swift."""
     raw = subprocess.check_output([str(inspect_bin), str(extra_dir)], text=True)
     faces = json.loads(raw)
     grouped = {}
     for face in faces:
-        # Keep only files inside a repo folder that has a verified open-license file.
         path = Path(face["file"])
         repo = path
         while repo.parent != extra_dir and repo.parent != repo:
@@ -169,7 +162,6 @@ def extra_families(extra_dir, inspect_bin, known_names, manifest):
         if name.lower() in known_names:
             continue
         group = grouped[name]
-        # Prefer OTF/TTF variable fonts if present, else static styles in 300..700 (or nearest 400).
         entries = []
         for italic in (False, True):
             sub = [f for f in group if f["italic"] == italic]
@@ -194,7 +186,6 @@ def extra_families(extra_dir, inspect_bin, known_names, manifest):
                         for sz in optical_sizes(axes):
                             picks += [(v["file"], {"wght": w, "opsz": sz, **normal}, w, 100, sz) for w in ws if w <= 500]
             else:
-                # Deduplicate same weight+style (e.g. both OTF and TTF copies in one repo).
                 by_weight = {}
                 for f in sub:
                     by_weight.setdefault(f["weight"], f)

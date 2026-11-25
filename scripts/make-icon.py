@@ -28,15 +28,12 @@ from fontTools.ttLib import TTFont
 
 ASSETS = Path(__file__).resolve().parent.parent / "Resources" / "AppIcon.icon" / "Assets"
 
-# The cube, in a 1024 canvas: the near corner at NEAR, an edge EDGE long, seen corner on. The near corner is the
-# hexagon's centre, so the cube is centred.
 NEAR = (512.0, 512.0)
 EDGE = 400.0
 COS30 = math.cos(math.radians(30))
 
 
 def project(p):
-    """World (x, y, z), the cube [0, 1]³ with its near corner at (1, 1, 1), to canvas pixels."""
     x, y, z = p
     return (
         NEAR[0] + EDGE * COS30 * ((1 - x) - (1 - y)),
@@ -60,31 +57,23 @@ def unit(a):
 TOWARD_VIEWER = unit((1, 1, 1))
 LIGHT = unit((1.25, 0.35, 1.6))
 
-# A face: the corner its letter's (0, 0) sits at, the letter's right and up, and its outward normal.
-# Right × up is the normal, so no letter is mirrored. The top's letter reads from the left face.
 FACES = {
     "left": dict(glyph="C", origin=(1, 0, 0), right=(0, 1, 0), up=(0, 0, 1), normal=(1, 0, 0)),
     "top": dict(glyph="one", origin=(1, 0, 1), right=(0, 1, 0), up=(-1, 0, 0), normal=(0, 0, 1)),
     "right": dict(glyph="six", origin=(1, 1, 0), right=(-1, 0, 0), up=(0, 0, 1), normal=(0, 1, 0)),
 }
 
-# Cap height as a share of an edge, and how deep the letters are cut, also as a share of an edge.
 CAP = 0.64
 DEPTH = 0.04
 
-# How far a wall goes toward its floor's colour at the bottom.
 OCCLUSION = 0.7
 
-# How far a face reaches under its neighbours, in pixels, so no background shows where two faces meet.
 JOIN = 1.5
 
-# The lip on a face round each letter, LIP pixels wide: the cut's edge as a 45° bevel between the face and the wall,
-# as white as LIP_OPACITY where it faces the light most and fading, in LIP_LEVELS steps, to nothing where it faces away.
 LIP = 4.0
 LIP_OPACITY = 0.6
 LIP_LEVELS = 10
 
-# Per face: the floor, and the darkest and lightest a wall can be at its top (sRGB).
 COLORS = {
     "top": dict(floor="#3D0904", dark=(0x5A, 0x10, 0x08), light=(0xB4, 0x30, 0x1E)),
     "left": dict(floor="#050A3A", dark=(0x0A, 0x14, 0x60), light=(0x22, 0x3A, 0xBC)),
@@ -93,8 +82,6 @@ COLORS = {
 
 
 class ContourPen(BasePen):
-    """Collects a glyph's contours as lists of segments: ("L", p0, p1) or ("C", p0, c1, c2, p1)."""
-
     def __init__(self, glyphSet):
         super().__init__(glyphSet)
         self.contours = []
@@ -119,11 +106,9 @@ class ContourPen(BasePen):
 
 
 def flatten(contour, tolerance, longest):
-    """A contour's points, its curves cut into lines no further than tolerance from them nor longer than longest."""
     points = [contour[0][1]]
 
     def cubic(p0, c1, c2, p1, depth=0):
-        # Distance of the control points from the chord bounds the curve's.
         dx, dy = p1[0] - p0[0], p1[1] - p0[1]
         length = math.hypot(dx, dy) or 1e-9
         d1 = abs((c1[0] - p0[0]) * dy - (c1[1] - p0[1]) * dx) / length
@@ -185,7 +170,6 @@ def fmt(v, places=2):
 
 
 def path_data(contours, to_canvas, offset=(0, 0), places=2):
-    """SVG path data for contours of segments, mapped to the canvas and moved by offset."""
     out = []
     for contour in contours:
         p = add(to_canvas(contour[0][1]), offset)
@@ -205,7 +189,6 @@ def hex_color(rgb):
 
 
 def mix(a, b, t):
-    # In linear light, so the middle of a wall's range isn't muddy.
     lin = lambda c: ((c / 255 + 0.055) / 1.055) ** 2.4 if c / 255 > 0.04045 else c / 255 / 12.92
     srgb = lambda c: 255 * (1.055 * c ** (1 / 2.4) - 0.055 if c > 0.0031308 else 12.92 * c)
     return tuple(srgb(lin(x) + (lin(y) - lin(x)) * t) for x, y in zip(a, b))
@@ -217,7 +200,6 @@ def face_corners(face):
 
 
 def joined_outline(face):
-    """The face's outline, reaching JOIN pixels across its edges with the other faces but not past the cube's."""
     corner = lambda p: (round(p[0] * UNITS), round(p[1] * UNITS))
     cube = [corner(project(v)) for v in ((0, 0, 1), (0, 1, 1), (0, 1, 0), (1, 1, 0), (1, 0, 0), (1, 0, 1))]
     grown = pyclipper.PyclipperOffset()
@@ -227,13 +209,11 @@ def joined_outline(face):
 
 
 def build(font_path, longest=2.5, places=2, shades=32, bands=12, steps=LIP_LEVELS):
-    """The layers: walls in pieces no longer than longest pixels, in that many shades and bands of depth, the lip in that
-    many steps, to places decimals."""
     font = TTFont(font_path)
     glyphs = font.getGlyphSet()
     cap = font["OS/2"].sCapHeight
-    scale = CAP / cap  # font units to face units
-    pixel = scale * EDGE  # roughly, canvas pixels per font unit
+    scale = CAP / cap
+    pixel = scale * EDGE
 
     layers = {}
     for name, face in FACES.items():
@@ -241,7 +221,6 @@ def build(font_path, longest=2.5, places=2, shades=32, bands=12, steps=LIP_LEVEL
         glyphs[face["glyph"]].draw(pen)
         contours = pen.contours
         xs = [q[0] for c in contours for s in c for q in s[1:]]
-        # Centred on the face: across on the outline's extremes, up and down on the cap height.
         cx = (min(xs) + max(xs)) / 2
         cy = cap / 2
 
@@ -255,7 +234,6 @@ def build(font_path, longest=2.5, places=2, shades=32, bands=12, steps=LIP_LEVEL
         depth = (project(inward)[0] - project((0, 0, 0))[0], project(inward)[1] - project((0, 0, 0))[1])
         along = unit(depth)
 
-        # Flattened outlines, each turned so the letter, the hole, is on its left.
         polygons = [flatten(c, 0.04 / pixel, longest / pixel) for c in contours]
         for i, polygon in enumerate(polygons):
             nesting = sum(inside(polygon[0], other) for j, other in enumerate(polygons) if j != i)
@@ -270,24 +248,17 @@ def build(font_path, longest=2.5, places=2, shades=32, bands=12, steps=LIP_LEVEL
                 du, dv = b[0] - a[0], b[1] - a[1]
                 if du == 0 and dv == 0:
                     continue
-                # The wall's normal points into the hole, away from the cube's material.
                 normal = unit(add(tuple(-dv * r for r in face["right"]), face["up"], du))
                 pa, pb = to_canvas(a), to_canvas(b)
-                # The lip's, halfway between the face's and the wall's, whichever way the wall faces.
                 bevels.append((dot(unit(add(face["normal"], normal)), LIGHT), pa, pb))
                 if dot(normal, TOWARD_VIEWER) <= 1e-6:
                     continue
                 light = round((0.18 + 0.82 * max(0.0, dot(normal, LIGHT))) * shades) / shades
-                # Of two walls on one line of sight into the hole, the one met first lies further along it.
                 key = dot(((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2), along)
                 edges.append((key, light, pa, pb))
-        # Nearest first, so each wall keeps only what no nearer one hides.
         edges.sort(key=lambda e: -e[0])
         floor_rgb = tuple(int(colors["floor"][i:i + 2], 16) for i in (1, 3, 5))
         wall_paths = []
-        # The walls darken as they go down, which tells a wall seen through a narrow gap from the edge in
-        # front of it. The walls down to each depth, the deepest first, each band drawn over the one below:
-        # a point shows the band of the depth where its line of sight first meets a wall.
         for band in range(bands, 0, -1):
             reach = band / bands
             shadow = OCCLUSION * ((band - 0.5) / bands) ** 1.3
@@ -299,7 +270,6 @@ def build(font_path, longest=2.5, places=2, shades=32, bands=12, steps=LIP_LEVEL
                 shaded.setdefault(color, []).extend(clip(pyclipper.CT_DIFFERENCE, [quad], covered) if covered else [quad])
                 covered = clip(pyclipper.CT_UNION, covered + [quad])
             for color, pieces in shaded.items():
-                # A little larger, so no seam shows between shades.
                 offset = pyclipper.PyclipperOffset()
                 offset.AddPaths(clip(pyclipper.CT_UNION, pieces), pyclipper.JT_MITER, pyclipper.ET_CLOSEDPOLYGON)
                 region = offset.Execute(0.3 * UNITS)
@@ -307,8 +277,6 @@ def build(font_path, longest=2.5, places=2, shades=32, bands=12, steps=LIP_LEVEL
                     wall_paths.append((color, "".join(
                         "M" + "L".join(f"{fmt(x / UNITS, places)} {fmt(y / UNITS, places)}" for x, y in ring) + "Z" for ring in region)))
 
-        # The lip: the face within LIP pixels of the hole, outside the letter and inside its counters, its round
-        # ends as finely cut as the letters' curves.
         holes = pyclipper.Pyclipper()
         holes.AddPaths([[(round(x * UNITS), round(y * UNITS)) for x, y in map(to_canvas, polygon)] for polygon in polygons],
                        pyclipper.PT_SUBJECT, True)
@@ -316,8 +284,6 @@ def build(font_path, longest=2.5, places=2, shades=32, bands=12, steps=LIP_LEVEL
         grown = pyclipper.PyclipperOffset(arc_tolerance=0.1 * longest * UNITS)
         grown.AddPaths(hole, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
         ring = clip(pyclipper.CT_DIFFERENCE, grown.Execute(LIP * UNITS), hole)
-        # Each edge lights the ring within 1.6 LIP of it, which reaches across the ring round corners too, as much as
-        # it faces the light among this face's edges, falling off steeply so the edges facing away stay dark.
         lo, hi = min(e[0] for e in bevels), max(e[0] for e in bevels)
         lit = {}
         for light, pa, pb in bevels:
@@ -327,7 +293,6 @@ def build(font_path, longest=2.5, places=2, shades=32, bands=12, steps=LIP_LEVEL
                 reach.AddPath([(round(pa[0] * UNITS), round(pa[1] * UNITS)), (round(pb[0] * UNITS), round(pb[1] * UNITS))],
                               pyclipper.JT_ROUND, pyclipper.ET_OPENROUND)
                 lit.setdefault(level, []).extend(reach.Execute(1.6 * LIP * UNITS))
-        # The brightest first, each level only where no brighter one is.
         lip, covered = [], []
         for level in sorted(lit, reverse=True):
             region = clip(pyclipper.CT_INTERSECTION, clip(pyclipper.CT_UNION, lit[level]), ring)
@@ -375,7 +340,6 @@ def write_assets(layers):
         (ASSETS / f"{name}-lip.svg").write_text(svg("".join(f'<path fill="#fff" fill-opacity="{o}" d="{d}"/>' for o, d in layer["lip"])))
 
 
-# The faces' gradients, top to bottom, light and dark, which write_gradients puts into icon.json.
 GRADIENTS = {
     "top": (("#FF8A70", "#F23015"), ("#FF8F7A", "#DE3422")),
     "left": (("#5B80FF", "#1B27EA"), ("#5F83FD", "#2437BF")),
@@ -384,13 +348,11 @@ GRADIENTS = {
 
 
 def gradient_span(name):
-    """Where a face's gradient starts and stops on the canvas, top to bottom: across the whole face."""
     ys = [p[1] for p in face_corners(FACES[name])]
     return min(ys), max(ys)
 
 
 def write_gradients():
-    """Gives the faces in icon.json their gradients, light and dark, from GRADIENTS, across the whole face."""
     path = ASSETS.parent / "icon.json"
     doc = json.loads(path.read_text())
     srgb = lambda c: "srgb:" + ",".join(f"{v:.5f}" for v in (*(int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)), 1))
@@ -407,7 +369,6 @@ def write_gradients():
 
 
 def flat(layers, prefix="", dark_classes=False):
-    """The whole cube as one SVG body, as the website draws it."""
     defs, body = [], []
     for name in ("top", "left", "right"):
         (l0, l1), _ = GRADIENTS[name]
@@ -436,7 +397,6 @@ def main():
     layers = build(args.font)
     write_assets(layers)
     write_gradients()
-    # The website's drawings show just the cube, with about 1% of an edge of room around it.
     corners = [p for face in FACES.values() for p in face_corners(face)]
     x0, y0 = min(p[0] for p in corners), min(p[1] for p in corners)
     pad = EDGE / 86
@@ -444,8 +404,6 @@ def main():
     if args.preview:
         Path(args.preview).write_text(svg('<rect x="0" y="0" width="1024" height="1024" fill="#fff"/>' + flat(layers)))
     if args.web:
-        # Drawn at most a few dozen pixels wide, so in fewer pieces, to whole pixels of the canvas, the walls in one
-        # band and the lip in four steps.
         layers = build(args.font, longest=8, places=0, shades=8, bands=1, steps=4)
         web = Path(args.web)
         dark = "".join(f".{n}0{{stop-color:{GRADIENTS[n][1][0]}}}.{n}1{{stop-color:{GRADIENTS[n][1][1]}}}" for n in ("top", "left", "right"))

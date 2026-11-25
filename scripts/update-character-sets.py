@@ -27,8 +27,6 @@ ADOBE = "https://raw.githubusercontent.com/adobe-type-tools/adobe-latin-charsets
 GOOGLE = "https://raw.githubusercontent.com/googlefonts/glyphsets/432104e3ecb119c44b3cc29d7209d7b54bf41017"
 UNICODE = f"https://www.unicode.org/Public/{unicodedata.unidata_version}/ucd/Blocks.txt"
 
-# Blocks type designers check coverage of. Ideograph blocks, private use and the like aren't useful
-# as "has every character" filters.
 BLOCKS = [
     "Basic Latin", "Latin-1 Supplement", "Latin Extended-A", "Latin Extended-B", "Latin Extended Additional",
     "Latin Extended-C", "Latin Extended-D", "Latin Extended-E", "IPA Extensions", "Spacing Modifier Letters",

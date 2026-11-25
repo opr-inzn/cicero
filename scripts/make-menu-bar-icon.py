@@ -30,7 +30,6 @@ def main():
     cap = TTFont(args.font)["OS/2"].sCapHeight
     scale = icon.CAP / cap
 
-    # The cube's outline on the icon's canvas, whose y goes down.
     corners = [p for face in icon.FACES.values() for p in icon.face_corners(face)]
     x0, y0 = min(p[0] for p in corners), min(p[1] for p in corners)
     width, height = max(p[0] for p in corners) - x0, max(p[1] for p in corners) - y0
@@ -44,7 +43,6 @@ def main():
         pen = icon.ContourPen(glyphs)
         glyphs[face["glyph"]].draw(pen)
         xs = [q[0] for c in pen.contours for s in c for q in s[1:]]
-        # Placed as make-icon.py places it: centred across on the outline's extremes, up and down on the cap height.
         cx, cy = (min(xs) + max(xs)) / 2, cap / 2
 
         def canvas(q, face=face, cx=cx, cy=cy):
@@ -54,7 +52,6 @@ def main():
         lines = [f"path.move(to: {point(icon.face_corners(face)[0])})"]
         lines += [f"path.line(to: {point(p)})" for p in icon.face_corners(face)[1:]]
         lines.append("path.close()")
-        # The projection is affine, so a curve's control points carry over.
         for contour in pen.contours:
             lines.append(f"path.move(to: {point(canvas(contour[0][1]))})")
             for segment in contour:

@@ -13,26 +13,22 @@ cd "$(dirname "$0")/.."
 plist() { /usr/libexec/PlistBuddy -c "Print $1" Resources/Info.plist; }
 VERSION=$(plist CFBundleShortVersionString)
 BUILD=$(plist CFBundleVersion)
-# Sparkle wants major.minor.patch.
+# Appcast minimumSystemVersion needs major.minor.patch.
 MINIMUM_SYSTEM=$(plist LSMinimumSystemVersion)
 [[ "$MINIMUM_SYSTEM" == *.*.* ]] || MINIMUM_SYSTEM="$MINIMUM_SYSTEM.0"
 DMG="${1:-build/Cicero-$VERSION.dmg}"
 [[ -f "$DMG" ]] || { echo "Missing $DMG — run ./scripts/release.sh first." >&2; exit 1; }
-# The feed must name the build the DMG holds, or Sparkle offers the update again and again.
+# The feed must name the build the DMG holds, or updates repeat forever.
 BUILT=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" build/Cicero.app/Contents/Info.plist 2>/dev/null || true)
 [[ "$BUILT" == "$BUILD" ]] ||
     { echo "build/Cicero.app is build ${BUILT:-(missing)}, Info.plist says $BUILD — run ./scripts/release.sh again." >&2; exit 1; }
-# A feed naming a build that isn't above the published one would never offer it.
 ./scripts/check-version.sh
 
 NOTES=$(awk -v v="$VERSION" '$0 == "## " v { found = 1; next } found && /^## / { exit } found' CHANGELOG.md)
 [[ -n "${NOTES//[[:space:]]/}" ]] || { echo "Add a \"## $VERSION\" section to CHANGELOG.md first." >&2; exit 1; }
-# Sparkle shows the notes with no address to start from, so a link relative to CHANGELOG.md would go nowhere: it points
-# to the file in this version's tag on GitHub, as the release page's links do. Full addresses (with ":") stay.
+# Relative links in appcast notes have no base URL, so rewrite them to this version's tag on GitHub.
 NOTES=$(sed -E 's#\]\(([^):/\#][^):]*)\)#](https://github.com/opr-inzn/cicero/blob/v'"$VERSION"'/\1)#g' <<<"$NOTES")
 
-# Prints sparkle:edSignature="…" length="…" for the enclosure. The first time, macOS may ask to let
-# sign_update use the key. Choose Always Allow.
 SIGN_UPDATE=.build/artifacts/sparkle/Sparkle/bin/sign_update
 [[ -x "$SIGN_UPDATE" ]] || swift package resolve
 if [[ -n "${SPARKLE_KEY_FILE:-}" ]]; then
@@ -43,7 +39,7 @@ fi
 [[ "$ENCLOSURE_SIGNATURE" =~ ^sparkle:edSignature=\"[^\"]+\"\ length=\"[0-9]+\"$ ]] ||
     { echo "Unexpected output from sign_update: $ENCLOSURE_SIGNATURE" >&2; exit 1; }
 
-# Sparkle (2.9 and later) shows Markdown notes as they are. Only "]]>" would end the CDATA section.
+# Only "]]>" ends an XML CDATA section.
 APPCAST=build/appcast.xml
 cat >"$APPCAST" <<EOF
 <?xml version="1.0" encoding="utf-8"?>

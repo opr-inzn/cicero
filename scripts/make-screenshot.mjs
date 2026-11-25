@@ -57,7 +57,6 @@ try {
   rmSync(work, { recursive: true, force: true });
 }
 
-// Serves the built website on a free port.
 function serve(root) {
   const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css",
     ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
@@ -74,7 +73,6 @@ function serve(root) {
   return new Promise((r) => server.listen(0, "127.0.0.1", () => r(server)));
 }
 
-// Chrome writes the port it picked to DevToolsActivePort in its profile.
 async function debuggingPort(profile) {
   const file = join(profile, "DevToolsActivePort");
   for (let i = 0; i < 100; i++) {
@@ -87,7 +85,6 @@ async function debuggingPort(profile) {
   throw new Error(`Chrome didn't start (${chrome}).`);
 }
 
-// Loads the page and captures the showcase panel, with a couple of rows to spare above and below.
 async function capture(port, url) {
   const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: "PUT" })).json();
   const ws = new WebSocket(target.webSocketDebuggerUrl);
@@ -145,8 +142,7 @@ async function capture(port, url) {
   return Buffer.from(shot.data, "base64");
 }
 
-// Keeps the rows that are opaque in the middle, where the panel covers them fully: its top and bottom
-// edges fall between pixels, so the rows they cross are only partly covered.
+// Keeps the rows that are opaque in the middle, where the panel covers them fully: its top and bottom edges fall between pixels, so the rows they cross are only partly covered.
 function cropToPanel(png) {
   const chunks = [];
   for (let at = 8; at < png.length;) {
@@ -160,7 +156,6 @@ function cropToPanel(png) {
   const filtered = inflateSync(Buffer.concat(chunks.filter((c) => c.type === "IDAT").map((c) => c.data)));
   const stride = width * 4;
 
-  // Undo each row's filter (PNG's None, Sub, Up, Average and Paeth) to read the pixels.
   const pixels = Buffer.alloc(stride * height);
   for (let y = 0; y < height; y++) {
     const filter = filtered[y * (stride + 1)];
@@ -179,8 +174,7 @@ function cropToPanel(png) {
   const top = opaque[0], bottom = opaque.at(-1) + 1;
   if (opaque.length !== bottom - top) throw new Error("The panel isn't opaque all the way down.");
 
-  // Each row keeps its filtered bytes, as they only refer to the row above, except the first, which
-  // has no row above any more and is written unfiltered.
+  // Each row keeps its filtered bytes, as they only refer to the row above, except the first, which has no row above any more and is written unfiltered.
   const rows = [Buffer.concat([Buffer.from([0]), pixels.subarray(top * stride, (top + 1) * stride)])];
   rows.push(filtered.subarray((top + 1) * (stride + 1), bottom * (stride + 1)));
   const croppedHeader = Buffer.from(header);
@@ -196,7 +190,6 @@ function cropToPanel(png) {
   return { data, width, height: bottom - top };
 }
 
-// Hands the file to ImageOptim, in the background, and waits until its tools have finished with it.
 async function optimize(file) {
   if (!existsSync("/Applications/ImageOptim.app")) {
     console.log("ImageOptim isn't installed; the PNG is left as captured.");

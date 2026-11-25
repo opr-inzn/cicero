@@ -43,27 +43,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 LETTERS, SIZE, DIMENSIONS = 19, 64, 128
-# The words LetterImages sets in strips, as many as there are, each SIZE tall and STRIP_WIDTH wide, the line starting
-# STRIP_MARGIN pixels from the left.
 STRIPS, STRIP_WIDTH, STRIP_MARGIN = 2, 384, 4
-# The letters LetterImages draws large, as many, each in a square DETAIL_SIZE wide, DETAIL_SCALE times as large, on a
-# baseline DETAIL_BASELINE up.
 DETAILS, DETAIL_SIZE, DETAIL_SCALE, DETAIL_BASELINE = 2, 128, 3, 8
-# The baseline, in pixels from the top (LetterImages.baseline is from the bottom).
+# LetterImages.baseline is measured from the bottom, while pixels here are from the top.
 BASELINE = SIZE - 18
 CATEGORIES = ["SANS_SERIF", "SERIF", "DISPLAY", "HANDWRITING", "MONOSPACE"]
 MEASURES = 22
 KINDS = ("/Sans/", "/Serif/", "/Slab/", "/Script/", "/Theme/", "/Monospace/")
-# Cicero's classifications the model tells, in the order of its answer (Classification's raw values).
 CLASSES = ["Serif", "Sans Serif", "Script", "Ornamental"]
-# Google's themes of decorative lettering, which Cicero calls ornamental.
 ORNAMENTAL = {"Blackletter", "Stencil", "Inline", "Shaded", "Distressed", "Pixel", "Blobby", "Wacky", "Art Deco",
               "Art Nouveau", "Tuscan", "Medieval"}
-# Key measures used for soft-target similarity and evaluation.
 X_HEIGHT, X_HEIGHT_STEP = 0, 0.04
 CONTRAST, CONTRAST_STEP = 4, 0.10
 WIDTH, WIDTH_STEP = 6, 0.08
-# The monospaced measure, 1 for a monospaced style.
 MONOSPACED = 17
 WIDTHS = [6, 7, 8]
 
@@ -91,8 +83,6 @@ class ResBlock(nn.Module):
 
 
 class LetterBlock(nn.Module):
-    """Pre-norm multi-head self-attention + FFN over letters using basic tensor ops for Core ML tracing."""
-
     def __init__(self, dim=128, heads=4, ff=256):
         super().__init__()
         self.heads = heads
@@ -166,21 +156,15 @@ class Embedder(nn.Module):
             *block(1, 24, 2), *block(24, 48), *block(48, 48, 2), *block(48, 96), *block(96, 96, 2), *block(96, 128),
             nn.AdaptiveAvgPool2d(4), nn.Flatten(), nn.Linear(128 * 16, 128), nn.ReLU(inplace=True),
         )
-        # What it sees in each letter, and how wide each letter's advance is: all of it at once ("dense", two thirds
-        # of the model's numbers), or each letter's first told in 32 numbers, the same way for every letter ("small",
-        # --together), in a sixth of them.
         self.kind = together
         if together == "small":
             self.each = nn.Sequential(nn.Linear(129, 32), nn.ReLU(inplace=True))
-        # The words in strips (--strips), each seen the same way as 128 numbers, of the line's upper and lower half
-        # in 24 steps across, next to the letters.
         self.sees_strips = strips
         if strips:
             self.strip = nn.Sequential(
                 *block(1, 24, 2), *block(24, 48), *block(48, 48, 2), *block(48, 96), *block(96, 96, 2), *block(96, 128),
                 *block(128, 32), nn.AdaptiveAvgPool2d((2, 24)), nn.Flatten(), nn.Linear(32 * 48, 128), nn.ReLU(inplace=True),
             )
-        # The large letters (--details), each seen the same way as 128 numbers, next to them.
         self.sees_details = details
         if details:
             self.detail = nn.Sequential(
@@ -196,9 +180,6 @@ class Embedder(nn.Module):
         self.measures = nn.Linear(DIMENSIONS, measures)
 
     def combine(self, each, advances, strips=None, details=None):
-        """What it sees in each letter, (n, L, 128), the advances, (n, L), the strips, (n, 2, 64, 384), and the
-        large letters, (n, 2, 128, 128), when it sees them → (n, 128) of length 1. No shape is taken from the input,
-        for `Exported`."""
         if self.kind == "small":
             letters = self.each(torch.cat([each, advances[:, :, None]], 2)).reshape(-1, self.num_letters * 32)
             return F.normalize(self.together(letters), dim=1)
@@ -210,15 +191,12 @@ class Embedder(nn.Module):
         return F.normalize(self.together(torch.cat(seen, 1)), dim=1)
 
     def forward(self, letters, advances, strips=None, details=None):
-        """(n, L, 64, 64), 0 to 1, (n, L), in squares, and (n, 2, 64, 384) and (n, 2, 128, 128), 0 to 1, when it
-        sees the strips and the large letters → (n, 128) of length 1."""
         count = letters.shape[0]
         each = self.letter(letters.reshape(count * self.num_letters, 1, SIZE, SIZE)).reshape(count, self.num_letters, 128)
         return self.combine(each, advances, strips, details)
 
 
 def embedder(saved):
-    """The model a checkpoint saved, as it was made."""
     arch = saved.get("arch", "vgg")
     num_letters = saved.get("letters", 16)
     num_measures = saved.get("measures", 18)
@@ -229,14 +207,10 @@ def embedder(saved):
 
 
 def classifier():
-    """From an embedding to how likely each of CLASSES is."""
     return nn.Sequential(nn.Linear(DIMENSIONS, 64), nn.ReLU(), nn.Linear(64, len(CLASSES)))
 
 
 class Exported(nn.Module):
-    """One style at a time, as Cicero asks, with no shape taken from the input: its embedding, how likely each
-    classification is when there's a classifier, and its Google kind-tag scores."""
-
     def __init__(self, model, classify=None, kind_indices=None):
         super().__init__()
         self.model = model
@@ -247,7 +221,6 @@ class Exported(nn.Module):
             self.kind_indices = None
 
     def forward(self, letters, advances, *more):
-        """The strips and the large letters after the advances, those the model sees."""
         if isinstance(self.model, ResAttnEmbedder):
             present = (letters.amax(dim=(2, 3)) > 0.05).float()
             feat = self.model.letter(letters.reshape(self.model.num_letters, 1, SIZE, SIZE))
@@ -269,7 +242,6 @@ class Exported(nn.Module):
 
 
 def read_measurements(path, rows):
-    """Each row's measures, NaN where there's none to say; infers the column count from the file."""
     lines = Path(path).expanduser().read_text().splitlines()
     cols = max((len(line.split("\t")) - 1 for line in lines if "\t" in line), default=MEASURES)
     values = np.full((rows, cols), np.nan, dtype=np.float32)
@@ -286,10 +258,6 @@ def standard_scores(values):
 
 
 def label(family):
-    """The family's classification as Cicero names it (an index into CLASSES), from Google's metadata: handwriting and
-    script or brush tags are script; display families with a decorative theme ornamental (themes alone aren't
-    enough: Google tags Bodoni Moda blackletter); then the stroke Google gives it, else its category or tags, serif
-    (slab serif among them) or sans serif. None for a monospaced family, and for one nothing says enough about."""
     tags, kinds = family["tags"], set(family.get("classifications", [])) | {family["category"]}
     strongest = lambda prefixes: max([score for tag, score in tags.items() if tag.startswith(prefixes)], default=0)
     if "MONOSPACE" in kinds or strongest("/Monospace/") >= 0.5:
@@ -311,19 +279,15 @@ def label(family):
     return None
 
 
-# Words that name a family's optical size, width or kind, as its siblings' names differ: DM Serif Display and Text,
-# Playfair and Playfair Display, Roboto, Roboto Condensed and Roboto Mono, IBM Plex Sans, Serif and Mono.
 SIBLING_WORDS = {"display", "text", "headline", "caption", "fine", "deck", "poster", "banner", "micro", "subhead", "condensed",
                  "narrow", "compressed", "expanded", "extended", "wide", "semi", "extra", "ultra", "sc", "mono", "code", "sans", "serif"}
 
 
 def sibling_root(name):
-    """The family's name without the words that name an optical size or width, which its siblings share."""
     words = [word for word in name.lower().split() if word not in SIBLING_WORDS]
     return " ".join(words) or name.lower()
 
 
-# Words that name a family's width: Roboto Condensed and Saira Semi Condensed are Roboto and Saira, for --invariant.
 WIDTH_WORDS = {"condensed", "narrow", "compressed", "expanded", "extended", "wide", "semi", "extra", "ultra"}
 
 
@@ -333,9 +297,6 @@ def without_width(name):
 
 
 class Letters:
-    """What render-letters.swift drew: each entry's squares, 0 to 255, its letters' advances, in squares, and its
-    words in strips and large letters, 0 to 255, when they were drawn (read when asked)."""
-
     def __init__(self, work):
         raw_adv = np.fromfile(work / "letters-advances.f32", dtype=np.float32)
         raw_px = np.fromfile(work / "letters.u8", dtype=np.uint8)
@@ -352,14 +313,12 @@ class Letters:
         return len(self.pixels)
 
     def tensors(self, rows, device, strips=False, details=False):
-        """The letters, advances, strips and large letters, None for those not asked for."""
         read = lambda images: torch.tensor(images[rows], device=device).float() / 255
         return (read(self.pixels), torch.tensor(self.advances[rows], device=device),
                 read(self.strips) if strips else None, read(self.details) if details else None)
 
 
 def load(work, fold=0):
-    """The designs, the letters drawn (see `Letters`) and the names of the tags."""
     families = json.loads((work / "families.json").read_text())
     drawn = json.loads((work / "letters.json").read_text())
     letters = Letters(work)
@@ -390,7 +349,6 @@ def load(work, fold=0):
 
 
 def merge_alike(designs, letters, device):
-    """Groups of designs whose regulars are drawn alike, as for a family that borrows another's Latin."""
     regulars = torch.tensor(letters.pixels[[design["regular"] for design in designs]], device=device).float().reshape(len(designs), -1) / 255
     squares = (regulars * regulars).sum(1)
     distances = (squares[:, None] + squares[None, :] - 2 * regulars @ regulars.T).clamp(min=0).sqrt() / math.sqrt(regulars.shape[1])
@@ -413,21 +371,15 @@ def merge_alike(designs, letters, device):
 
 
 def held_out(name, fold=0):
-    """Whether the family is in the tenth held out, `fold` of ten, by the first word of its name, so that its
-    siblings are too; none is for a fold below 0, to learn from them all."""
     return fold >= 0 and zlib.crc32(name.split()[0].lower().encode()) % 10 == fold
 
 
 def augment(batch, advances, strips=None, details=None):
-    """Each style a little bigger or smaller about its baseline, its advances with it, and moved a pixel or two, and
-    a letter or two missing now and then; its strips and large letters, when given, as much bigger or smaller about
-    the line's start and the letters' baseline, and moved as much."""
     count, num_letters = batch.shape[0], batch.shape[1]
     device = batch.device
     scale = torch.empty(count, device=device).uniform_(0.9, 1.1)
     shift_x = torch.empty(count, device=device).uniform_(-2, 2) / (SIZE / 2)
     shift_y = torch.empty(count, device=device).uniform_(-1.5, 1.5) / (SIZE / 2)
-    # Scaled about the middle of the baseline, in grid_sample's coordinates, -1 to 1.
     base = (BASELINE + 0.5) / (SIZE / 2) - 1
     theta = torch.zeros(count, 2, 3, device=device)
     theta[:, 0, 0] = 1 / scale
@@ -436,7 +388,6 @@ def augment(batch, advances, strips=None, details=None):
     theta[:, 1, 2] = base - (base + shift_y) / scale
     grid = F.affine_grid(theta, list(batch.shape), align_corners=False)
     moved = F.grid_sample(batch, grid, align_corners=False, padding_mode="zeros")
-    # Standard 8% missing letters, plus occasional heavier subset dropout (like trial or PDF subset fonts, keeping >= 8).
     subset_mask = (torch.rand(count, 1, 1, 1, device=device) < 0.10)
     drop_rate = torch.where(subset_mask, 0.35, 0.08)
     keep = (torch.rand(count, num_letters, 1, 1, device=device) > drop_rate).float()
@@ -451,7 +402,6 @@ def augment(batch, advances, strips=None, details=None):
         theta[:, 1, 2] = base - (base + shift_y) / scale
         strips = F.grid_sample(strips, F.affine_grid(theta, list(strips.shape), align_corners=False), align_corners=False)
     if details is not None:
-        # Moved DETAIL_SCALE times as many pixels, in a square DETAIL_SIZE / SIZE times as wide.
         moving = DETAIL_SCALE * SIZE / DETAIL_SIZE
         large = (DETAIL_SIZE - DETAIL_BASELINE + 0.5) / (DETAIL_SIZE / 2) - 1
         theta = torch.zeros(count, 2, 3, device=device)
@@ -464,9 +414,6 @@ def augment(batch, advances, strips=None, details=None):
 
 
 def vary(letters, advances, wider=0.5, heavier=0.3):
-    """For --invariant, each style now and then drawn up to a fifth wider or narrower (`wider` of them), its advances
-    with it, and bolder or lighter by up to a pixel (`heavier` of them), about a weight, so that the embedding learns
-    them as the same design: the measurements tell widths and weights. Which styles were changed, too."""
     count, device = letters.shape[0], letters.device
     widened = torch.rand(count, device=device) < wider
     factors = torch.empty(count, device=device).uniform_(math.log(0.8), math.log(1.25)).exp()
@@ -481,7 +428,6 @@ def vary(letters, advances, wider=0.5, heavier=0.3):
 
 
 def stretch(batch, factors):
-    """Each style drawn wider or narrower by its factor, about the middle of each square."""
     theta = torch.zeros(batch.shape[0], 2, 3, device=batch.device)
     theta[:, 0, 0] = 1 / factors
     theta[:, 1, 1] = 1
@@ -490,7 +436,6 @@ def stretch(batch, factors):
 
 
 def contrastive(embeddings, temperature):
-    """NT-Xent over pairs: rows i and i + n are two views of one family."""
     count = embeddings.shape[0] // 2
     similarities = embeddings @ embeddings.T / temperature
     similarities.fill_diagonal_(-1e4)
@@ -499,10 +444,6 @@ def contrastive(embeddings, temperature):
 
 
 def soft_contrastive(embeddings, kinds, italic, temperature, target_temperature, raw_measures=None):
-    """For --soft, how near each row should be to the others: its other view nearest, then the designs whose Google
-    tags of a kind are alike (Didone, geometric…, `kinds` of length 1 or 0), less so when one is italic and the other
-    not or when their widths/contrast/x-height differ strongly, others least; and how far the embeddings are from it
-    (Kullback-Leibler). Rows i and i + n are two views of one design; rows without such tags are left to `contrastive`."""
     count = embeddings.shape[0] // 2
     rows = torch.arange(2 * count, device=embeddings.device)
     partners = torch.cat([rows[count:], rows[:count]])
@@ -511,7 +452,6 @@ def soft_contrastive(embeddings, kinds, italic, temperature, target_temperature,
         v = raw_measures[:, WIDTH]
         valid = (~v.isnan())[:, None] & (~v.isnan())[None, :]
         dw = ((v[:, None] - v[None, :]).nan_to_num(0.0).abs() / WIDTH_STEP).clamp(max=6.0)
-        # Only pull apart pairs whose widths visibly diverge (> 2 steps), keeping same-width tag targets intact.
         excess = (dw - 2.0).clamp(min=0.0)
         width_factor = torch.where(valid, torch.exp(-0.08 * excess * excess).clamp(min=0.5, max=1.0), torch.ones_like(dw))
         alike = alike * width_factor
@@ -535,7 +475,6 @@ def embed(model, letters, rows, device, batch=256):
 
 
 def model_distance(model, letters, device):
-    """The distance between the embeddings of rows, each embedded once."""
     known = {}
 
     def distance(first, second):
@@ -548,14 +487,6 @@ def model_distance(model, letters, device):
 
 @torch.no_grad()
 def evaluate(distance, designs, tag_names, measurements=None):
-    """On the designs held out, by `distance(rows, rows)`:
-    own design: how often a style's nearest other style is its design's;
-    tags, category: how much the ten nearest upright designs of the normal width share an upright one's Google tags
-    by kind (Didone, geometric…) and its category;
-    uprights, italics: how many of the ten nearest designs of the normal width are upright, for an upright one, and
-    italic, for an italic one;
-    width: how far apart the ten nearest upright designs, of any width, are in width, in SimilarFonts' steps;
-    monospaced: how many of the ten nearest upright designs of the normal width are monospaced, for a monospaced one."""
     kinds = np.array([1.0 if name.startswith(KINDS) else 0.0 for name in tag_names] + [0.0] * len(CATEGORIES))
     targets = np.array([design["target"] for design in designs]) * kinds
     targets /= np.maximum(np.linalg.norm(targets, axis=1, keepdims=True), 1e-9)
@@ -576,13 +507,11 @@ def evaluate(distance, designs, tag_names, measurements=None):
     several = np.array([len(designs[owner]["all"]) > 1 for owner in owners])
     scores = {"own design": float((owners[found.argmin(1).cpu().numpy()] == owners)[several].mean())}
 
-    # Evaluate tags/category on Google Fonts gallery (category != None) so untagged extra fonts aren't scored as 0.
     upright = [index for index, design in enumerate(designs) if not design["italic"] and design["width"] == 100 and design["category"] is not None]
     queries = [index for index in upright if designs[index]["held_out"]]
     tags, category, counted, categorized = 0.0, 0.0, 0, 0
     by_kind = {}
     for query, near in zip(queries, nearest(queries, upright)):
-        # None for a family from another foundry than Google's (prepare-other.py), which no category says.
         if designs[query]["category"] is not None:
             category += sum(designs[other]["category"] == designs[query]["category"] for other in near) / 10
             categorized += 1
@@ -592,7 +521,6 @@ def evaluate(distance, designs, tag_names, measurements=None):
             counted += 1
             by_kind.setdefault(designs[query]["category"], []).append(agreement)
     scores["tags"], scores["category"] = tags / max(counted, 1), category / max(categorized, 1)
-    # Tags by the query's category, as a library of text faces cares most about serifs and sans serifs.
     for name, kind in (("serif", "SERIF"), ("sans", "SANS_SERIF"), ("display", "DISPLAY"), ("script", "HANDWRITING")):
         if by_kind.get(kind):
             scores[f"tags {name}"] = float(np.mean(by_kind[kind]))
@@ -629,16 +557,13 @@ def train(arguments):
     merged = [group for group in groups if len(group) > 1]
     print(f"{len(designs)} designs of {len({design['family'] for design in designs})} families drawn, {len(groups)} once alike "
           "ones are one; alike: " + "; ".join(", ".join(designs[index]["name"] for index in group) for group in merged[:40]))
-    # A group is held out when any of it is, so nothing held out was seen.
     for group in groups:
         if any(designs[index]["held_out"] for index in group):
             for index in group:
                 designs[index]["held_out"] = True
     classes = [group for group in groups if not designs[group[0]]["held_out"]]
-    # Only part of the families, with their siblings, to see what more of them would do (--share).
     if arguments.share < 1:
         classes = [group for group in classes if zlib.crc32(designs[group[0]]["root"].encode()) % 1000 < arguments.share * 1000]
-    # A family's widths, and its siblings named for another width, as one design (--invariant).
     if arguments.invariant:
         joined = {}
         for group in classes:
@@ -649,14 +574,11 @@ def train(arguments):
     print(f"training on {len(classes)} designs ({sum(map(len, classes))} before merging) of {len(families)} families, "
           f"{sum(not designs[group[0]]['italic'] and designs[group[0]]['width'] == 100 and not designs[group[0]]['size'] for group in classes)} "
           f"of them upright and of the normal width and size; holding out {sum(design['held_out'] for design in designs)} designs")
-    # Each family's designs, and its siblings' (see `sibling_root`), so that they go into a batch together.
     by_root = {}
     for position, group in enumerate(classes):
         for index in group:
             by_root.setdefault(designs[index]["root"], set()).add(position)
     roots = sorted(by_root)
-    # How often each family comes in an epoch (--mix): text faces more than display and handwriting ones, as a
-    # library has more of them than Google.
     MIX = {"SERIF": 2.0, "SANS_SERIF": 1.5, "DISPLAY": 0.6, "HANDWRITING": 0.5, "MONOSPACE": 1.0}
     often = {root: MIX.get(designs[classes[min(by_root[root])][0]]["category"], 1.0) if arguments.mix else 1.0 for root in roots}
     kind_mask = torch.tensor([1.0 if name.startswith(KINDS) else 0.0 for name in tag_names] + [0.0] * len(CATEGORIES), device=device)
@@ -669,7 +591,6 @@ def train(arguments):
     kinds = F.normalize(targets * kind_mask, dim=1)
     italics = torch.tensor([design["italic"] for design in designs], device=device)
     tagged = torch.tensor([design["tagged"] for design in designs], device=device)
-    # Tags of a kind count for more than the expressive ones (calm, playful…), the category most.
     tag_weights = torch.tensor([1.0 if name.startswith(KINDS) else 0.3 for name in tag_names] + [1.0] * len(CATEGORIES), device=device)
     measurements = read_measurements(arguments.measurements, len(drawn)) if arguments.measurements else None
     num_measures = measurements.shape[1] if measurements is not None else MEASURES
@@ -686,7 +607,6 @@ def train(arguments):
         model = Embedder(len(tag_names) + len(CATEGORIES), arguments.together, arguments.strips, arguments.details,
                          letters=drawn.letters, measures=num_measures).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=arguments.rate, weight_decay=arguments.decay)
-    # The model's weights as they were over the last steps, which it is judged by and saved as (--ema).
     average = None
     if arguments.ema:
         from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn
@@ -695,14 +615,12 @@ def train(arguments):
     total = arguments.epochs * steps_per_epoch
     schedule = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=arguments.rate, total_steps=total, pct_start=0.05)
     out = work / arguments.name
-    # Every weight of a design for --invariant, else those a weight or so from its regular.
     views = "all" if arguments.invariant else "views"
     for epoch in range(arguments.epochs):
         model.train()
-        # Families in a random order, each with its siblings, cut into batches of exactly as many designs: a batch of
-        # another size would have the GPU work out and keep another graph, and its memory grows with every one.
+        # Every batch must have the exact same size, or MPS builds and caches a new graph for each size and memory grows.
         if arguments.mix:
-            # Some families twice, but never twice in a batch, where one would be the other's negative.
+            # Never put the same family twice in one batch, where one would be the other's negative.
             coming = [root for root in roots for _ in range(int(often[root]) + (random.random() < often[root] % 1))]
             batches, batch, waiting = [], [], []
             for root in random.sample(coming, len(coming)):
@@ -727,12 +645,10 @@ def train(arguments):
         for chosen in batches:
             first_rows, second_rows, owners = [], [], []
             for group in chosen:
-                # Two views: of one design of the group, or of two, which are drawn alike anyway.
                 a, b = designs[random.choice(group)], designs[random.choice(group)]
                 first_rows.append(random.choice(a[views]))
                 second_rows.append(random.choice(b[views]))
                 owners.append(random.choice(group))
-            # Some designs again, drawn wider or narrower, as designs of their own: two views of each, alike.
             stretched = random.sample(range(len(chosen)), round(len(chosen) * arguments.stretch))
             factors = torch.tensor([random.choice([0.75, 0.85, 1.18, 1.33]) for _ in stretched], device=device)
             count = len(chosen)
@@ -766,7 +682,6 @@ def train(arguments):
             if measures is not None:
                 wanted = measures[rows]
                 known = ~wanted.isnan()
-                # A stretched style's measures aren't its design's.
                 plain = torch.ones(len(rows), 1, dtype=torch.bool, device=device)
                 for offset in (count, len(first_rows) + count):
                     plain[offset:offset + len(stretched)] = False
@@ -793,14 +708,11 @@ def train(arguments):
 
 
 def classify(arguments):
-    """Fits the classifier on the embeddings of every style of the designs learned from, and says how it does on the
-    regulars of those held out: how often it's right, and how often when it's sure enough to say."""
     work = Path(arguments.work).expanduser()
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     torch.manual_seed(arguments.seed)
     checkpoint = arguments.checkpoint or work / "model.pt"
     saved = torch.load(checkpoint, map_location="cpu")
-    # Held out as the model was.
     designs, drawn, tag_names = load(work, saved.get("fold", 0))
     for group in merge_alike(designs, drawn, device):
         if any(designs[index]["held_out"] for index in group):
@@ -815,8 +727,6 @@ def classify(arguments):
     targets = torch.tensor([label for _, label in learn], device=device)
     held = embed(model, drawn, [row for row, _ in check], device) if check else None
     answers = torch.tensor([label for _, label in check], device=device)
-    # Every family counts as much (--balance 0): counting the rare ornamental ones for more had the model say
-    # ornamental of heavy and rounded sans serifs.
     counts = torch.bincount(targets, minlength=len(CLASSES)).float()
     weights = (counts.sum() / counts / len(CLASSES)) ** arguments.balance
     head = classifier().to(device)

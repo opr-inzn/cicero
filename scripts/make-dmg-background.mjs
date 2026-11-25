@@ -24,9 +24,7 @@ if (!fonts || !existsSync(join(fonts, "Mischief-Regular.woff2"))) {
 const chrome = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const font = (file) => `url(data:font/woff2;base64,${readFileSync(join(fonts, file)).toString("base64")}) format("woff2")`;
 
-// In points. The layout keeps to the top 400, which the window always shows below the Finder's title and
-// tab bars. The picture runs on in paper to the window's full height, so it fills the window whether or
-// not the path and status bars are turned on, and Finder's white never shows below it.
+// In points: the layout stays in the top 400 below Finder's title and tab bars, and the background extends to 68 + 400 + 56 so Finder's white never shows when the path and status bars are off.
 const WIDTH = 660, LAYOUT = 400, HEIGHT = 68 + LAYOUT + 56;
 
 const page = `<!doctype html>

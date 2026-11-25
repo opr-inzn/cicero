@@ -19,7 +19,6 @@ OUT=help/version-history.md
         keep {
             line = $0
             out = ""
-            # Each link target: as it is when it is a web address or an anchor, else relative to help/.
             while (match(line, /\]\([^)]+\)/)) {
                 target = substr(line, RSTART + 2, RLENGTH - 3)
                 if (target !~ /^[a-z]+:/ && target !~ /^#/) {

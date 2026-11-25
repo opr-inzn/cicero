@@ -30,30 +30,21 @@ SUBCATEGORIES = {"Letter": ["", "Ligature", "Modifier"], "Number": ["Letter", ""
                  "Mark": ["Nonspacing", "Spacing"]}
 CASES = ["upper", "lower", "minor", ""]
 
-# The blocks whose characters without a script in GlyphsInfo go with Greek and Cyrillic, like Cicero's groups, and the
-# dotted grave and acute, which Unicode gives Greek.
 BLOCKS = {
     "greek": [(0x370, 0x3FF), (0x1F00, 0x1FFF), (0x1DC0, 0x1DC1)],
     "cyrillic": [(0x400, 0x52F), (0x1C80, 0x1C8F), (0x2DE0, 0x2DFF), (0xA640, 0xA69F), (0x1E030, 0x1E08F)],
 }
 
-# Latin letters whose names don't say where they go: each run after the letter given, in the run's order, after
-# that letter's accented forms and the letters named after it, like Æ Ǽ Ǣ after the A's and Ŋ after the N's.
 LATIN_AFTER = [
     ("ÆǼǢ", "A"), ("æǽǣ", "a"), ("Ð", "D"), ("ð", "d"), ("Ə", "E"), ("əɚ", "e"), ("Ȝ", "G"), ("ȝ", "g"),
     ("ĳ", "i"), ("Ŋ", "N"), ("ŋ", "n"), ("Œ", "O"), ("œ", "o"), ("Þ", "P"), ("þ", "p"), ("ẞ", "S"), ("ßſ", "s"),
     ("Ꞌ", "Z"), ("ꞌ", "z"),
 ]
-# Latin letters that go right after a letter, before its accented forms: the dotless i and j, and Ɣ, which looks like
-# a V.
 LATIN_NEXT = [("ı", "i"), ("ȷ", "j"), ("Ɣ", "V")]
-# Names that don't follow the others of their kind: ɪ goes with the small capitals, named like ʙ's Bsmall.
 LATIN_NAMES = {"icapitalsmall": "Ismall"}
 
 GREEK_ALPHABET = "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρςστυφχψω"
 CYRILLIC_ALPHABET = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя"
-# Cyrillic letters that go right after a letter of the alphabet, in this order: Ѓ and Ukrainian's Ґ, then the other
-# forms of Г. Ѝ and Ҋ after Й.
 CYRILLIC_AFTER = [("ЃҐӶҒҔ", "Г"), ("ѓґӷғҕ", "г"), ("ЍҊ", "Й"), ("ѝҋ", "й")]
 
 LATIN_PLACES = {letter: f"{base}~{index:02}" for run, base in LATIN_AFTER for index, letter in enumerate(run)}
@@ -75,13 +66,10 @@ def glyphs(text):
 
 
 def letter_base(character):
-    """The letter Unicode takes a character apart into, like the Α of Ά, or the character itself."""
     return unicodedata.normalize("NFD", character)[0]
 
 
 def greek_place(value):
-    """Α to Ω, then the other letters of the Greek block with accents, then the block's other letters, like Ϙ and Ϲ,
-    then Greek Extended's letter by letter, those with the iota subscript last. Lowercase the same."""
     character = chr(value)
     base = letter_base(character)
     if character in GREEK_ALPHABET:
@@ -94,8 +82,6 @@ def greek_place(value):
 
 
 def cyrillic_place(value):
-    """А to Я, each followed by the letters of the basic Cyrillic block that are it with an accent, like Ё after Е, and
-    those CYRILLIC_AFTER puts after it; then the block's other letters, like Ђ, Є and Ѕ, then the others."""
     character = chr(value)
     if character in CYRILLIC_ALPHABET:
         return (0, CYRILLIC_ALPHABET.index(character), 0, value)
@@ -125,7 +111,6 @@ def key(glyph, script):
 
 
 def members(data, script):
-    """Latin's letters, but ligatures, which Cicero groups on their own; every Greek and Cyrillic character."""
     found = []
     for glyph in data:
         value = int(glyph["unicode"], 16)
@@ -148,8 +133,6 @@ def literal(glyph):
 
 
 def lines(sorted_glyphs, script):
-    """A line for each kind of character and, in Latin, first letter of the names, or in Greek and Cyrillic, part of
-    the alphabet, at most 40 characters long."""
     out, previous = [], None
     for glyph in sorted_glyphs:
         place = key(glyph, script)

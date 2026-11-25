@@ -42,7 +42,6 @@ MIN_PYTHON = (3, 11)
 
 
 def native_name(name):
-    """A language's own name without the stray punctuation some Hyperglot entries end with ("ਪੰਜਾਬੀ,")."""
     return (name or "").strip().rstrip(",;").strip()
 
 
@@ -96,7 +95,7 @@ def export():
     # Hyperglot writes a pickle cache into the working directory. Keep it out of the repo.
     os.chdir(tempfile.mkdtemp(prefix="update-languages-"))
 
-    languages = Languages()  # Hyperglot's defaults: validity >= draft, Rosetta macrolanguage model
+    languages = Languages()
     rows = []
     skipped_empty = 0
     for iso in sorted(languages.keys()):
@@ -141,7 +140,6 @@ def export():
     }
     os.makedirs(RESOURCES, exist_ok=True)
     with open(os.path.join(RESOURCES, "Languages.json"), "w", encoding="utf-8") as f:
-        # One language per line keeps diffs between versions readable.
         f.write("{\n")
         for key, value in header.items():
             f.write(f"{json.dumps(key)}: {json.dumps(value, ensure_ascii=False)},\n")

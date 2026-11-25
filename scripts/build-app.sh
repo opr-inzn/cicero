@@ -10,9 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# SwiftPM's build system links without telling clang which SDK it is, so the app would say it was built
-# with the SDK of its deployment target (15), and a newer macOS would give it that release's look and
-# behaviour. Hand the SDK to the link step too.
+# SwiftPM's build system links without telling clang which SDK it is, so the app would say it was built with the SDK of its deployment target (15), and a newer macOS would give it that release's look and behaviour. Hand the SDK to the link step too.
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 BUILD=(swift build -c release --arch arm64 -Xswiftc -Xclang-linker -Xswiftc -isysroot -Xswiftc -Xclang-linker -Xswiftc "$SDK")
 [[ "${MEASURE:-}" == 1 ]] && BUILD+=(-Xswiftc -DCICERO_MEASURE)
@@ -23,11 +21,8 @@ APP=build/Cicero.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks" "$APP/Contents/Helpers"
 cp "$BIN_DIR/Cicero" "$APP/Contents/MacOS/Cicero"
-# The cicero command-line tool. Not in Contents/MacOS: on a disk that ignores case, cicero is Cicero, the app. It reads
-# CharacterSets.json and Languages.json from Contents/Resources, and Sparkle updates it with the app.
+# Not in Contents/MacOS: on a disk that ignores case, cicero is Cicero, the app.
 cp "$BIN_DIR/cicero-tool" "$APP/Contents/Helpers/cicero"
-# Its completion scripts for zsh, bash and fish, made by the tool itself (swift-argument-parser), which Install Cicero
-# CLI links where each shell looks. For the command `cicero`, not the binary's name here.
 mkdir -p "$APP/Contents/Resources/zsh" "$APP/Contents/Resources/bash" "$APP/Contents/Resources/fish"
 "$BIN_DIR/cicero-tool" --generate-completion-script zsh > "$APP/Contents/Resources/zsh/_cicero"
 "$BIN_DIR/cicero-tool" --generate-completion-script bash > "$APP/Contents/Resources/bash/cicero"
@@ -44,9 +39,7 @@ if ! grep -qx "complete -c 'cicero' -f" "$APP/Contents/Resources/fish/cicero.fis
     echo "The fish completion script isn't for the command cicero" >&2
     exit 1
 fi
-# The measurements are only in a binary built with them, never in one built for users: their types' symbols, and the
-# scenario's environment variable (a string long enough to be stored as text. LC_ALL=C and -a, or grep stops at the
-# first bytes that aren't UTF-8).
+# LC_ALL=C and -a, or grep stops at the first bytes that aren't UTF-8.
 if [[ "${MEASURE:-}" != 1 ]] && { nm "$APP/Contents/MacOS/Cicero" 2>/dev/null | grep -qE "MeasureRun|12Measurements" \
     || LC_ALL=C grep -aq "CICERO_MEASURE_RUN" "$APP/Contents/MacOS/Cicero"; }; then
     echo "The binary has the app performance runs' measurements in it (CICERO_MEASURE): rebuild without MEASURE=1" >&2
@@ -68,27 +61,18 @@ if [[ "${MEASURE:-}" != 1 ]]; then
     strip -S -x "$APP/Contents/MacOS/Cicero" "$APP/Contents/Helpers/cicero"
 fi
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-# Language data from Hyperglot (see scripts/update-languages.py) and its license.
 cp Resources/Languages.json Resources/Languages-LICENSE.txt Resources/Languages-README.txt "$APP/Contents/Resources/"
-# Built-in character sets (see scripts/update-character-sets.py) and their licenses.
 cp Resources/CharacterSets.json Resources/CharacterSets-LICENSES.txt "$APP/Contents/Resources/"
-# The release notes, which Cicero shows in What's New after an update.
 cp CHANGELOG.md "$APP/Contents/Resources/"
-# The glyph names the order of Latin letters comes from (see scripts/update-letter-order.py): their license.
 cp Resources/GlyphsInfo-LICENSE.txt "$APP/Contents/Resources/"
 
-# Sparkle, for updates, and its license. The binary finds it through the @executable_path/../Frameworks
-# rpath set in Package.swift. Cicero isn't sandboxed, so Sparkle starts its installer itself and the
-# XPC services it ships for sandboxed apps aren't needed.
 SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
 ditto "$BIN_DIR/Sparkle.framework" "$SPARKLE"
 rm -rf "$SPARKLE/XPCServices" "$SPARKLE/Versions/B/XPCServices"
 cp .build/artifacts/sparkle/Sparkle/LICENSE "$APP/Contents/Resources/Sparkle-LICENSE.txt"
 
-# The model of letters' embeddings for similar fonts (see scripts/embedding).
 xcrun coremlcompiler compile Resources/LetterEmbedding.mlpackage "$APP/Contents/Resources" >/dev/null
 
-# Compile the Icon Composer icon into Assets.car plus an AppIcon.icns fallback.
 # actool runs through a helper process, so it needs absolute paths.
 PARTIAL="$(mktemp -d)/partial.plist"
 xcrun actool "$PWD/Resources/AppIcon.icon" --compile "$PWD/$APP/Contents/Resources" \
@@ -101,7 +85,7 @@ if [[ "$IDENTITY" == "-" ]]; then
 else
     SIGN=(codesign --force --options runtime --timestamp --sign "$IDENTITY")
 fi
-# Inside out and without --deep, as Sparkle's documentation says: its helpers, the framework, the app.
+# Sign inside out without --deep: helpers, framework, then app.
 for CODE in "$SPARKLE/Versions/B/Autoupdate" "$SPARKLE/Versions/B/Updater.app" "$SPARKLE"; do
     "${SIGN[@]}" "$CODE"
 done

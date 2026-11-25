@@ -102,7 +102,6 @@ def main():
 
 
 def shared_scripts(extensions_text, aliases_text, scripts):
-    """The scripts each character is listed for besides or instead of its own, like Arabic and Syriac for the fathatan."""
     long_names = {short: long.replace("_", " ") for short, long in re.findall(r"^sc ; (\w+)\s*; (\w+)", aliases_text, re.M)}
     shared = {}
     for first, last, codes in re.findall(r"^([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s*; ([\w ]+?)\s*#", extensions_text, re.M):

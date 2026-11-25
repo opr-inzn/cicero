@@ -2,27 +2,20 @@
 import Foundation
 import PackageDescription
 
-// The tests stay out of the public repository, so a clone builds without them.
 let hasTests = FileManager.default.fileExists(atPath: Context.packageDirectory + "/Tests/CiceroCoreTests")
 
 let package = Package(
     name: "Cicero",
     platforms: [.macOS(.v15)],
     dependencies: [
-        // Updates (see scripts/build-app.sh for how the framework gets into the app).
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
-        // The `cicero` command's arguments, help and shell completions.
         .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2"),
-        // `cicero mcp`: the Model Context Protocol server for AI agents.
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk", exact: "0.12.1"),
     ],
     targets: [
-        // Fonts, the library, activation, coverage and user data. No UI. Tested by CiceroCoreTests.
         .target(name: "CiceroCore", path: "Sources/CiceroCore"),
-        // The `cicero` command's commands as functions, input to result value, and the JSON they answer in. No printing.
         .target(name: "CiceroCommands", dependencies: ["CiceroCore"], path: "Sources/CiceroCommands"),
-        // The `cicero` command-line tool: arguments, printing for people and --json. Built as cicero-tool, as a binary
-        // named cicero would be the app's on a disk that ignores case. It goes in the bundle as Contents/Helpers/cicero.
+        // Built as cicero-tool because a binary named cicero collides with the Cicero app on a case-insensitive disk.
         .executableTarget(
             name: "cicero-tool",
             dependencies: [
@@ -32,13 +25,11 @@ let package = Package(
             ],
             path: "Sources/CiceroTool"
         ),
-        // The app. Everything in it runs on the main actor unless it says otherwise.
         .executableTarget(
             name: "Cicero",
             dependencies: ["CiceroCore", "CiceroCommands", .product(name: "Sparkle", package: "Sparkle")],
             path: "Sources/Cicero",
             swiftSettings: [.defaultIsolation(MainActor.self)],
-            // Sparkle.framework is embedded in Contents/Frameworks.
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
     ] + (hasTests ? [
