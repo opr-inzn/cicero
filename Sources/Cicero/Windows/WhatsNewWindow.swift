@@ -181,7 +181,7 @@ struct WhatsNewWindow: View {
         }
         .onExitCommand { dismissWindow() }
         .windowMinimizeBehavior(.disabled)
-        .frame(width: Self.width, height: contentHeight.map { min($0 + barHeight, Self.maximumHeight) })
+        .frame(width: Self.width, height: contentHeight.map { min(($0 + barHeight).rounded(.up), Self.maximumHeight) })
         .frame(maxHeight: Self.maximumHeight)
     }
 }
