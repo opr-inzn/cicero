@@ -129,7 +129,7 @@ final class AppModel {
     private(set) var asksAboutGuessing = false
     var showsGuessingQuestion = false
     static let asksAboutGuessingKey = ClassificationGuesses.askingKey
-    private(set) var tagDots: [String: [TagColor]] = [:]
+    private(set) var tagDots: [String: [TagDot]] = [:]
 
     // MARK: Navigation
 
@@ -963,10 +963,10 @@ final class AppModel {
     // MARK: Groups
 
     private func refreshTagDots() {
-        var dots: [String: [TagColor]] = [:]
+        var dots: [String: [TagDot]] = [:]
         for family in data.familyTags.keys {
-            let colors = data.tags(of: family).compactMap { data.tagColors[$0] }
-            if !colors.isEmpty { dots[family] = colors }
+            let tags = data.tags(of: family).map { TagDot(name: $0, color: data.tagColors[$0]) }
+            if !tags.isEmpty { dots[family] = tags }
         }
         if dots != tagDots { tagDots = dots }
     }

@@ -381,7 +381,7 @@ private struct TagsRow: View {
                 FlowLayout(spacing: 10, lineSpacing: 4) {
                     ForEach(tags, id: \.self) { tag in
                         HStack(spacing: 4) {
-                            TagDots(colors: model.data.tagColors[tag].map { [$0] } ?? [])
+                            TagDots(dots: [TagDot(name: tag, color: model.data.tagColors[tag])]).accessibilityHidden(true)
                             Text(tag).font(.callout)
                         }
                     }

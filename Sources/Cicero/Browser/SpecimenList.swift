@@ -70,7 +70,7 @@ private struct Specimen: View {
             HStack(spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(family.name).font(.headline).lineLimit(1).truncationMode(.middle)
-                    TagDots(colors: model.tagColors(of: family)).centredOnName()
+                    TagDots(dots: model.tagDots(of: family)).centredOnName()
                     StatusTag(family: family).centredOnName()
                     VariableTag(family: family).centredOnName()
                     NoteMark(note: model.note(of: family)).centredOnName()

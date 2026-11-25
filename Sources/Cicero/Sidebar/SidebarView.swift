@@ -569,7 +569,7 @@ private struct SidebarLabel: View {
 
     var body: some View {
         let style: AnyShapeStyle = highlight.dropTarget == row.item ? AnyShapeStyle(.white)
-            : highlight.selected.contains(row.item) ? AnyShapeStyle(Color.accentColor.opacity(appearsActive ? 1 : 0.45))
+            : highlight.selected.contains(row.item) ? AnyShapeStyle((row.color?.color ?? .accentColor).opacity(appearsActive ? 1 : 0.45))
             : appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
         // On the symbol too: a sidebar styles symbols itself. A tag's dot keeps its own colour.
         Label {

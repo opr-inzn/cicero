@@ -237,7 +237,7 @@ They’re tags like any other: rename them, delete them, or make your own. Libra
 
 ### Tag fonts
 
-- Right-click families and choose **Tags**, then a tag. A checkmark shows the tags they have; choose a checked one to take it off. **Remove All Tags** takes every tag off them, and **New Tag** makes a tag and gives it to them. The families keep the tags they have.
+- Right-click families and choose **Tags**, then a tag. A checkmark shows the tags they have; choose a checked one to take it off. **Remove All** takes every tag off them, and **New Tag** makes a tag and gives it to them. The families keep the tags they have.
 - On a font page, right-click the text, the header or a style for the same menu.
 - Drag families onto a tag under **Tags** in the sidebar.
 - In the [Info panel](browsing.md#see-a-fonts-details), click **Change** next to **Tags**.

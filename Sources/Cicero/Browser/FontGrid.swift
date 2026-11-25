@@ -382,7 +382,7 @@ private struct Tile: View {
                         .font(.callout.weight(.medium))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    TagDots(colors: model.tagColors(of: family))
+                    TagDots(dots: model.tagDots(of: family))
                     let note = model.note(of: family), rating = model.rating(of: family)
                     if note != nil || rating != nil {
                         Spacer(minLength: 8)

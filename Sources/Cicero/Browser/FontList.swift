@@ -15,7 +15,7 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
     let added: Date
     let year: Int
     let rating: Int
-    let tags: [TagColor]
+    let tags: [TagDot]
     var position = 0
     let libraryPosition: Int
 
@@ -33,7 +33,7 @@ nonisolated struct FontRow: Identifiable, Equatable, Sendable {
         let foundryName: (Family) -> String?
         let classificationName: (Family) -> String
         let ratings: [String: Int]
-        let tagDots: [String: [TagColor]]
+        let tagDots: [String: [TagDot]]
 
         @MainActor init(_ model: AppModel) {
             library = model.library
@@ -734,7 +734,7 @@ private struct FontListRow: View {
         case .name:
             HStack(spacing: 6) {
                 Text(row.name).lineLimit(1).truncationMode(.middle)
-                TagDots(colors: row.tags)
+                TagDots(dots: row.tags)
                 StatusTag(family: family)
                 VariableTag(family: family)
             }

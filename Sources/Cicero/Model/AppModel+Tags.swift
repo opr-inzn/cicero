@@ -45,7 +45,7 @@ extension AppModel {
         self.data = data
     }
 
-    func tagColors(of family: Family) -> [TagColor] {
+    func tagDots(of family: Family) -> [TagDot] {
         tagDots[family.id] ?? []
     }
 
