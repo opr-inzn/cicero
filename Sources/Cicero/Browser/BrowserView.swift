@@ -278,6 +278,7 @@ private struct FolderOutOfReach: View {
 
 private struct EmptyBrowser: View {
     @Environment(AppModel.self) private var model
+    @FocusState private var focused: Bool
 
     var body: some View {
         let query = model.appliedSearch.trimmingCharacters(in: .whitespaces)
@@ -286,7 +287,13 @@ private struct EmptyBrowser: View {
         } else if !model.searchTokens.isEmpty {
             EmptyState.search()
         } else {
+            // Focusable, or SwiftUI hands the cursor of the list it replaces to the toolbar's search field.
             content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .focusable()
+                .focused($focused)
+                .focusEffectDisabled()
+                .modifier(TakesStartFocus(focused: $focused))
         }
     }
 
