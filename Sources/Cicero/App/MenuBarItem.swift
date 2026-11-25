@@ -73,7 +73,7 @@ final class MenuBarItem: NSObject, NSMenuDelegate, NSWindowDelegate {
             let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
             item.autosaveName = "Cicero"
             if let button = item.button {
-                button.image = MenuBarIcon.image(height: 17)
+                button.image = MenuBarIcon.image()
                 button.target = self
                 button.action = #selector(clicked)
                 button.sendAction(on: [.leftMouseUp, .rightMouseUp])

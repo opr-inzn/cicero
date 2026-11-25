@@ -1,260 +1,117 @@
 {
-  "fill-specializations": [
+  "fill-specializations" : [
     {
-      "value": "system-light"
+      "value" : "system-light"
     },
     {
-      "appearance": "dark",
-      "value": "system-dark"
+      "appearance" : "dark",
+      "value" : "system-dark"
     }
   ],
-  "groups": [
+  "groups" : [
     {
-      "name": "Top",
-      "layers": [
+      "layers" : [
         {
-          "name": "Top Lip",
-          "image-name": "top-lip.svg",
-          "glass": false
-        },
-        {
-          "name": "Top Gloss",
-          "image-name": "top-gloss.svg",
-          "glass": false
-        },
-        {
-          "name": "Top Face",
-          "image-name": "top-face.svg",
-          "glass": true,
-          "fill-specializations": [
+          "fill-specializations" : [
             {
-              "value": {
-                "linear-gradient": [
-                  "srgb:1.00000,0.54118,0.43922,1.00000",
-                  "srgb:0.94902,0.18824,0.08235,1.00000"
-                ],
-                "orientation": {
-                  "start": {
-                    "x": 0.5,
-                    "y": 0.109375
-                  },
-                  "stop": {
-                    "x": 0.5,
-                    "y": 0.5
-                  }
-                }
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
               }
             },
             {
-              "appearance": "dark",
-              "value": {
-                "linear-gradient": [
-                  "srgb:1.00000,0.56078,0.47843,1.00000",
-                  "srgb:0.87059,0.20392,0.13333,1.00000"
-                ],
-                "orientation": {
-                  "start": {
-                    "x": 0.5,
-                    "y": 0.109375
-                  },
-                  "stop": {
-                    "x": 0.5,
-                    "y": 0.5
-                  }
-                }
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
               }
             }
-          ]
+          ],
+          "glass" : false,
+          "image-name" : "selected-letter.svg",
+          "name" : "C"
         },
         {
-          "name": "Top Wall",
-          "image-name": "top-wall.svg",
-          "glass": false
-        },
-        {
-          "name": "Top Floor",
-          "image-name": "top-floor.svg",
-          "glass": false,
-          "fill": {
-            "solid": "srgb:0.23922,0.03529,0.01569,1.00000"
-          }
+          "fill-specializations" : [
+            {
+              "value" : {
+                "solid" : "srgb:0.03922,0.51765,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:0.06275,0.57647,0.98039,1.00000"
+              }
+            }
+          ],
+          "glass" : true,
+          "image-name" : "selected-circle.svg",
+          "name" : "Selected Circle"
         }
       ],
-      "shadow": {
-        "kind": "none",
-        "opacity": 0.5
+      "name" : "Selected",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.40000000000000002
       },
-      "specular": false,
-      "translucency": {
-        "enabled": false,
-        "value": 0.5
+      "specular" : true,
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
       }
     },
     {
-      "name": "Left",
-      "layers": [
+      "layers" : [
         {
-          "name": "Left Lip",
-          "image-name": "left-lip.svg",
-          "glass": false
-        },
-        {
-          "name": "Left Gloss",
-          "image-name": "left-gloss.svg",
-          "glass": false
-        },
-        {
-          "name": "Left Face",
-          "image-name": "left-face.svg",
-          "glass": true,
-          "fill-specializations": [
+          "fill-specializations" : [
             {
-              "value": {
-                "linear-gradient": [
-                  "srgb:0.35686,0.50196,1.00000,1.00000",
-                  "srgb:0.10588,0.15294,0.91765,1.00000"
-                ],
-                "orientation": {
-                  "start": {
-                    "x": 0.5,
-                    "y": 0.3046875
-                  },
-                  "stop": {
-                    "x": 0.5,
-                    "y": 0.890625
-                  }
-                }
+              "value" : {
+                "solid" : "srgb:0.10980,0.10980,0.11765,1.00000"
               }
             },
             {
-              "appearance": "dark",
-              "value": {
-                "linear-gradient": [
-                  "srgb:0.37255,0.51373,0.99216,1.00000",
-                  "srgb:0.14118,0.21569,0.74902,1.00000"
-                ],
-                "orientation": {
-                  "start": {
-                    "x": 0.5,
-                    "y": 0.3046875
-                  },
-                  "stop": {
-                    "x": 0.5,
-                    "y": 0.890625
-                  }
-                }
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:0.94902,0.94902,0.96863,1.00000"
               }
             }
-          ]
+          ],
+          "glass" : false,
+          "image-name" : "letters.svg",
+          "name" : "Letters"
         },
         {
-          "name": "Left Wall",
-          "image-name": "left-wall.svg",
-          "glass": false
-        },
-        {
-          "name": "Left Floor",
-          "image-name": "left-floor.svg",
-          "glass": false,
-          "fill": {
-            "solid": "srgb:0.01961,0.03922,0.22745,1.00000"
-          }
-        }
-      ],
-      "shadow": {
-        "kind": "none",
-        "opacity": 0.5
-      },
-      "specular": false,
-      "translucency": {
-        "enabled": false,
-        "value": 0.5
-      }
-    },
-    {
-      "name": "Right",
-      "layers": [
-        {
-          "name": "Right Lip",
-          "image-name": "right-lip.svg",
-          "glass": false
-        },
-        {
-          "name": "Right Gloss",
-          "image-name": "right-gloss.svg",
-          "glass": false
-        },
-        {
-          "name": "Right Face",
-          "image-name": "right-face.svg",
-          "glass": true,
-          "fill-specializations": [
+          "fill-specializations" : [
             {
-              "value": {
-                "linear-gradient": [
-                  "srgb:0.47451,0.96078,0.37647,1.00000",
-                  "srgb:0.06275,0.70196,0.20784,1.00000"
-                ],
-                "orientation": {
-                  "start": {
-                    "x": 0.5,
-                    "y": 0.3046875
-                  },
-                  "stop": {
-                    "x": 0.5,
-                    "y": 0.890625
-                  }
-                }
+              "value" : {
+                "solid" : "srgb:0.95686,0.95686,0.95686,1.00000"
               }
             },
             {
-              "appearance": "dark",
-              "value": {
-                "linear-gradient": [
-                  "srgb:0.32157,0.94902,0.27451,1.00000",
-                  "srgb:0.14118,0.57647,0.18039,1.00000"
-                ],
-                "orientation": {
-                  "start": {
-                    "x": 0.5,
-                    "y": 0.3046875
-                  },
-                  "stop": {
-                    "x": 0.5,
-                    "y": 0.890625
-                  }
-                }
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:0.16471,0.16471,0.16471,1.00000"
               }
             }
-          ]
-        },
-        {
-          "name": "Right Wall",
-          "image-name": "right-wall.svg",
-          "glass": false
-        },
-        {
-          "name": "Right Floor",
-          "image-name": "right-floor.svg",
-          "glass": false,
-          "fill": {
-            "solid": "srgb:0.02353,0.18824,0.04314,1.00000"
-          }
+          ],
+          "glass" : true,
+          "image-name" : "circles.svg",
+          "name" : "Circles"
         }
       ],
-      "shadow": {
-        "kind": "none",
-        "opacity": 0.5
+      "name" : "Glyphs",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.40000000000000002
       },
-      "specular": false,
-      "translucency": {
-        "enabled": false,
-        "value": 0.5
+      "specular" : true,
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
       }
     }
   ],
-  "supported-platforms": {
-    "squares": [
+  "supported-platforms" : {
+    "squares" : [
       "macOS"
     ]
   }
