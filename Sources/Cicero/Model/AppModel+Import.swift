@@ -67,7 +67,7 @@ extension AppModel {
             panel.canChooseFiles = false
             panel.canChooseDirectories = true
             panel.allowsMultipleSelection = false
-            panel.message = "Choose FontBase’s folder from another Mac, the one in Library/Application Support in a home folder."
+            panel.message = "Choose FontBase’s library (the FontBase folder in Library/Application Support)."
         }
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         let origin = panel.urls.count == 1 ? "“\(panel.urls[0].lastPathComponent)”" : "\(panel.urls.count) collections"
