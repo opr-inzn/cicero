@@ -182,6 +182,7 @@ final class AppModel {
         didSet { if externalSimilar != oldValue { keepsOwnOrder = true } }
     }
     var jumpTargets: Set<String>?
+    var scrollsToTop = 0
     var searchText = "" {
         didSet {
             scheduleSearch()

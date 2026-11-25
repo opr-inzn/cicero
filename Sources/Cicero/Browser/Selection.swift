@@ -101,9 +101,21 @@ struct DeselectsOnEmptyClick: ViewModifier {
     }
 }
 
+nonisolated enum ScrollTop: Hashable {
+    case id
+}
+
 extension View {
     func visibleHeight(_ height: Binding<CGFloat>) -> some View {
         onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height - $0.contentInsets.top - $0.contentInsets.bottom } action: { height.wrappedValue = $1 }
+    }
+
+    func scrollTopAnchor() -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // 1x1 so ScrollViewProxy does not ignore an empty rect.
+            Color.clear.frame(width: 1, height: 1).id(ScrollTop.id).padding(.bottom, -1)
+            self
+        }
     }
 }
 
@@ -112,13 +124,14 @@ struct FamilyKeys: ViewModifier {
     let order: FamilyOrder
     @Binding var anchor: SelectionAnchor
     let proxy: ScrollViewProxy
-    @Binding var position: ScrollPosition
     var layout = FamilyLayout.list
     var pinned: String?
     @State private var typed = ""
     @State private var lastTyped = Date.distantPast
     @State private var pendingQuickLook: Task<Void, Never>?
     @State private var lastJump: (id: String, date: Date)?
+    private static var lastJumpDate = Date.distantPast
+    static var jumpedRecently: Bool { Date.now.timeIntervalSince(lastJumpDate) < 1 }
 
     private var families: [Family] { order.families }
 
@@ -196,6 +209,7 @@ struct FamilyKeys: ViewModifier {
                 anchor = SelectionAnchor(id: first.id)
                 scrollToTop(first.id)
                 lastJump = (first.id, .now)
+                Self.lastJumpDate = .now
                 model.jumpTargets = nil
             }
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.top } action: { _, _ in
@@ -205,6 +219,15 @@ struct FamilyKeys: ViewModifier {
             .onChange(of: quickLook.isOpen, initial: true) { _, isOpen in
                 if isOpen { quickLook.updateOrder(families.map(\.id)) }
             }
+            .onChange(of: model.selectedItems) { startAtTop() }
+            .onChange(of: model.shownSort) { startAtTop() }
+            .onChange(of: model.sortsAscending) { startAtTop() }
+            .onChange(of: model.scrollsToTop) { startAtTop() }
+    }
+
+    private func startAtTop() {
+        guard model.jumpTargets == nil, lastJump.map({ Date.now.timeIntervalSince($0.date) >= 1 }) ?? true else { return }
+        proxy.scrollTo(ScrollTop.id, anchor: .top)
     }
 
     private func stopTyping() {
@@ -214,7 +237,7 @@ struct FamilyKeys: ViewModifier {
     }
 
     private func scrollToTop(_ id: String) {
-        if id == families.first?.id { position.scrollTo(edge: .top) } else { proxy.scrollTo(id, anchor: .top) }
+        if id == families.first?.id { proxy.scrollTo(ScrollTop.id, anchor: .top) } else { proxy.scrollTo(id, anchor: .top) }
     }
 
     private func select(_ id: String) {

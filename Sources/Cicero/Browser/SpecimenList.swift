@@ -9,7 +9,6 @@ struct SpecimenList: View {
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
     @State private var visibleHeight: CGFloat = 0
-    @State private var position = ScrollPosition(idType: String.self)
 
     var body: some View {
         let pinned = model.similarFamilyID.flatMap { id in families.first?.id == id ? families.first : nil }
@@ -31,6 +30,7 @@ struct SpecimenList: View {
                 }
                 .scrollTargetLayout()
                 .cardsPadding(infoShown: infoShown, scale: scale, top: pinned == nil)
+                .scrollTopAnchor()
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
             .modifier(PinnedBar(isShown: pinned != nil, infoShown: infoShown, scale: scale) {
@@ -40,13 +40,13 @@ struct SpecimenList: View {
                 }
             })
             .visibleHeight($visibleHeight)
-            .modifier(KeepsTopOnResize(position: $position))
+            .modifier(KeepsTopOnResize(proxy: proxy))
             .background(Color.canvas)
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
             .modifier(TakesStartFocus(focused: $focused))
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .specimens, pinned: pinned?.id))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, layout: .specimens, pinned: pinned?.id))
         }
     }
 

@@ -101,22 +101,126 @@ extension EnvironmentValues {
 }
 
 struct KeepsTopOnResize: ViewModifier {
-    // Applied by the scroll view as it lays out, so after the rows have reflowed (a proxy can jump too early).
-    @Binding var position: ScrollPosition
+    @Environment(AppModel.self) private var model
+    // ScrollViewProxy, not .scrollPosition: in a sectioned LazyVGrid, SwiftUI's ScrollPosition jumps to the top when any view inside updates, such as on window resign-key or click.
+    let proxy: ScrollViewProxy
     @State private var topID: String?
     @State private var isAtTop = true
+    @State private var held: String?
+    @State private var settling: Task<Void, Never>?
+    @State private var hasAppeared = false
+    @State private var beforeSearch: (items: Set<SidebarItem>, id: String?)?
+    private static var closedAt: (items: Set<SidebarItem>, id: String)?
+    private static var isClosing = false
 
     func body(content: Content) -> some View {
         content
-            .scrollPosition($position, anchor: .top)
             // Needs .scrollTargetLayout() on the content.
             .onScrollTargetVisibilityChange(idType: String.self) { if let first = $0.first { topID = first } }
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top < 1 } action: { isAtTop = $1 }
             // Reported before the visible families update, so `topID` is still the one from before.
-            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width - $0.contentInsets.leading - $0.contentInsets.trailing } action: { _, _ in
-                if !isAtTop, let topID { position.scrollTo(id: topID, anchor: .top) }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width - $0.contentInsets.leading - $0.contentInsets.trailing } action: { old, new in
+                guard old > 0, new > 0, abs(new - old) >= 0.5 else { return }
+                keep()
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { old, new in
+                guard let held, abs(new - old) >= 0.5 else { return }
+                proxy.scrollTo(held, anchor: .top)
+            }
+            .onScrollPhaseChange { _, phase in
+                if phase == .interacting || phase == .decelerating { clearHeld() }
+            }
+            .onChange(of: model.selectedItems) { clearHeld() }
+            .onChange(of: model.shownSort) { clearHeld() }
+            .onChange(of: model.sortsAscending) { clearHeld() }
+            .onChange(of: model.scrollsToTop) { clearHeld() }
+            .onChange(of: model.jumpTargets) { clearHeld() }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
+                guard let window = note.object as? NSWindow, window === TextEditingKeys.mainWindow else { return }
+                Self.closedAt = isAtTop ? nil : topID.map { (model.selectedItems, $0) }
+                Self.isClosing = true
+            }
+            .onAppear {
+                Self.isClosing = false
+                guard !hasAppeared else { return }
+                hasAppeared = true
+                guard let place = Self.closedAt, place.items == model.selectedItems else { return }
+                restore(place.id)
+            }
+            .onChange(of: SearchState(model)) { old, new in
+                if !old.isActive, new.isActive {
+                    beforeSearch = (model.selectedItems, isAtTop ? nil : topID)
+                } else if old.isActive, !new.isActive {
+                    let before = beforeSearch
+                    beforeSearch = nil
+                    if let before, before.items == model.selectedItems {
+                        if let id = before.id { restore(id) } else { toTop() }
+                    }
+                    return
+                }
+                if new.isActive { toTop() }
+            }
+            // SwiftUI makes the browser twice as the window opens and removes the first only after the second has appeared.
+            .onDisappear {
+                clearHeld()
+                if !Self.isClosing { Self.closedAt = nil }
             }
     }
+
+    private func keep() {
+        if settling == nil { held = isAtTop ? nil : topID }
+        guard let id = held else { return }
+        hold(id)
+        // A turn later, after FontGrid's onGeometryChange updates its column count and rows reflow.
+        DispatchQueue.main.async {
+            guard held == id else { return }
+            proxy.scrollTo(id, anchor: .top)
+        }
+    }
+
+    private func restore(_ id: String) {
+        guard model.jumpTargets == nil else { return }
+        hold(id)
+        DispatchQueue.main.async {
+            guard held == id, !FamilyKeys.jumpedRecently else { return }
+            proxy.scrollTo(id, anchor: .top)
+        }
+    }
+
+    private func toTop() {
+        guard model.jumpTargets == nil, !FamilyKeys.jumpedRecently else { return }
+        clearHeld()
+        proxy.scrollTo(ScrollTop.id, anchor: .top)
+    }
+
+    private func hold(_ id: String) {
+        held = id
+        settling?.cancel()
+        settling = Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            held = nil
+            settling = nil
+        }
+    }
+
+    private func clearHeld() {
+        settling?.cancel()
+        settling = nil
+        held = nil
+    }
+}
+
+private struct SearchState: Equatable {
+    let text: String
+    let tokens: [SearchToken]
+
+    init(_ model: AppModel) {
+        text = model.appliedSearch
+        tokens = model.searchTokens
+    }
+
+    var isActive: Bool { !text.isEmpty || !tokens.isEmpty }
 }
 
 private struct InfoPanel: View {

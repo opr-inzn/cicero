@@ -235,7 +235,6 @@ struct FontList: View {
     @FocusState private var focused: Bool
     @State private var visibleWidth: CGFloat = 900
     @State private var visibleHeight: CGFloat = 0
-    @State private var position = ScrollPosition(idType: String.self)
 
     var body: some View {
         let columns = shownColumns
@@ -261,6 +260,7 @@ struct FontList: View {
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .scrollTargetLayout()
                 .padding(.bottom, 8)
+                .scrollTopAnchor()
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
             .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width - $0.contentInsets.leading - $0.contentInsets.trailing } action: { _, width in
@@ -271,13 +271,13 @@ struct FontList: View {
             }
             .hardTopScrollEdge()
             .visibleHeight($visibleHeight)
-            .modifier(KeepsTopOnResize(position: $position))
+            .modifier(KeepsTopOnResize(proxy: proxy))
             .background(Color.canvas)
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
             .modifier(TakesStartFocus(focused: $focused))
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy))
         }
         .onChange(of: model.shownSort, initial: true) {
             if let column = model.shownSort, column.canHide, allColumns.contains(column), !shownColumns.contains(column) { setShown(true, column) }

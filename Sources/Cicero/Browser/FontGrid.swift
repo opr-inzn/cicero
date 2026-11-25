@@ -13,7 +13,6 @@ struct FontGrid: View {
     @FocusState private var focused: Bool
     @State private var gridRoom = GridRoom(width: 0, infoShown: 0)
     @State private var visibleHeight: CGFloat = 0
-    @State private var position = ScrollPosition(idType: String.self)
     @State private var shown: Shown?
 
     static let spacing: CGFloat = 12
@@ -109,6 +108,7 @@ struct FontGrid: View {
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .onGeometryChange(for: GridRoom.self) { [infoShown] in GridRoom(width: $0.size.width, infoShown: infoShown) } action: { gridRoom = $0 }
                 .cardsPadding(infoShown: infoShown, scale: scale, top: pinned == nil)
+                .scrollTopAnchor()
                 .modifier(DeselectsOnEmptyClick(model: model, height: visibleHeight) { focused = true })
             }
             .modifier(PinnedBar(isShown: pinned != nil, infoShown: infoShown, scale: scale) {
@@ -124,13 +124,13 @@ struct FontGrid: View {
             .onChange(of: factor, initial: true) { GridScale.shared.factor = factor }
             .onChange(of: isCovered, initial: true) { coveredHidden = isCovered ? SidebarRoom.shared.hiddenWidth : nil }
             .onDisappear { GridScale.shared.factor = nil }
-            .modifier(KeepsTopOnResize(position: $position))
+            .modifier(KeepsTopOnResize(proxy: proxy))
             .background(Color.canvas)
             .focusable()
             .focused($focused)
             .focusEffectDisabled()
             .modifier(TakesStartFocus(focused: $focused))
-            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, position: $position, layout: .grid(columns: count, groups: FamilyGroup.starts(groups)), pinned: pinned?.id))
+            .modifier(FamilyKeys(order: FamilyOrder(families), anchor: $anchor, proxy: proxy, layout: .grid(columns: count, groups: FamilyGroup.starts(groups)), pinned: pinned?.id))
         }
     }
 

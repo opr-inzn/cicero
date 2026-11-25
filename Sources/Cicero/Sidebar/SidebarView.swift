@@ -204,7 +204,7 @@ private struct SidebarContent: View {
         }
         .padding(.trailing, 10)
         // Behind a header inside the list, so the outline view is among its superviews.
-        .background(OutlineViewSetup(drag: drag, highlight: highlight) { [model] in model.dragOutOfSidebar($0) })
+        .background(OutlineViewSetup(drag: drag, highlight: highlight, isPageOpen: { [model] in model.openFamilyID != nil }, reselect: { [model] in if model.openFamilyID != nil { model.openFamilyID = nil } else { model.scrollsToTop += 1 } }) { [model] in model.dragOutOfSidebar($0) })
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -668,6 +668,13 @@ private final class FittingTextField: NSTextField {
 }
 
 private extension SidebarItem {
+    var isLibrary: Bool {
+        switch self {
+        case .all, .active, .inactive, .temporary, .recent, .system, .problems: true
+        default: false
+        }
+    }
+
     var isRenamable: Bool {
         switch self {
         case .set, .tag, .folder: true
@@ -814,11 +821,13 @@ private struct GroupDrop: ViewModifier {
 private struct OutlineViewSetup: NSViewRepresentable {
     let drag: SidebarDrag
     let highlight: SidebarHighlight
+    let isPageOpen: () -> Bool
+    let reselect: () -> Void
     let hide: ([SidebarRow]) -> Void
 
     func makeNSView(context: Context) -> NSView {
         drag.hide = hide
-        return Marker(drag: drag, highlight: highlight)
+        return Marker(drag: drag, highlight: highlight, isPageOpen: isPageOpen, reselect: reselect)
     }
 
     func updateNSView(_ nsView: NSView, context: Context) { drag.hide = hide }
@@ -826,11 +835,15 @@ private struct OutlineViewSetup: NSViewRepresentable {
     private final class Marker: NSView {
         let drag: SidebarDrag
         let highlight: SidebarHighlight
+        let isPageOpen: () -> Bool
+        let reselect: () -> Void
         private weak var hookedOutline: NSOutlineView?
 
-        init(drag: SidebarDrag, highlight: SidebarHighlight) {
+        init(drag: SidebarDrag, highlight: SidebarHighlight, isPageOpen: @escaping () -> Bool, reselect: @escaping () -> Void) {
             self.drag = drag
             self.highlight = highlight
+            self.isPageOpen = isPageOpen
+            self.reselect = reselect
             super.init(frame: .zero)
         }
 
@@ -855,6 +868,14 @@ private struct OutlineViewSetup: NSViewRepresentable {
                 doubleClick.delaysPrimaryMouseButtonEvents = false
                 outline.addGestureRecognizer(doubleClick)
             }
+            // A click on the row already selected doesn't reach the list's selection at all.
+            if !outline.gestureRecognizers.contains(where: { $0 is ReselectClick }) {
+                let click = ReselectClick()
+                click.delaysPrimaryMouseButtonEvents = false
+                click.onReselect = reselect
+                click.isReselectable = { [highlight, isPageOpen] in highlight.selected.count == 1 && (isPageOpen() || highlight.selected.allSatisfy(\.isLibrary)) }
+                outline.addGestureRecognizer(click)
+            }
             SidebarDrag.prepare(in: outline)
         }
 
@@ -865,6 +886,27 @@ private struct OutlineViewSetup: NSViewRepresentable {
                   outline.delegate?.outlineView?(outline, isGroupItem: item) != true,
                   highlight.selected.count == 1, let selected = highlight.selected.first, selected.isRenamable else { return }
             highlight.renaming = selected
+        }
+    }
+}
+
+private final class ReselectClick: NSClickGestureRecognizer {
+    var onReselect: () -> Void = {}
+    var isReselectable: () -> Bool = { false }
+
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        // Never recognized, so it can't hold back the double click that renames.
+        state = .failed
+        guard let outline = view as? NSOutlineView, outline.window?.isKeyWindow == true, isReselectable(),
+              event.modifierFlags.isDisjoint(with: [.command, .shift, .control, .option]) else { return }
+        let row = outline.row(at: outline.convert(event.locationInWindow, from: nil))
+        guard row >= 0, outline.selectedRowIndexes == IndexSet(integer: row) else { return }
+        let start = event.locationInWindow
+        // The outline view tracks the mouse until it goes up and keeps that event, so this recognizer never ends: look once the press is over.
+        RunLoop.main.perform(inModes: [.default]) { [onReselect] in
+            guard let up = NSApp.currentEvent, up.type == .leftMouseUp, hypot(up.locationInWindow.x - start.x, up.locationInWindow.y - start.y) < 4 else { return }
+            onReselect()
         }
     }
 }
