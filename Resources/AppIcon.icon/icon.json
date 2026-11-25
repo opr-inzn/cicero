@@ -5,7 +5,22 @@
     },
     {
       "appearance" : "dark",
-      "value" : "system-dark"
+      "value" : {
+        "linear-gradient" : [
+          "srgb:0.18431,0.18431,0.18431,1.00000",
+          "srgb:0.07843,0.07843,0.07843,1.00000"
+        ],
+        "orientation" : {
+          "start" : {
+            "x" : 0.5,
+            "y" : 0
+          },
+          "stop" : {
+            "x" : 0.5,
+            "y" : 1
+          }
+        }
+      }
     }
   ],
   "groups" : [
