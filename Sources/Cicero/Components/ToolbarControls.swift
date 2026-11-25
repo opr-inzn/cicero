@@ -63,7 +63,7 @@ struct ToolbarPicker<Value: Hashable>: View {
 
     @available(macOS 26, *)
     private var onGlass: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: ToolbarButtonStyle.segmentInset) {
             ForEach(values, id: \.self) { value in
                 Button {
                     withAnimation(.snappy(duration: 0.3)) { selection = value }
