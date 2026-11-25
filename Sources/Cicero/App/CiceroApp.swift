@@ -49,6 +49,7 @@ struct CiceroApp: App {
                 .onAppear {
                     TextEditingKeys.install()
                     SearchTokenTint.install()
+                    SearchFolding.install()
                     model.start()
                     ApplicationsFolder.checkAtLaunch(model: model)
                     delegate.model = model
