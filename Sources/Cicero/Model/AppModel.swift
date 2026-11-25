@@ -241,7 +241,6 @@ final class AppModel {
     var earlierImportPrompt: EarlierImportPrompt? {
         didSet { showHeldToast() }
     }
-    var mayOfferEarlierImportCopy = false
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
     private(set) var toastUndo: (() -> Void)?
@@ -345,7 +344,6 @@ final class AppModel {
             if store.flush(durably: true) { AppFolderMoves.remove(support: locations.support) }
         }
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = locations.defaultFontLibrary.path }
-        mayOfferEarlierImportCopy = FontExplorerImport.earlierImportLocation(in: data).map { !Self.declinedEarlierImport($0) } ?? false
         if guessesClassifications { classificationGuesses = guesser.guesses }
         refreshTagDots()
         restoreGroups()

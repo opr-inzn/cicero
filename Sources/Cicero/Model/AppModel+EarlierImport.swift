@@ -27,14 +27,13 @@ extension AppModel {
     func offerEarlierImportCopy() {
         guard job == nil, importing == nil,
               let folder = FontExplorerImport.earlierImportLocation(in: data), !Self.declinedEarlierImport(folder)
-        else { return mayOfferEarlierImportCopy = false }
+        else { return }
         let candidates = earlierImportCandidates(in: folder)
-        guard !candidates.isEmpty else { return mayOfferEarlierImportCopy = false }
+        guard !candidates.isEmpty else { return }
         let smartSets = data.smartSets.filter { $0.rules.contains { $0.field == .folder && $0.value == folder.id.uuidString } }.map(\.name)
         let engine = importEngine
         let intoFontLibrary = data.installsIntoFontLibrary
         Task {
-            defer { mayOfferEarlierImportCopy = false }
             let (files, copying) = await Task.detached(priority: .userInitiated) {
                 let existing = candidates.filter { FileManager.default.fileExists(atPath: $0) }
                 let copying = existing.isEmpty ? 0 : engine.copyPlan(existing).toCopy.count

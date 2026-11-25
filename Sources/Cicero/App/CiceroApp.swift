@@ -12,11 +12,6 @@ struct CiceroApp: App {
 
     init() {
         UserDefaults.standard.register(defaults: ["NSUseAnimatedFocusRing": false])
-        #if CICERO_MEASURE
-        Measurements.time("noteLaunch") { WhatsNew.shared.noteLaunch() }
-        #else
-        WhatsNew.shared.noteLaunch()
-        #endif
         let model = AppModel()
         let updates = Updates()
         let promptWatcher = PromptWatcher(model: model)

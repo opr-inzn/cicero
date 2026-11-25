@@ -3,7 +3,6 @@ import SwiftUI
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
     @State private var promptText = ""
     @FocusState private var isSearchFocused: Bool
     @State private var startFocus = StartFocus()
@@ -51,10 +50,6 @@ struct MainWindow: View {
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
         .background { WindowReader { TextEditingKeys.mainWindow = $0 } }
-        .task(id: model.mayOfferEarlierImportCopy || model.earlierImportPrompt != nil) {
-            guard !model.mayOfferEarlierImportCopy, model.earlierImportPrompt == nil, WhatsNew.shared.takePending() else { return }
-            openWindow(id: WindowID.whatsNew)
-        }
         .sheet(item: Binding(get: { model.documentFonts == nil ? model.installPrompt : nil }, set: { model.installPrompt = $0 })) {
             InstallSheet(prompt: $0)
         }
