@@ -15,10 +15,10 @@ struct ProblemsView: View {
             if groups.isEmpty {
                 if model.hasScanned {
                     EmptyState("No Conflicts", systemImage: "checkmark.circle",
-                               description: Text("Fonts installed twice, duplicates, and missing or damaged files show up here."))
+                               description: Text("Fonts installed twice, duplicates, and missing or\ndamaged files show up here."))
                 } else {
                     EmptyState("Checking Fonts…", systemImage: "checkmark.circle",
-                               description: Text("Fonts installed twice, duplicates, and missing or damaged files will show up here."))
+                               description: Text("Fonts installed twice, duplicates, and missing or\ndamaged files will show up here."))
                 }
             } else {
                 ScrollView {

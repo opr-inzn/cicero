@@ -313,7 +313,7 @@ private struct EmptyBrowser: View {
             FolderOutOfReach(folderID: id)
         case .inactive:
             EmptyState("Everything Is Active", systemImage: "checkmark.seal",
-                       description: Text("Every font in your library is active. Add a location to keep more fonts here without activating them.")) {
+                       description: Text("Every font in your library is active. Add a location\nto keep more fonts here without activating them.")) {
                 Button("Add Location") { model.presentAddFolderPanel() }
             }
         case .active:
