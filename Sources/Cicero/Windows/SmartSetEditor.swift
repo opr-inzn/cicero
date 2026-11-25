@@ -10,7 +10,7 @@ struct SmartSetEditor: View {
     @State private var summaryCache = MatchSummaryCache()
 
     private final class MatchSummaryCache {
-        var key: (matchAll: Bool, rules: [SmartRule], fingerprint: Int, revision: Int)?
+        var key: (matchAll: Bool, rules: [SmartRule], fingerprint: Int, revision: Int, coverageRevision: Int, guessRevision: Int)?
         var summary = ""
     }
 
@@ -73,9 +73,10 @@ struct SmartSetEditor: View {
     }
 
     private var matchSummary: String {
-        let key = (draft.matchAll, draft.rules, model.library.fingerprint, model.dataRevision)
+        let key = (draft.matchAll, draft.rules, model.library.fingerprint, model.dataRevision, model.coverageRevision, model.guessRevision)
         if let cached = summaryCache.key, cached.matchAll == key.0, cached.rules == key.1,
-           cached.fingerprint == key.2, cached.revision == key.3 {
+           cached.fingerprint == key.2, cached.revision == key.3,
+           cached.coverageRevision == key.4, cached.guessRevision == key.5 {
             return summaryCache.summary
         }
         let test = model.matcher(for: draft)

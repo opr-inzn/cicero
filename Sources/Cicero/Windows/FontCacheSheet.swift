@@ -28,18 +28,16 @@ private struct FontCacheSheetModifier: ViewModifier {
             }
             .alert("Font Caches Cleared", isPresented: $isOfferingRestart) {
                 Button("Restart Now") {
-                    if !Self.restart() { model.showToast("Couldn’t restart. Choose Apple menu\u{00A0}→\u{00A0}Restart") }
+                    Task {
+                        if await AppleScript.run("tell application \"loginwindow\" to «event aevtrrst»") != nil {
+                            model.showToast("Couldn’t restart. Choose Apple menu\u{00A0}→\u{00A0}Restart")
+                        }
+                    }
                 }
                 Button("Later", role: .cancel) {}
             } message: {
                 Text("Apps that are open keep using the old caches until you restart your Mac.")
             }
-    }
-
-    private static func restart() -> Bool {
-        var error: NSDictionary?
-        _ = NSAppleScript(source: "tell application \"loginwindow\" to «event aevtrrst»")?.executeAndReturnError(&error)
-        return error == nil
     }
 }
 

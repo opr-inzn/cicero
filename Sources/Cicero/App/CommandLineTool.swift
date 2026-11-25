@@ -1,4 +1,5 @@
 import AppKit
+import CiceroCore
 import Observation
 
 enum CommandLineTool {
@@ -132,14 +133,7 @@ enum CommandLineTool {
                 "/bin/mkdir -p \(quoted($0.at.deletingLastPathComponent().path)) && /bin/ln -sfn \(quoted($0.to.path)) \(quoted($0.at.path))"
             }.joined(separator: " && ")
             let source = "do shell script \(literal(script)) with prompt \(literal("Cicero wants to install its CLI in \(prefix.path).")) with administrator privileges"
-            let cancelled = await withCheckedContinuation { continuation in
-                DispatchQueue.global(qos: .userInitiated).async {
-                    var error: NSDictionary?
-                    _ = NSAppleScript(source: source)?.executeAndReturnError(&error)
-                    continuation.resume(returning: error?[NSAppleScript.errorNumber] as? Int == -128)
-                }
-            }
-            if cancelled { return .cancelled }
+            if (await AppleScript.run(source))?.number == -128 { return .cancelled }
         }
         return links.allSatisfy(\.isMade) ? .installed : .failed
     }

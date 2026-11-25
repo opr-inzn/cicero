@@ -164,11 +164,14 @@ public enum AddedDuplicates {
     }
 
     static func isSameFile(_ a: String, _ b: String) -> Bool {
-        let fm = FileManager.default
-        guard let sizeA = (try? fm.attributesOfItem(atPath: a))?[.size] as? Int,
-              let sizeB = (try? fm.attributesOfItem(atPath: b))?[.size] as? Int,
-              sizeA == sizeB
+        var infoA = stat(), infoB = stat()
+        guard stat(a, &infoA) == 0, stat(b, &infoB) == 0,
+              infoA.st_mode & S_IFMT == S_IFREG, infoB.st_mode & S_IFMT == S_IFREG,
+              // A file iCloud has taken off the Mac is never read, which would download it.
+              (infoA.st_flags | infoB.st_flags) & UInt32(SF_DATALESS) == 0,
+              infoA.st_size == infoB.st_size
         else { return false }
-        return fm.contentsEqual(atPath: a, andPath: b)
+        if infoA.st_dev == infoB.st_dev && infoA.st_ino == infoB.st_ino { return true }
+        return FileManager.default.contentsEqual(atPath: a, andPath: b)
     }
 }

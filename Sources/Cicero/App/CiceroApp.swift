@@ -11,6 +11,7 @@ struct CiceroApp: App {
     @State private var menuBarItem: MenuBarItem
 
     init() {
+        UserDefaults.standard.register(defaults: ["NSUseAnimatedFocusRing": false])
         #if CICERO_MEASURE
         Measurements.time("noteLaunch") { WhatsNew.shared.noteLaunch() }
         #else

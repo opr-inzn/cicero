@@ -21,19 +21,8 @@ public enum SystemFontCaches {
         case .allUsers:
             // Run in Cicero, not by osascript, so the password dialog names Cicero.
             let script = "do shell script \"/usr/bin/atsutil databases -remove; /usr/bin/killall fontd || true\" with prompt \"Cicero wants to clear the macOS font caches for all users.\" with administrator privileges"
-            let error: (number: Int?, message: String)? = await withCheckedContinuation { continuation in
-                DispatchQueue.global(qos: .userInitiated).async {
-                    var error: NSDictionary?
-                    guard let compiled = NSAppleScript(source: script) else {
-                        continuation.resume(returning: (nil, "Couldn’t prepare the cache-clearing command."))
-                        return
-                    }
-                    _ = compiled.executeAndReturnError(&error)
-                    continuation.resume(returning: error.map { ($0[NSAppleScript.errorNumber] as? Int, $0[NSAppleScript.errorMessage] as? String ?? "") })
-                }
-            }
-            if let error {
-                throw error.number == -128 ? Failure.cancelled : Failure.failed(error.message)
+            if let error = await AppleScript.run(script) {
+                throw error.number == -128 ? Failure.cancelled : Failure.failed(error.message.isEmpty ? "Couldn’t prepare the cache-clearing command." : error.message)
             }
         }
     }

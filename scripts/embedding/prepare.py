@@ -138,21 +138,35 @@ def tags(root):
     return found
 
 
+TEXT_LICENSE_SUFFIXES = {"", ".txt", ".md", ".rst", ".rtf", ".html", ".htm"}
+
+
+def repo_licensed(repo):
+    for lf in repo.rglob("*"):
+        if not lf.is_file() or lf.suffix.lower() not in TEXT_LICENSE_SUFFIXES:
+            continue
+        if not any(w in lf.name.lower() for w in ("ofl", "license", "licence", "copying")):
+            continue
+        text = lf.read_text(errors="ignore").lower()
+        if any(k in text for k in ("sil open font license", "apache license", "mit license", "ubuntu font licence")):
+            return True
+    return False
+
+
 def extra_families(extra_dir, inspect_bin, known_names, manifest):
     raw = subprocess.check_output([str(inspect_bin), str(extra_dir)], text=True)
     faces = json.loads(raw)
     grouped = {}
+    license_cache = {}
     for face in faces:
         path = Path(face["file"])
         repo = path
         while repo.parent != extra_dir and repo.parent != repo:
             repo = repo.parent
-        lic_ok = any(
-            any(k in lf.read_text(errors="ignore").lower()
-                for k in ("sil open font license", "apache license", "mit license", "ubuntu font licence"))
-            for lf in repo.rglob("*")
-            if lf.is_file() and any(w in lf.name.lower() for w in ("ofl", "license", "licence", "copying"))
-        )
+        lic_ok = license_cache.get(repo)
+        if lic_ok is None:
+            lic_ok = repo_licensed(repo)
+            license_cache[repo] = lic_ok
         if not lic_ok:
             continue
         grouped.setdefault(face["family"], []).append(face)

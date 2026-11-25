@@ -5,7 +5,15 @@ import Foundation
 public struct PDFEmbeddedFont: Sendable {
     public let fontData: Data
     public let glyphMap: [Character: CGGlyph]
+    public let glyphNames: [Character: String]
     public let isCID: Bool
+
+    public init(fontData: Data, glyphMap: [Character: CGGlyph], glyphNames: [Character: String] = [:], isCID: Bool) {
+        self.fontData = fontData
+        self.glyphMap = glyphMap
+        self.glyphNames = glyphNames
+        self.isCID = isCID
+    }
 
     public func makeFont() -> (font: CTFont, glyphMap: ((Character) -> CGGlyph?)?)? {
         guard let provider = CGDataProvider(data: fontData as CFData),
@@ -14,6 +22,10 @@ public struct PDFEmbeddedFont: Sendable {
         let directHits = LetterImages.letters.count { ctFont.glyph(for: $0) != nil }
         if directHits >= LetterImages.fewest { return (ctFont, nil) }
         var combined = glyphMap
+        for (ch, name) in glyphNames where combined[ch] == nil {
+            let g = CTFontGetGlyphWithName(ctFont, name as CFString)
+            if g != 0 { combined[ch] = g }
+        }
         // CFF / Type1C subsets often omit a cmap and ToUnicode, keeping standard PostScript glyph names instead.
         let candidates = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
         for ch in candidates where combined[ch] == nil {
@@ -84,7 +96,8 @@ private struct EmbeddedCollector {
                 return true
             }, nil)
             for (key, candidate) in pairs {
-                if let existing = extracted[key], existing.fontData.count >= candidate.fontData.count && existing.glyphMap.count >= candidate.glyphMap.count {
+                if let existing = extracted[key], existing.fontData.count >= candidate.fontData.count
+                    && (existing.glyphMap.count + existing.glyphNames.count) >= (candidate.glyphMap.count + candidate.glyphNames.count) {
                     continue
                 }
                 extracted[key] = candidate
@@ -141,27 +154,77 @@ private struct EmbeddedCollector {
         }
         guard var fontData = rawData, !fontData.isEmpty else { return nil }
         let widths = isCID ? cidWidths(descriptorOwner) : simpleWidths(font)
+        let cidMapping = isCID ? parseCIDToGID(descriptorOwner) : nil
+        let encodingNames = isCID ? [:] : parseSimpleEncoding(font)
+        var effectiveCIDToGID: [UInt32: CGGlyph]?
+        var cidIsIdentity = false
+        if case .map(let map) = cidMapping {
+            effectiveCIDToGID = map
+        } else if case .identity = cidMapping {
+            cidIsIdentity = true
+        }
         if isBareCFF {
-            guard let wrapped = SFNTWrapper.wrapCFF(fontData, widths: widths) else { return nil }
+            guard let info = SFNTWrapper.cffInfo(fontData) else { return nil }
+            if isCID, effectiveCIDToGID == nil, let cffMap = info.cidToGID {
+                effectiveCIDToGID = cffMap
+                cidIsIdentity = false
+            }
+            let gidWidths: [Int: UInt16]
+            if isCID {
+                if let gidMap = effectiveCIDToGID {
+                    var remapped: [Int: UInt16] = [:]
+                    for (cid, width) in widths {
+                        if cid >= 0, let gid = gidMap[UInt32(cid)], gid != 0 { remapped[Int(gid)] = width }
+                    }
+                    gidWidths = remapped
+                } else if cidIsIdentity {
+                    gidWidths = widths
+                } else {
+                    gidWidths = [:]
+                }
+            } else {
+                gidWidths = [:]
+            }
+            guard var wrapped = SFNTWrapper.wrapCFF(fontData, numGlyphs: info.numGlyphs, widths: gidWidths) else { return nil }
+            if !isCID, !widths.isEmpty,
+               let provider = CGDataProvider(data: wrapped as CFData),
+               let cgFont = CGFont(provider) {
+                let ctFont = CTFontCreateWithGraphicsFont(cgFont, 1000, nil, nil)
+                var remapped: [Int: UInt16] = [:]
+                for (code, width) in widths {
+                    let name = encodingNames[code] ?? standardASCIIName(for: code)
+                    if let name {
+                        let gid = CTFontGetGlyphWithName(ctFont, name as CFString)
+                        if gid != 0 { remapped[Int(gid)] = width }
+                    }
+                }
+                if !remapped.isEmpty, let rewrapped = SFNTWrapper.wrapCFF(fontData, numGlyphs: info.numGlyphs, widths: remapped) {
+                    wrapped = rewrapped
+                }
+            }
             fontData = wrapped
         }
 
         let toUnicode = parseToUnicode(font)
-        let cidToGID = isCID ? parseCIDToGID(descriptorOwner) : nil
         var glyphMap: [Character: CGGlyph] = [:]
-        if !toUnicode.isEmpty {
+        var glyphNames: [Character: String] = [:]
+        if isCID {
             for (code, ch) in toUnicode {
-                if let gidMap = cidToGID {
+                if let gidMap = effectiveCIDToGID {
                     if let gid = gidMap[code], gid != 0 { glyphMap[ch] = gid }
-                } else if code > 0 && code < 65536 {
+                } else if cidIsIdentity, code > 0 && code < 65536 {
                     glyphMap[ch] = CGGlyph(code)
                 }
             }
+        } else {
+            for (_, name) in encodingNames {
+                if let ch = adobeGlyphNameToASCII(name) { glyphNames[ch] = name }
+            }
+            for (code, ch) in toUnicode {
+                if let name = encodingNames[Int(code)] { glyphNames[ch] = name }
+            }
         }
-        if glyphMap.isEmpty && !isCID {
-            glyphMap = parseSimpleEncoding(font)
-        }
-        return (base.lowercased(), PDFEmbeddedFont(fontData: fontData, glyphMap: glyphMap, isCID: isCID))
+        return (base.lowercased(), PDFEmbeddedFont(fontData: fontData, glyphMap: glyphMap, glyphNames: glyphNames, isCID: isCID))
     }
 
     private static func isSFNT(_ data: Data) -> Bool {
@@ -177,7 +240,12 @@ private struct EmbeddedCollector {
         return data.count <= limit ? data : nil
     }
 
-    private static func parseCIDToGID(_ descendant: CGPDFDictionaryRef) -> [UInt32: CGGlyph]? {
+    private enum CIDToGID {
+        case identity
+        case map([UInt32: CGGlyph])
+    }
+
+    private static func parseCIDToGID(_ descendant: CGPDFDictionaryRef) -> CIDToGID? {
         var stream: CGPDFStreamRef?
         if CGPDFDictionaryGetStream(descendant, "CIDToGIDMap", &stream), let stream, let data = copyStream(stream, limit: maxMapBytes) {
             var map: [UInt32: CGGlyph] = [:]
@@ -186,7 +254,15 @@ private struct EmbeddedCollector {
                 let gid = UInt16(data[cid * 2]) << 8 | UInt16(data[cid * 2 + 1])
                 if gid != 0 { map[UInt32(cid)] = gid }
             }
-            return map
+            return .map(map)
+        }
+        var namePtr: UnsafePointer<CChar>?
+        if CGPDFDictionaryGetName(descendant, "CIDToGIDMap", &namePtr), let namePtr, String(cString: namePtr) == "Identity" {
+            return .identity
+        }
+        var subPtr: UnsafePointer<CChar>?
+        if CGPDFDictionaryGetName(descendant, "Subtype", &subPtr), let subPtr, String(cString: subPtr) == "CIDFontType2" {
+            return .identity
         }
         return nil
     }
@@ -217,7 +293,8 @@ private struct EmbeddedCollector {
                     let head = hexTokens(String(s[..<bracket]))
                     let tail = hexTokens(String(s[bracket...]))
                     guard head.count >= 2, let lo = UInt32(head[0], radix: 16), let hi = UInt32(head[1], radix: 16), hi >= lo, hi - lo < 512 else { continue }
-                    for (offset, hex) in tail.enumerated() where lo + UInt32(offset) <= hi {
+                    let limit = Int(hi - lo) + 1
+                    for (offset, hex) in tail.prefix(limit).enumerated() {
                         if let ch = unicodeChar(fromHex: hex) { map[lo + UInt32(offset)] = ch }
                     }
                 } else {
@@ -227,7 +304,8 @@ private struct EmbeddedCollector {
                         if let lo = UInt32(hexes[i], radix: 16), let hi = UInt32(hexes[i + 1], radix: 16),
                            let dst = UInt32(hexes[i + 2], radix: 16), hi >= lo, hi - lo < 512 {
                             for offset in 0...(hi - lo) {
-                                if let scalar = UnicodeScalar(dst + offset) { map[lo + offset] = Character(scalar) }
+                                let (codePoint, overflow) = dst.addingReportingOverflow(offset)
+                                if !overflow, let scalar = UnicodeScalar(codePoint) { map[lo + offset] = Character(scalar) }
                             }
                         }
                         i += 3
@@ -259,11 +337,11 @@ private struct EmbeddedCollector {
         return Character(scalar)
     }
 
-    private static func parseSimpleEncoding(_ font: CGPDFDictionaryRef) -> [Character: CGGlyph] {
+    private static func parseSimpleEncoding(_ font: CGPDFDictionaryRef) -> [Int: String] {
         var enc: CGPDFDictionaryRef?, diffs: CGPDFArrayRef?
         guard CGPDFDictionaryGetDictionary(font, "Encoding", &enc), let enc,
               CGPDFDictionaryGetArray(enc, "Differences", &diffs), let diffs else { return [:] }
-        var map: [Character: CGGlyph] = [:]
+        var map: [Int: String] = [:]
         var code = 0
         for index in 0..<CGPDFArrayGetCount(diffs) {
             var num: CGPDFInteger = 0
@@ -272,13 +350,24 @@ private struct EmbeddedCollector {
                 code = Int(num)
             } else if CGPDFArrayGetName(diffs, index, &namePtr), let namePtr {
                 let name = String(cString: namePtr)
-                if let ch = adobeGlyphNameToASCII(name), code > 0 && code < 65536 {
-                    map[ch] = CGGlyph(code)
+                if code >= 0 && code <= 65535 {
+                    map[code] = name
                 }
-                code += 1
+                if code < 65536 { code += 1 }
             }
         }
         return map
+    }
+
+    private static func standardASCIIName(for code: Int) -> String? {
+        guard code >= 0x30 && code <= 0x7A, let scalar = UnicodeScalar(code) else { return nil }
+        let ch = Character(scalar)
+        if ch.isASCII && ch.isLetter { return String(ch) }
+        switch ch {
+        case "0": return "zero"; case "1": return "one"; case "2": return "two"; case "3": return "three"; case "4": return "four"
+        case "5": return "five"; case "6": return "six"; case "7": return "seven"; case "8": return "eight"; case "9": return "nine"
+        default: return nil
+        }
     }
 
     private static func adobeGlyphNameToASCII(_ name: String) -> Character? {
@@ -288,6 +377,11 @@ private struct EmbeddedCollector {
         case "five": return "5"; case "six": return "6"; case "seven": return "7"; case "eight": return "8"; case "nine": return "9"
         default: return nil
         }
+    }
+
+    private static func clampedWidth(_ value: CGPDFReal) -> UInt16? {
+        guard value.isFinite else { return nil }
+        return UInt16(min(65535.0, max(0.0, value.rounded())))
     }
 
     private static func cidWidths(_ descendant: CGPDFDictionaryRef) -> [Int: UInt16] {
@@ -303,16 +397,19 @@ private struct EmbeddedCollector {
             var endCID: CGPDFInteger = 0
             var widthVal: CGPDFReal = 0
             if CGPDFArrayGetArray(wArray, i + 1, &nested), let nested {
-                for j in 0..<CGPDFArrayGetCount(nested) {
-                    var w: CGPDFReal = 0
-                    if CGPDFArrayGetNumber(nested, j, &w) {
-                        widths[Int(startCID) + j] = UInt16(max(0, min(65535, Int(w.rounded()))))
+                if startCID >= 0, startCID <= 65535 {
+                    for j in 0..<CGPDFArrayGetCount(nested) {
+                        let (cid, overflow) = Int(startCID).addingReportingOverflow(j)
+                        guard !overflow, cid <= 65535 else { break }
+                        var w: CGPDFReal = 0
+                        if CGPDFArrayGetNumber(nested, j, &w), let clamped = clampedWidth(w) {
+                            widths[cid] = clamped
+                        }
                     }
                 }
                 i += 2
             } else if i + 2 < count, CGPDFArrayGetInteger(wArray, i + 1, &endCID), CGPDFArrayGetNumber(wArray, i + 2, &widthVal) {
-                let clamped = UInt16(max(0, min(65535, Int(widthVal.rounded()))))
-                if endCID >= startCID && endCID - startCID < 4096 {
+                if startCID >= 0, endCID >= startCID, endCID <= 65535, endCID - startCID < 4096, let clamped = clampedWidth(widthVal) {
                     for cid in startCID...endCID { widths[Int(cid)] = clamped }
                 }
                 i += 3
@@ -328,11 +425,14 @@ private struct EmbeddedCollector {
         var firstChar: CGPDFInteger = 0
         var wArray: CGPDFArrayRef?
         guard CGPDFDictionaryGetInteger(font, "FirstChar", &firstChar),
+              firstChar >= 0, firstChar <= 65535,
               CGPDFDictionaryGetArray(font, "Widths", &wArray), let wArray else { return widths }
         for j in 0..<CGPDFArrayGetCount(wArray) {
+            let (code, overflow) = Int(firstChar).addingReportingOverflow(j)
+            guard !overflow, code <= 65535 else { break }
             var w: CGPDFReal = 0
-            if CGPDFArrayGetNumber(wArray, j, &w) {
-                widths[Int(firstChar) + j] = UInt16(max(0, min(65535, Int(w.rounded()))))
+            if CGPDFArrayGetNumber(wArray, j, &w), let clamped = clampedWidth(w) {
+                widths[code] = clamped
             }
         }
         return widths
@@ -340,9 +440,14 @@ private struct EmbeddedCollector {
 }
 
 private enum SFNTWrapper {
+    struct CFFInfo {
+        let numGlyphs: Int
+        let cidToGID: [UInt32: CGGlyph]?
+    }
+
     // CoreGraphics CGFont requires an OpenType SFNT container around bare PDF FontFile3 CFF streams.
-    static func wrapCFF(_ cff: Data, widths: [Int: UInt16]) -> Data? {
-        guard let numGlyphs = cffGlyphCount(cff), numGlyphs > 0 else { return nil }
+    static func wrapCFF(_ cff: Data, numGlyphs: Int, widths: [Int: UInt16]) -> Data? {
+        guard numGlyphs > 0, numGlyphs <= Int(UInt16.max) else { return nil }
         var head = Data(repeating: 0, count: 54)
         writeU32(&head, 0, 0x0001_0000)
         writeU32(&head, 12, 0x5F0F_3CF5)
@@ -390,7 +495,7 @@ private enum SFNTWrapper {
         return out
     }
 
-    private static func cffGlyphCount(_ cff: Data) -> Int? {
+    static func cffInfo(_ cff: Data) -> CFFInfo? {
         guard cff.count >= 4 else { return nil }
         var pos = Int(cff[2])
         func skipIndex() -> Bool {
@@ -407,6 +512,7 @@ private enum SFNTWrapper {
             var last = 0
             let lastStart = pos + count * offSize
             for i in 0..<offSize { last = (last << 8) | Int(cff[lastStart + i]) }
+            guard last >= 1 else { return false }
             pos = offsetsEnd + last - 1
             return pos <= cff.count
         }
@@ -420,12 +526,17 @@ private enum SFNTWrapper {
         func readOff(_ at: Int) -> Int {
             var v = 0; for i in 0..<offSize { v = (v << 8) | Int(cff[at + i]) }; return v
         }
-        let dStart = pos + (dictCount + 1) * offSize + readOff(pos) - 1
-        let dEnd = pos + (dictCount + 1) * offSize + readOff(pos + offSize) - 1
+        let firstOff = readOff(pos)
+        let secondOff = readOff(pos + offSize)
+        guard firstOff >= 1, secondOff >= firstOff else { return nil }
+        let dStart = pos + (dictCount + 1) * offSize + firstOff - 1
+        let dEnd = pos + (dictCount + 1) * offSize + secondOff - 1
         guard dStart >= 0, dEnd <= cff.count, dStart < dEnd else { return nil }
         var stack: [Int] = []
         var p = dStart
         var charStringsOffset: Int?
+        var charsetOffset: Int?
+        var hasROS = false
         while p < dEnd {
             let b0 = Int(cff[p]); p += 1
             if b0 == 28, p + 2 <= dEnd {
@@ -444,14 +555,60 @@ private enum SFNTWrapper {
                 while p < dEnd { let nb = cff[p]; p += 1; if (nb & 0xF) == 0xF || (nb >> 4) == 0xF { break } }
                 stack.append(0)
             } else if b0 == 12, p < dEnd {
-                p += 1; stack.removeAll()
+                let b1 = Int(cff[p]); p += 1
+                if b1 == 30 { hasROS = true }
+                stack.removeAll()
             } else {
-                if b0 == 17, let off = stack.last { charStringsOffset = off; break }
+                if b0 == 15, let off = stack.last { charsetOffset = off }
+                if b0 == 17, let off = stack.last { charStringsOffset = off }
                 stack.removeAll()
             }
         }
         guard let csOff = charStringsOffset, csOff >= 0, csOff + 2 <= cff.count else { return nil }
-        return Int(cff[csOff]) << 8 | Int(cff[csOff + 1])
+        let numGlyphs = Int(cff[csOff]) << 8 | Int(cff[csOff + 1])
+        guard numGlyphs > 0 else { return nil }
+        let cidToGID = hasROS ? parseCIDCharset(cff, offset: charsetOffset, numGlyphs: numGlyphs) : nil
+        return CFFInfo(numGlyphs: numGlyphs, cidToGID: cidToGID)
+    }
+
+    private static func parseCIDCharset(_ cff: Data, offset: Int?, numGlyphs: Int) -> [UInt32: CGGlyph]? {
+        guard let offset, offset > 2, offset < cff.count else { return nil }
+        let format = cff[offset]
+        var p = offset + 1
+        var gid = 1
+        var map: [UInt32: CGGlyph] = [:]
+        switch format {
+        case 0:
+            while gid < numGlyphs, p + 2 <= cff.count {
+                let cid = UInt32(cff[p]) << 8 | UInt32(cff[p + 1])
+                map[cid] = CGGlyph(gid)
+                p += 2
+                gid += 1
+            }
+        case 1:
+            while gid < numGlyphs, p + 3 <= cff.count {
+                let first = UInt32(cff[p]) << 8 | UInt32(cff[p + 1])
+                let nLeft = Int(cff[p + 2])
+                p += 3
+                for k in 0...nLeft where gid < numGlyphs {
+                    map[first + UInt32(k)] = CGGlyph(gid)
+                    gid += 1
+                }
+            }
+        case 2:
+            while gid < numGlyphs, p + 4 <= cff.count {
+                let first = UInt32(cff[p]) << 8 | UInt32(cff[p + 1])
+                let nLeft = Int(cff[p + 2]) << 8 | Int(cff[p + 3])
+                p += 4
+                for k in 0...nLeft where gid < numGlyphs {
+                    map[first + UInt32(k)] = CGGlyph(gid)
+                    gid += 1
+                }
+            }
+        default:
+            return nil
+        }
+        return map.isEmpty ? nil : map
     }
 
     private static func checksum(_ data: Data) -> UInt32 {

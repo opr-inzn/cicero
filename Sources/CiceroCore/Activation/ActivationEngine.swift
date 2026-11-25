@@ -1116,14 +1116,17 @@ public struct ActivationEngine: Sendable {
         var reserved = Set<String>()
         var plan: [(origin: String, destination: URL)] = []
         for path in paths {
-            var destination = Self.uniqueURL(for: Self.url(path).lastPathComponent, in: inactive)
-            while reserved.contains(destination.path) {
-                let stem = destination.deletingPathExtension().lastPathComponent
-                let ext = destination.pathExtension
-                let next = ext.isEmpty ? "\(stem) 2" : "\(stem) 2.\(ext)"
+            let name = Self.url(path).lastPathComponent
+            var destination = Self.uniqueURL(for: name, in: inactive)
+            let stem = (name as NSString).deletingPathExtension
+            let ext = (name as NSString).pathExtension
+            var number = 2
+            while reserved.contains(destination.path.lowercased()) {
+                let next = ext.isEmpty ? "\(stem) \(number)" : "\(stem) \(number).\(ext)"
                 destination = Self.uniqueURL(for: next, in: inactive)
+                number += 1
             }
-            reserved.insert(destination.path)
+            reserved.insert(destination.path.lowercased())
             plan.append((origin: path, destination: destination))
         }
         do {

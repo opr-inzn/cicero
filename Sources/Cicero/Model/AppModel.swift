@@ -54,6 +54,7 @@ final class AppModel {
     }
     @ObservationIgnored private var storedLibrary = Library.empty
     @ObservationIgnored private var restoring: SavedLibraryRead?
+    @ObservationIgnored private var rebuildScanID: Int?
     private(set) var hasScanned = false
     private(set) var scanProgress: ScanProgress?
     private(set) var problems: [Problem] = []
@@ -652,13 +653,19 @@ final class AppModel {
     func rebuildFontList() {
         coverageTask?.cancel()
         measurementTask?.cancel()
+        coverageRun &+= 1
+        measurementRun &+= 1
         coverageProgress = nil
         measurementProgress = nil
         scanner.clearCache()
         coverage.clearCache()
         measurements.clearCache()
+        coverageRevision &+= 1
+        measurementRevision &+= 1
+        letterGuesses = [:]
+        guessRevision &+= 1
         SampleWidths.shared.clearSaved()
-        rescan()
+        rebuildScanID = rescan()
     }
 
     private func apply(_ new: Library, scan id: Int) {
@@ -669,11 +676,13 @@ final class AppModel {
         defer { measuring.end(detail: "\(library.families.count) families") }
         #endif
         let first = !hasScanned
+        let rebuilding = rebuildScanID.map { id >= $0 } ?? false
         hasScanned = true
+        if rebuilding { rebuildScanID = nil }
         defer { guessClassifications() }
         // Looking for gone added files every time touches their folder, which may be one macOS asks about, like Downloads.
         if !store.isReadOnly, !new.goneFiles.isEmpty || !data.missingFontFiles.isEmpty { data.noteGoneFiles(new.goneFiles) }
-        guard first || new.fingerprint != library.fingerprint else { return endScan(id) }
+        guard first || rebuilding || new.fingerprint != library.fingerprint else { return endScan(id) }
         let previousFaces = first ? [] : library.families.map(\.regular.face.id)
         let previousMeasured = first ? [] : measurements.measuredFaceIDs(of: library.families)
         let known = Set(library.families.lazy.flatMap(\.faces).map(\.face.path))
@@ -695,7 +704,7 @@ final class AppModel {
         pageContents.forget(paths: new.changedPaths)
         scanner.tookChanges(new.changedPaths)
         FontLoader.shared.prefetch(visibleFamilies.prefix(Self.readAheadFirst).map(\.regular.face))
-        if first || !new.changedPaths.isEmpty || previousFaces != new.families.map(\.regular.face.id) {
+        if first || rebuilding || !new.changedPaths.isEmpty || previousFaces != new.families.map(\.regular.face.id) {
             updateCoverage()
         } else if previousMeasured != measurements.measuredFaceIDs(of: new.families) {
             updateMeasurements()

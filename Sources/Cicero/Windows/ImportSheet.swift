@@ -52,6 +52,10 @@ struct ImportSheet: View {
         .interactiveDismissDisabled(stage != nil)
         .onAppear { appIsOpen = isAppRunning }
         .onDisappear { rereading?.cancel() }
+        .onChange(of: prompt.id) {
+            copies = nil
+            candidates = []
+        }
         .task(id: "\(prompt.id) \(model.data.installsIntoFontLibrary)") { await findCopies() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
             if isOtherApp(note), stage == nil, summary == nil { appIsOpen = isAppRunning }
@@ -143,7 +147,7 @@ struct ImportSheet: View {
     private var sections: some View {
         if library.fontFolder != nil || !library.otherFiles.isEmpty {
             section("Fonts") {
-                Text(toCopy.isEmpty ? "They’re in your library already. \(appName)’s own files stay where they are."
+                Text(copies != nil && toCopy.isEmpty ? "They’re in your library already. \(appName)’s own files stay where they are."
                     : "They’re copied into \(model.installPlace). \(appName)’s own files stay where they are.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -248,7 +252,7 @@ struct ImportSheet: View {
             } else if isRereading {
                 ProgressView().controlSize(.small)
                 Text("Reading \(appName)’s library…").font(.callout).foregroundStyle(.secondary)
-            } else if isLooking, !candidates.isEmpty {
+            } else if isLooking, library.fontFolder != nil || !library.otherFiles.isEmpty {
                 ProgressView().controlSize(.small)
                 Text("Checking for fonts already in your library…").font(.callout).foregroundStyle(.secondary)
             } else {
@@ -265,7 +269,7 @@ struct ImportSheet: View {
             .disabled(stage.map { !$0.canStop } ?? false)
             Button("Import") { start() }
                 .keyboardShortcut(.defaultAction)
-                .disabled(stage != nil || !hasChoice || isWaiting)
+                .disabled(stage != nil || !hasChoice || isWaiting || (isLooking && (library.fontFolder != nil || !library.otherFiles.isEmpty)))
         }
         .padding(16)
     }
@@ -349,7 +353,7 @@ struct ImportSheet: View {
     private var activateDetail: String {
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
         let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first so they aren’t active twice."
-        return "\(count(library.active.count, "style")), \(toCopy.isEmpty ? "activated" : "activated once they’re copied")." + office + quit
+        return "\(count(library.active.count, "style")), \(copies != nil && toCopy.isEmpty ? "activated" : "activated once they’re copied")." + office + quit
     }
 
     private var copyingCount: Int {
@@ -412,6 +416,7 @@ struct ImportSheet: View {
     }
 
     private func alreadyNote(total: Int, copying: Int, same: Int) -> String {
+        guard copies != nil else { return "" }
         let inAlready = total - copying - same
         if copying + same == 0, total > 0 { return ", in your library already" }
         var parts: [String] = []

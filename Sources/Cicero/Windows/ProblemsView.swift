@@ -4,7 +4,7 @@ import SwiftUI
 struct ProblemsView: View {
     @Environment(AppModel.self) private var model
     @State private var width: CGFloat = 0
-    @State private var marks: [String: Set<String>] = [:]
+    @State private var marks: [String: Bool] = [:]
 
     var body: some View {
         let groups = ProblemKind.allCases.compactMap { kind -> (kind: ProblemKind, problems: [Problem])? in
@@ -94,11 +94,23 @@ private struct ProblemGroup: View {
     }
 }
 
-private extension Problem {
-    func marked(_ marks: [String: Set<String>]) -> Set<String> {
-        guard let chosen = marks[id] else { return Set(extraCopies) }
-        let valid = chosen.intersection(trashable)
-        return copyGroups.contains { $0.allSatisfy(valid.contains) } ? Set(extraCopies) : valid
+private enum DuplicateSelection {
+    static func marked(in problems: [Problem], overrides: [String: Bool]) -> Set<String> {
+        let trashable = problems.reduce(into: Set<String>()) { $0.formUnion($1.trashable) }
+        let defaults = problems.reduce(into: Set<String>()) { $0.formUnion($1.extraCopies) }
+        var result = Set<String>()
+        for problem in problems {
+            for file in problem.files where trashable.contains(file.path) {
+                if overrides[file.path] ?? defaults.contains(file.path) {
+                    result.insert(file.path)
+                }
+            }
+        }
+        for group in problems.flatMap(\.copyGroups) where !group.isEmpty && group.allSatisfy(result.contains) {
+            let keep = group.first { !defaults.contains($0) } ?? group[0]
+            result.remove(keep)
+        }
+        return result
     }
 }
 
@@ -110,9 +122,10 @@ private enum DuplicateColumn {
 
 private struct DuplicatesSection: View {
     let problems: [Problem]
-    @Binding var marks: [String: Set<String>]
+    @Binding var marks: [String: Bool]
 
     var body: some View {
+        let marked = DuplicateSelection.marked(in: problems, overrides: marks)
         VStack(alignment: .leading, spacing: 12) {
             Text(ProblemKind.duplicates.title).font(.title2.bold())
             Text(ProblemKind.duplicates.explanation).foregroundStyle(.secondary)
@@ -133,7 +146,6 @@ private struct DuplicatesSection: View {
                 .frame(height: 28)
                 .overlay(alignment: .bottom) { Divider() }
                 ForEach(problems) { problem in
-                    let marked = problem.marked(marks)
                     HStack(spacing: 6) {
                         Text(problem.title).fontWeight(.semibold)
                         Text(problem.files.count == 1 ? "1 file" : "\(problem.files.count.plain) files").foregroundStyle(.secondary)
@@ -142,7 +154,7 @@ private struct DuplicatesSection: View {
                     .padding(.top, 14)
                     .padding(.bottom, 5)
                     ForEach(Array(problem.files.enumerated()), id: \.element.path) { index, file in
-                        DuplicateRow(file: file, problem: problem, marked: marked, isStriped: !index.isMultiple(of: 2), marks: $marks)
+                        DuplicateRow(file: file, problem: problem, problems: problems, marked: marked, isStriped: !index.isMultiple(of: 2), marks: $marks)
                     }
                 }
             }
@@ -160,9 +172,10 @@ private struct DuplicateRow: View {
     @Environment(AppModel.self) private var model
     let file: ProblemFile
     let problem: Problem
+    let problems: [Problem]
     let marked: Set<String>
     let isStriped: Bool
-    @Binding var marks: [String: Set<String>]
+    @Binding var marks: [String: Bool]
 
     var body: some View {
         let isMarked = marked.contains(file.path)
@@ -201,39 +214,44 @@ private struct DuplicateRow: View {
     }
 
     private func toggle(_ isOn: Bool) {
-        var set = marked
         guard isOn else {
-            set.remove(file.path)
-            marks[problem.id] = set
+            marks[file.path] = false
             return
         }
+        var set = marked
         set.insert(file.path)
-        for group in problem.copyGroups where group.contains(file.path) && group.allSatisfy(set.contains) {
-            if let other = group.first(where: { $0 != file.path }) { set.remove(other) }
+        marks[file.path] = true
+        for group in problems.flatMap(\.copyGroups) where group.contains(file.path) && group.allSatisfy(set.contains) {
+            if let other = group.first(where: { $0 != file.path }) {
+                set.remove(other)
+                marks[other] = false
+            }
         }
-        marks[problem.id] = set
     }
 }
 
 private struct DuplicatesBar: View {
     @Environment(AppModel.self) private var model
     let problems: [Problem]
-    @Binding var marks: [String: Set<String>]
+    @Binding var marks: [String: Bool]
 
     var body: some View {
-        let paths = problems.flatMap { $0.marked(marks).sorted() }
+        let marked = DuplicateSelection.marked(in: problems, overrides: marks)
+        let paths = marked.sorted()
         HStack(spacing: 12) {
             Text(paths.isEmpty ? "No duplicates selected."
                 : paths.count == 1 ? "1 duplicate file will go to the Trash." : "\(paths.count.plain) duplicate files will go to the Trash.")
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
             if !paths.isEmpty {
-                Button("Deselect All") { marks = Dictionary(uniqueKeysWithValues: problems.map { ($0.id, []) }) }
+                Button("Deselect All") {
+                    marks = Dictionary(problems.flatMap(\.files).map { ($0.path, false) }, uniquingKeysWith: { first, _ in first })
+                }
             } else if problems.contains(where: { !$0.extraCopies.isEmpty }) {
                 Button("Select Extra Copies") { marks = [:] }
             }
             Button(paths.isEmpty ? "Move to Trash" : paths.count == 1 ? "Move 1 File to Trash" : "Move \(paths.count.plain) Files to Trash") {
-                model.trashExtraCopies(of: problems.filter { !$0.marked(marks).isEmpty }, paths: paths)
+                model.trashExtraCopies(of: problems.filter { $0.files.contains { marked.contains($0.path) } }, paths: paths)
             }
             .buttonStyle(.borderedProminent)
             .disabled(paths.isEmpty)

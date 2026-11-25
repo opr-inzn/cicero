@@ -46,6 +46,7 @@ struct SidebarView: View {
         pace.last = now
         pace.commit?.cancel()
         let items = model.sidebarSelection(items, from: pendingSelection ?? model.selectedItems)
+        highlight.selected = items
         guard !resting else {
             pendingSelection = nil
             return model.selectSidebarItems(items)
@@ -206,7 +207,7 @@ private struct SidebarContent: View {
         }
         .padding(.trailing, 10)
         // Behind a header inside the list, so the outline view is among its superviews.
-        .background(OutlineViewSetup(drag: drag, highlight: highlight, isPageOpen: { [model] in model.openFamilyID != nil }, reselect: { [model] in if model.openFamilyID != nil { model.openFamilyID = nil } else { model.scrollsToTop += 1 } }) { [model] in model.dragOutOfSidebar($0) })
+        .background(OutlineViewSetup(drag: drag, highlight: highlight, isPageOpen: { [model] in model.openFamilyID != nil }, isEditing: { [model] in model.isEditingSidebar }, reselect: { [model] in if model.openFamilyID != nil { model.openFamilyID = nil } else { model.scrollsToTop += 1 } }) { [model] in model.dragOutOfSidebar($0) })
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -583,12 +584,17 @@ private struct SidebarRenameField: View {
     @Environment(AppModel.self) private var model
     let row: SidebarRow
     let highlight: SidebarHighlight
-    @State private var name = ""
+    @State private var name: String
+
+    init(row: SidebarRow, highlight: SidebarHighlight) {
+        self.row = row
+        self.highlight = highlight
+        _name = State(initialValue: row.title)
+    }
 
     var body: some View {
         RenameTextField(text: $name, onCommit: commit, onCancel: { highlight.renaming = nil })
             .frame(maxWidth: .infinity, alignment: .leading)
-            .onAppear { name = row.title }
     }
 
     private func commit() {
@@ -709,7 +715,8 @@ private struct SidebarRowBackground: View {
             UnevenRoundedRectangle(topLeadingRadius: joinsAbove ? 0 : 8, bottomLeadingRadius: joinsBelow ? 0 : 8,
                                    bottomTrailingRadius: joinsBelow ? 0 : 8, topTrailingRadius: joinsAbove ? 0 : 8,
                                    style: .continuous)
-                .fill(.quaternary)
+                // Not .quaternary, which turns white on a selected row once a text field inside the sidebar takes focus.
+                .fill(Color.sidebarSelection)
                 .overlay(alignment: .top) {
                     if joinsAbove {
                         Rectangle().fill(Color.selectionSeparator).frame(height: 1).padding(.horizontal, 10)
@@ -829,12 +836,13 @@ private struct OutlineViewSetup: NSViewRepresentable {
     let drag: SidebarDrag
     let highlight: SidebarHighlight
     let isPageOpen: () -> Bool
+    let isEditing: () -> Bool
     let reselect: () -> Void
     let hide: ([SidebarRow]) -> Void
 
     func makeNSView(context: Context) -> NSView {
         drag.hide = hide
-        return Marker(drag: drag, highlight: highlight, isPageOpen: isPageOpen, reselect: reselect)
+        return Marker(drag: drag, highlight: highlight, isPageOpen: isPageOpen, isEditing: isEditing, reselect: reselect)
     }
 
     func updateNSView(_ nsView: NSView, context: Context) { drag.hide = hide }
@@ -843,13 +851,14 @@ private struct OutlineViewSetup: NSViewRepresentable {
         let drag: SidebarDrag
         let highlight: SidebarHighlight
         let isPageOpen: () -> Bool
+        let isEditing: () -> Bool
         let reselect: () -> Void
-        private weak var hookedOutline: NSOutlineView?
 
-        init(drag: SidebarDrag, highlight: SidebarHighlight, isPageOpen: @escaping () -> Bool, reselect: @escaping () -> Void) {
+        init(drag: SidebarDrag, highlight: SidebarHighlight, isPageOpen: @escaping () -> Bool, isEditing: @escaping () -> Bool, reselect: @escaping () -> Void) {
             self.drag = drag
             self.highlight = highlight
             self.isPageOpen = isPageOpen
+            self.isEditing = isEditing
             self.reselect = reselect
             super.init(frame: .zero)
         }
@@ -867,14 +876,7 @@ private struct OutlineViewSetup: NSViewRepresentable {
             outline.refusesFirstResponder = true
             // Without the answers, a row dragged out of the list stops Cicero.
             if SidebarDataSource.answer(for: outline, drag: drag) { outline.draggingDestinationFeedbackStyle = .gap }
-            if hookedOutline !== outline {
-                hookedOutline = outline
-                // On the outline view instead of SwiftUI's TapGesture(count: 2) on rows, which blocks single-click selection.
-                let doubleClick = NSClickGestureRecognizer(target: self, action: #selector(handleDoubleClick(_:)))
-                doubleClick.numberOfClicksRequired = 2
-                doubleClick.delaysPrimaryMouseButtonEvents = false
-                outline.addGestureRecognizer(doubleClick)
-            }
+            SidebarDoubleClick.install(on: outline, highlight: highlight, isEditing: isEditing)
             // A click on the row already selected doesn't reach the list's selection at all.
             if !outline.gestureRecognizers.contains(where: { $0 is ReselectClick }) {
                 let click = ReselectClick()
@@ -885,14 +887,64 @@ private struct OutlineViewSetup: NSViewRepresentable {
             }
             SidebarDrag.prepare(in: outline)
         }
+    }
+}
 
-        @objc private func handleDoubleClick(_ recognizer: NSClickGestureRecognizer) {
-            guard let outline = recognizer.view as? NSOutlineView else { return }
-            let row = outline.row(at: recognizer.location(in: outline))
-            guard row >= 0, let item = outline.item(atRow: row),
-                  outline.delegate?.outlineView?(outline, isGroupItem: item) != true,
-                  highlight.selected.count == 1, let selected = highlight.selected.first, selected.isRenamable else { return }
-            highlight.renaming = selected
+private final class SidebarDoubleClick {
+    private static let key = UnsafeMutableRawPointer.allocate(byteCount: 1, alignment: 1)
+    private weak var outline: NSOutlineView?
+    private nonisolated(unsafe) var monitor: Any?
+    var highlight: SidebarHighlight?
+    var isEditing: () -> Bool = { false }
+
+    static func install(on outline: NSOutlineView, highlight: SidebarHighlight, isEditing: @escaping () -> Bool) {
+        let handler = (objc_getAssociatedObject(outline, key) as? SidebarDoubleClick) ?? {
+            let created = SidebarDoubleClick(outline: outline)
+            objc_setAssociatedObject(outline, key, created, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            return created
+        }()
+        handler.highlight = highlight
+        handler.isEditing = isEditing
+    }
+
+    private init(outline: NSOutlineView) {
+        self.outline = outline
+        // Local monitor instead of NSClickGestureRecognizer: NSOutlineView keeps mouseUp in its tracking loop, and trackpads follow mouseUp with pressure events.
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            self?.handle(event)
+            return event
+        }
+    }
+
+    deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+    }
+
+    private func handle(_ event: NSEvent) {
+        guard event.clickCount == 2, !isEditing(),
+              let outline, let window = outline.window, event.window === window, window.isKeyWindow,
+              event.modifierFlags.isDisjoint(with: [.command, .shift, .control, .option]) else { return }
+        let point = outline.convert(event.locationInWindow, from: nil)
+        guard outline.visibleRect.contains(point) else { return }
+        if let superview = outline.superview,
+           let hit = outline.hitTest(superview.convert(event.locationInWindow, from: nil)),
+           hit is NSButton || hit is NSTextView {
+            return
+        }
+        let row = outline.row(at: point)
+        guard row >= 0, let item = outline.item(atRow: row),
+              outline.delegate?.outlineView?(outline, isGroupItem: item) != true else { return }
+        let start = NSEvent.mouseLocation
+        RunLoop.main.perform(inModes: [.default]) { [weak self, weak outline] in
+            MainActor.assumeIsolated {
+                guard let self, let outline, !self.isEditing(), outline.window?.isKeyWindow == true,
+                      hypot(NSEvent.mouseLocation.x - start.x, NSEvent.mouseLocation.y - start.y) < 6,
+                      outline.selectedRowIndexes == IndexSet(integer: row),
+                      let highlight = self.highlight, highlight.renaming == nil,
+                      highlight.selected.count == 1, let selected = highlight.selected.first, selected.isRenamable
+                else { return }
+                highlight.renaming = selected
+            }
         }
     }
 }
@@ -905,7 +957,7 @@ private final class ReselectClick: NSClickGestureRecognizer {
         super.mouseDown(with: event)
         // Never recognized, so it can't hold back the double click that renames.
         state = .failed
-        guard let outline = view as? NSOutlineView, outline.window?.isKeyWindow == true, isReselectable(),
+        guard event.clickCount == 1, let outline = view as? NSOutlineView, outline.window?.isKeyWindow == true, isReselectable(),
               event.modifierFlags.isDisjoint(with: [.command, .shift, .control, .option]) else { return }
         let row = outline.row(at: outline.convert(event.locationInWindow, from: nil))
         guard row >= 0, outline.selectedRowIndexes == IndexSet(integer: row) else { return }
@@ -1139,15 +1191,24 @@ private enum SidebarDataSource {
             let appKit = unsafeBitCast(method_getImplementation(inherited), to: OutlineCellFrame.self)
             let frame: @convention(block) (NSOutlineView, Int) -> NSRect = { outline, row in
                 // An empty frame keeps AppKit from making the section header's hover chevron, which would cover the header's +.
-                if let item = outline.item(atRow: row), outline.delegate?.outlineView?(outline, isGroupItem: item) == true { return .zero }
+                if sidebarDrag(of: outline) != nil, let item = outline.item(atRow: row), outline.delegate?.outlineView?(outline, isGroupItem: item) == true { return .zero }
                 return appKit(outline, selector, row)
             }
             replace(type, selector, method: inherited, with: imp_implementationWithBlock(frame))
             hidingDisclosure.insert(ObjectIdentifier(type))
         }
-        // AppKit made the chevron, hidden, when it added the header rows, before this ran, and on hover only shows it again.
-        outline.enumerateAvailableRowViews { rowView, _ in
-            for button in rowView.subviews where button.identifier == NSOutlineView.showHideButtonIdentifier { button.removeFromSuperview() }
+        // AppKit made the chevron before this ran and keeps a pointer to it: removing it ourselves crashes when AppKit recycles it, so let AppKit drop it on a layout pass.
+        DispatchQueue.main.async { [weak outline] in
+            guard let outline else { return }
+            var rows = IndexSet()
+            outline.enumerateAvailableRowViews { rowView, row in
+                if rowView.subviews.contains(where: { $0.identifier == NSOutlineView.showHideButtonIdentifier }) { rows.insert(row) }
+            }
+            guard !rows.isEmpty else { return }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                outline.noteHeightOfRows(withIndexesChanged: rows)
+            }
         }
     }
 

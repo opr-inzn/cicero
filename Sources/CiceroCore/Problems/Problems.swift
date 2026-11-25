@@ -570,7 +570,7 @@ public enum ProblemDetector {
     private static func identicalGroups(_ paths: [String]) -> [[String]] {
         var groups: [[String]] = []
         for path in paths {
-            if let index = groups.firstIndex(where: { AddedDuplicates.isSameFile($0[0], path) }) {
+            if let index = groups.firstIndex(where: { ActivationEngine.isIdenticalCopy($0[0], of: path) }) {
                 groups[index].append(path)
             } else {
                 groups.append([path])

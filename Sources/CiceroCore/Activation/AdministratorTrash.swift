@@ -18,13 +18,7 @@ enum AdministratorTrash {
             ? "Cicero wants to move “\((moves[0].source as NSString).lastPathComponent)” to the Trash."
             : "Cicero wants to move \(moves.count) files to the Trash."
         let source = "do shell script \(literal(script)) with prompt \(literal(prompt)) with administrator privileges"
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                var error: NSDictionary?
-                _ = NSAppleScript(source: source)?.executeAndReturnError(&error)
-                continuation.resume()
-            }
-        }
+        _ = await AppleScript.run(source)
         return Set(moves.filter { !fm.fileExists(atPath: $0.source) && fm.fileExists(atPath: $0.destination) }.map(\.source))
     }
 
