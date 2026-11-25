@@ -2,7 +2,7 @@
 # Writes help/version-history.md, which Help → Version History opens on GitHub: the released versions' sections of
 # CHANGELOG.md, newest first, as one page of text. Not "## Unreleased", nor the note above the first version. Links
 # relative to CHANGELOG.md are made relative to help/: help/privacy.md → privacy.md, docs/SPEC.md → ../docs/SPEC.md.
-# release.sh runs it; run it by hand after changing an earlier version's notes.
+# release.sh runs it. Run it by hand after changing an earlier version's notes.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

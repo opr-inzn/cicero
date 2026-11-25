@@ -35,7 +35,7 @@ public enum DocumentFonts {
         case "pdf":
             fonts = try pdf(url)
         case "ai":
-            // An Illustrator file saved with PDF compatibility is a PDF; its XMP lists the fonts either way.
+            // An Illustrator file saved with PDF compatibility is a PDF. Its XMP lists the fonts either way.
             fonts = ((try? pdf(url)) ?? []) + xmp(try data(url))
         case "idml":
             fonts = try idml(url)

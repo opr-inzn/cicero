@@ -76,7 +76,7 @@ public enum Embedding: String, CaseIterable, Codable, Sendable {
     public var rank: Int { Self.allCases.firstIndex(of: self)! }
 
     public init(fsType: UInt16) {
-        // Files from before version 3 of the OS/2 table can set more than one; the least restrictive applies.
+        // Files from before version 3 of the OS/2 table can set more than one. The least restrictive applies.
         self = fsType & 0x0008 != 0 ? .editable
             : fsType & 0x0004 != 0 ? .previewAndPrint
             : fsType & 0x0002 != 0 ? .restricted

@@ -107,7 +107,7 @@ enum LetterShapes {
             let box = path.boundingBoxOfPath
             guard box.height > 50, box.width > 0 else { return nil }
             let outline = Outline(path.flattened(threshold: 1))
-            // A stem, or a stem drawn in two overlapping parts; an outline or inline letter has more.
+            // A stem, or a stem drawn in two overlapping parts. An outline or inline letter has more.
             guard outline.contours <= 2 else { return nil }
             func y(_ fraction: CGFloat) -> CGFloat { box.minY + box.height * fraction }
 

@@ -21,7 +21,7 @@ final class AppSetWatcher {
         guard self.model == nil else { return }
         self.model = model
         running = Self.runningBundleIDs()
-        // The list changes as an app starts launching, before it reads its fonts; the launch notification comes only once it has finished.
+        // The list changes as an app starts launching, before it reads its fonts. The launch notification comes only once it has finished.
         observation = NSWorkspace.shared.observe(\.runningApplications) { [weak self] _, _ in
             Task { @MainActor in self?.runningAppsChanged() }
         }

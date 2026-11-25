@@ -363,7 +363,7 @@ extension ActivationEngine {
             let destination = installFolder(for: path, family: nil)
             let same = destination.appendingPathComponent((path as NSString).lastPathComponent, isDirectory: false).path
             if Self.isIdenticalCopy(same, of: path) {
-                // To the Trash, as the user may have put it there; one the Trash won't take stays, rather than going in twice.
+                // To the Trash, as the user may have put it there. One the Trash won't take stays, rather than going in twice.
                 if didTrash(Self.url(path)) { placed[path] = same }
                 continue
             }
@@ -498,7 +498,7 @@ extension ActivationEngine {
         }
     }
 
-    // Letter case ignored, as on the Mac's own disk; Swift's strings already count every Unicode form of a name as one.
+    // Letter case ignored, as on the Mac's own disk. Swift's strings already count every Unicode form of a name as one.
     private static func nameKey(_ name: String) -> String { name.lowercased() }
 
     static func uniqueName(for name: String, taken: inout Set<String>) -> String {

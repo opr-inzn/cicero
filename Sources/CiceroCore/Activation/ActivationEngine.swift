@@ -30,7 +30,7 @@ public struct CoreTextRegistrar: FontRegistrar {
             CTFontManagerRegisterFontURLs(urls as CFArray, scope, true, handler)
         }
         if result.timedOut, !result.failed.isEmpty {
-            // fontd may still turn on the files it hadn't by then; they're taken back without waiting, as fontd may not be answering.
+            // fontd may still turn on the files it hadn't by then. They're taken back without waiting, as fontd may not be answering.
             let late = urls.filter { result.failed.contains($0.path(percentEncoded: false)) }
             DispatchQueue.global(qos: .utility).async {
                 CTFontManagerUnregisterFontURLs(late as CFArray, scope) { _, _ in true }
@@ -301,7 +301,7 @@ public struct ActivationEngine: Sendable {
         let targets = Self.uniqueByPath(faces.map { currentVersion(of: installedCopy(of: $0, records: records), records: records) })
             .filter(\.canActivate)
         Self.stopKeepingOff(targets.map(\.face.path))
-        // A session registration of the same file would shadow the permanent one; one of a file in a Fonts folder ends only once the file is on there (below), as ending it first would take the file off macOS's list of fonts it has off, and leave it off.
+        // A session registration of the same file would shadow the permanent one. One of a file in a Fonts folder ends only once the file is on there (below), as ending it first would take the file off macOS's list of fonts it has off, and leave it off.
         let temporary = targets.map(\.face.path).filter { records.temporary[$0] != nil }
         let sessionOnly = temporary.filter { !isInsideFontsFolder($0) }
         let stuckInSession = sessionOnly.isEmpty ? [] : await registrar.unregister(sessionOnly.map(Self.url), scope: .session)
@@ -342,7 +342,7 @@ public struct ActivationEngine: Sendable {
         }
         let inFontsFolders = (toRegister.map(\.path) + copies.filter { !$0.isNew }.map(\.destination)).filter(isInsideFontsFolder)
         var stillOff = inFontsFolders.isEmpty ? [] : await registrar.setEnabled(inFontsFolders.map(Self.url), true)
-        // One that was on for a while seems on either way; with its session registration ended, it's on only if it went on.
+        // One that was on for a while seems on either way. With its session registration ended, it's on only if it went on.
         let wereTemporary = temporary.filter { isInsideFontsFolder($0) && !stillOff.contains($0) }
         if !wereTemporary.isEmpty {
             _ = await registrar.unregister(wereTemporary.map(Self.url), scope: .session)

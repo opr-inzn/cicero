@@ -129,7 +129,7 @@ async function capture(port, url) {
     style.textContent = "html, body { background: transparent !important; }";
     document.head.append(style);
     const panel = document.querySelector("[data-stage]").parentElement;
-    // The window's shadow runs past the panel's bottom; on the page it's lost in the white, here it would show.
+    // The window's shadow runs past the panel's bottom. On the page it's lost in the white, here it would show.
     panel.style.overflow = "hidden";
     const r = panel.getBoundingClientRect();
     return { x: r.x + scrollX, y: r.y + scrollY, width: r.width, height: r.height };
@@ -215,7 +215,7 @@ async function optimize(file) {
   for (const start = Date.now(); Date.now() - start < 240_000;) {
     await wait(5000);
     const now = statSync(file).size;
-    // It may take a while to open; a file it couldn't make smaller stays the same size throughout.
+    // It may take a while to open. A file it couldn't make smaller stays the same size throughout.
     if (now === size && !busy() && (now !== before || Date.now() - start > 60_000)) break;
     size = now;
   }

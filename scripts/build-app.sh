@@ -1,9 +1,9 @@
 #!/bin/bash
 # Builds build/Cicero.app. Pass --install to also copy it to /Applications.
-#   SIGN_IDENTITY  codesigning identity (default: ad-hoc "-"); a real identity also enables the hardened runtime
+#   SIGN_IDENTITY  codesigning identity (default: ad-hoc "-"). A real identity also enables the hardened runtime
 #                  and a secure timestamp, as notarization needs
 #   MEASURE=1      compiles in the app performance runs' measurements (-D CICERO_MEASURE), for
-#                  Tests/E2E/app-perf/build-perf-app.sh only, and keeps the symbols that Instruments shows; without it,
+#                  Tests/E2E/app-perf/build-perf-app.sh only, and keeps the symbols that Instruments shows. Without it,
 #                  a binary that has them is refused, and both binaries are stripped, their symbols kept in
 #                  build/dSYMs/<version>-<build> for crash reports
 # Apple silicon only.
@@ -45,7 +45,7 @@ if ! grep -qx "complete -c 'cicero' -f" "$APP/Contents/Resources/fish/cicero.fis
     exit 1
 fi
 # The measurements are only in a binary built with them, never in one built for users: their types' symbols, and the
-# scenario's environment variable (a string long enough to be stored as text; LC_ALL=C and -a, or grep stops at the
+# scenario's environment variable (a string long enough to be stored as text. LC_ALL=C and -a, or grep stops at the
 # first bytes that aren't UTF-8).
 if [[ "${MEASURE:-}" != 1 ]] && { nm "$APP/Contents/MacOS/Cicero" 2>/dev/null | grep -qE "MeasureRun|12Measurements" \
     || LC_ALL=C grep -aq "CICERO_MEASURE_RUN" "$APP/Contents/MacOS/Cicero"; }; then

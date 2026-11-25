@@ -17,12 +17,12 @@ let package = Package(
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk", exact: "0.12.1"),
     ],
     targets: [
-        // Fonts, the library, activation, coverage and user data. No UI; tested by CiceroCoreTests.
+        // Fonts, the library, activation, coverage and user data. No UI. Tested by CiceroCoreTests.
         .target(name: "CiceroCore", path: "Sources/CiceroCore"),
         // The `cicero` command's commands as functions, input to result value, and the JSON they answer in. No printing.
         .target(name: "CiceroCommands", dependencies: ["CiceroCore"], path: "Sources/CiceroCommands"),
         // The `cicero` command-line tool: arguments, printing for people and --json. Built as cicero-tool, as a binary
-        // named cicero would be the app's on a disk that ignores case; it goes in the bundle as Contents/Helpers/cicero.
+        // named cicero would be the app's on a disk that ignores case. It goes in the bundle as Contents/Helpers/cicero.
         .executableTarget(
             name: "cicero-tool",
             dependencies: [

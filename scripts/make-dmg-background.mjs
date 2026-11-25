@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Draws the picture behind the DMG's window, Resources/DMG/background.png and its @2x, in the website's
 // type and colours: a line that says what to do, and the two wells make-dmg.sh puts Cicero and the
-// Applications folder into, an arrow between them. Run it again when the wording or the layout changes;
+// Applications folder into, an arrow between them. Run it again when the wording or the layout changes.
 // the sizes here, the wells and the window and icon positions in dmg-settings.py go together.
 //
 //     scripts/make-dmg-background.mjs path/to/cicero-website

@@ -425,7 +425,7 @@ enum Snappy {
     static func decompress(_ input: ArraySlice<UInt8>) throws -> [UInt8] {
         var reader = IndexedDBBytes(Array(input))
         let length = try reader.varint()
-        // Snappy compresses at most about 1:21; a length beyond that is a lie.
+        // Snappy compresses at most about 1:21. A length beyond that is a lie.
         guard length <= max(input.count, 1) * 32 else { throw IndexedDBBytes.Failure.malformed }
         var output: [UInt8] = []
         output.reserveCapacity(length)

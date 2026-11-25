@@ -105,7 +105,7 @@ public final class FontLoader: Sendable {
                   let value = axis[kCTFontVariationAxisDefaultValueKey as String] as? NSNumber else { return }
             defaults[identifier] = value
         }
-        // Optical size "none", or CoreText matches it to the point size and drops a setting of the default; and every axis at once, after a step to the defaults, as CoreText reads a setting that leaves a descriptor where it is, like a weight set again, as the named style itself, which "none" then draws at the default optical size.
+        // Optical size "none", or CoreText matches it to the point size and drops a setting of the default. Set every axis at once, after a step to the defaults, as CoreText reads a setting that leaves a descriptor where it is, like a weight set again, as the named style itself, which "none" then draws at the default optical size.
         let atDefaults = CTFontDescriptorCreateCopyWithAttributes(descriptor, [kCTFontVariationAttribute: defaults] as CFDictionary)
         return CTFontDescriptorCreateCopyWithAttributes(
             atDefaults, [kCTFontOpticalSizeAttribute: "none", kCTFontVariationAttribute: values] as CFDictionary)

@@ -168,7 +168,7 @@ extension GlyphSection {
         """
 
     /// Greek characters: capitals, then lowercase letters, each Α to Ω, then Ά Έ Ή Ί Ό Ύ Ώ Ϊ Ϋ,
-    /// then the archaic ones, then the polytonic ones letter by letter; then numbers, punctuation, symbols and accents.
+    /// then the archaic ones, then the polytonic ones letter by letter, then numbers, punctuation, symbols and accents.
     static let glyphsGreekOrder = """
         ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ
         ΆΈΉΊΌΎΏΪΫ
@@ -201,7 +201,7 @@ extension GlyphSection {
         """
 
     /// Cyrillic characters: capitals, then lowercase letters, each А to Я with
-    /// Ѓ Ґ after Г and Ѐ Ё after Е, then Ђ Є Ѕ І Ї Ј Љ Њ Ћ Џ, then the others; then punctuation, symbols and marks.
+    /// Ѓ Ґ after Г and Ѐ Ё after Е, then Ђ Є Ѕ І Ї Ј Љ Њ Ћ Џ, then the others, then punctuation, symbols and marks.
     static let glyphsCyrillicOrder = """
         АБВГЃҐӶҒҔДЕЀЁЖЗИЙЍҊКЌЛМНОПРСТУЎФХЦЧШЩЪЫЬ
         ЭЮЯ

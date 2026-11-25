@@ -240,7 +240,7 @@ private struct GridRowDrawing: View, Equatable {
             let side = GlyphGridRow.side(width: width, columns: columns)
             let font = FontLoader.shared.font(face, size: GlyphsSection.glyphSize * GlyphGridRow.zoom(side: side), weight: weight,
                                               variations: variations)
-            // Glyphs by ID read from the file before it changed would be the new version's glyphs with those IDs; characters are drawn by character, which stays right.
+            // Glyphs by ID read from the file before it changed would be the new version's glyphs with those IDs. Characters are drawn by character, which stays right.
             let isCurrent = generation == FontLoader.shared.generation(of: face.path)
             let scale = context.environment.displayScale
             let frames = GlyphGridRow.frames(width: width, columns: columns, count: cells.count, scale: scale)

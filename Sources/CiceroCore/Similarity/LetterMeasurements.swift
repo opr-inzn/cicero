@@ -177,7 +177,7 @@ public struct LetterMeasurements: Equatable, Sendable {
         return leans[leans.count / 2]
     }
 
-    // Heavy condensed bicameral fonts (like Impact) fill most of their box, so raw overlap misfires; mean-centered correlation plus tall lowercase ascenders avoids them.
+    // Heavy condensed bicameral fonts (like Impact) fill most of their box, so raw overlap misfires. Mean-centered correlation plus tall lowercase ascenders avoids them.
     private static func detectAllCaps(_ font: CTFont, lookup: (Character) -> CGGlyph?, capitals: Int, lowercase: Int, ascenderOverX: CGFloat?) -> CGFloat? {
         if capitals >= 13 && lowercase < 5 { return 1 }
         if let ascenderOverX, ascenderOverX > 1.08 { return 0 }

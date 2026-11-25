@@ -141,7 +141,7 @@ private struct SidebarContent: View {
             )) {
                 movableRows(group.rows, in: key(group.id), section: .characterSets)
             } label: {
-                // In a selectable list only the chevron toggles a group: a tap, not a button, so the title doesn't dim while pressed; coloured here, or the list greys it while another window is in front.
+                // In a selectable list only the chevron toggles a group: a tap, not a button, so the title doesn't dim while pressed. Coloured here, or the list greys it while another window is in front.
                 Label {
                     Text(group.title).lineLimit(1).sidebarTitle(group.title, key: key(group.id), fit: fit)
                 } icon: {

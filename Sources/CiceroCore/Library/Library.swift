@@ -617,7 +617,7 @@ public final class LibraryScanner: Sendable {
                 found[path] = FoundFile(stamp: stamp, isActive: false, inFontsFolder: true)
             }
         }
-        // macOS's own fonts are on, whether or not CoreText's list has them; its hidden ones (".SFNS") have names starting with a dot, which the library leaves out.
+        // macOS's own fonts are on, whether or not CoreText's list has them. Its hidden ones (".SFNS") have names starting with a dot, which the library leaves out.
         for folder in locations.systemFonts {
             walk(folder) { path, stamp in
                 found[path] = FoundFile(stamp: stamp, isActive: true)

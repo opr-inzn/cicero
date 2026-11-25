@@ -10,7 +10,7 @@ public enum FolderAvailability: Hashable, Sendable {
         var info = stat()
         guard stat(path, &info) == 0 else { return errno == EACCES || errno == EPERM ? .noAccess : notFound(path) }
         guard info.st_mode & S_IFMT == S_IFDIR else { return .notFound }
-        // A cloud folder Cicero may not read can still be looked at; its contents can't.
+        // A cloud folder Cicero may not read can still be looked at. Its contents can't.
         guard let directory = opendir(path) else { return errno == EACCES || errno == EPERM ? .noAccess : notFound(path) }
         closedir(directory)
         return nil
@@ -28,7 +28,7 @@ public enum Reachability {
         let name = String(parts[1])
         var volume = stat(), volumes = stat()
         guard lstat("/Volumes/" + name, &volume) == 0 else { return name }
-        // A folder left where the disk was mounted is on the same disk as /Volumes; the startup disk is there as a link.
+        // A folder left where the disk was mounted is on the same disk as /Volumes. The startup disk is there as a link.
         guard volume.st_mode & S_IFMT == S_IFDIR, stat("/Volumes", &volumes) == 0 else { return nil }
         return volume.st_dev == volumes.st_dev ? name : nil
     }
@@ -103,7 +103,7 @@ public enum Reachability {
         let intent = NSFileAccessIntent.readingIntent(with: URL(fileURLWithPath: path, isDirectory: false), options: [])
         return await withCheckedContinuation { continuation in
             let answer = Answer(continuation)
-            // A coordinated read has the cloud service bring the file down first; reading it then makes sure it's all there.
+            // A coordinated read has the cloud service bring the file down first. Reading it then makes sure it's all there.
             NSFileCoordinator().coordinate(with: [intent], queue: downloads) { error in
                 answer.give(error == nil && (try? Data(contentsOf: intent.url)) != nil)
             }

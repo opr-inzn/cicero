@@ -23,7 +23,7 @@ enum FontFileReader {
     }
 
     static func withoutAddedDefaults(_ faces: [ReadFace]) -> [FontFace] {
-        // CoreText adds a variable font's default as one more face, a second Regular, when no named instance is at it; it stays when none is at the origin on every axis but weight, as in fonts whose instances, uprights too, say a slant of -32768, which leaves the default the only upright.
+        // CoreText adds a variable font's default as one more face, a second Regular, when no named instance is at it. It stays when none is at the origin on every axis but weight, as in fonts whose instances, uprights too, say a slant of -32768, which leaves the default the only upright.
         faces.filter { read in
             !read.isAddedDefault || !faces.contains { !$0.isAddedDefault && $0.fvar == read.fvar && $0.face.isAtOrigin }
         }.map(\.face)
@@ -49,7 +49,7 @@ enum FontFileReader {
         var axis: WeightAxis?
         var axes: [VariationAxis] = []
         var isAtOrigin = true
-        // A named instance's own coordinates, with axes it leaves out at their defaults; the font's variation would also hold the optical size CoreText picks for its point size.
+        // A named instance's own coordinates, with axes it leaves out at their defaults. The font's variation would also hold the optical size CoreText picks for its point size.
         let instance = (CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) as? [NSNumber: NSNumber] ?? [:])
             .reduce(into: [UInt32: Double]()) { $0[$1.key.uint32Value] = $1.value.doubleValue }
         let fvar = CTFontCopyTable(font, CTFontTableTag(kCTFontTableFvar), []) as Data?

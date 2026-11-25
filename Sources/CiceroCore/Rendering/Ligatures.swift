@@ -136,7 +136,7 @@ public struct LigatureGroup: Identifiable, Sendable {
             for scalar in scalars {
                 var glyph = glyphs[index]
                 index += scalar < 0x10000 ? 1 : 2
-                // Right after another character, CoreText reads a variation selector as part of a variation sequence and gives it no glyph of its own (0xFFFF); alone, it gets the font's, as Cambria Math has for U+FE00.
+                // Right after another character, CoreText reads a variation selector as part of a variation sequence and gives it no glyph of its own (0xFFFF). Alone, it gets the font's, as Cambria Math has for U+FE00.
                 if isVariationSelector(scalar) { glyph = self.glyph(for: scalar, in: font) }
                 if glyph != 0, !body(scalar, glyph) { return false }
             }

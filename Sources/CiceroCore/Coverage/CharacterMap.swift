@@ -89,7 +89,7 @@ enum CharacterMap {
                     }
                 }
             default:
-                // Format 14 lists variation sequences, not characters; 2 and 8 hold no Unicode.
+                // Format 14 lists variation sequences, not characters. Formats 2 and 8 hold no Unicode.
                 continue
             }
         }

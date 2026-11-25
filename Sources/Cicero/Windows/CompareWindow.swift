@@ -482,7 +482,7 @@ private struct SampleCaption: View {
                 .disabled(model.isCompareFull)
             }
         } label: {
-            // One text, as a menu's label puts an image of its own first; grey here only, as on the menu the grey would reach its items' icons too.
+            // One text, as a menu's label puts an image of its own first. Grey here only, as on the menu the grey would reach its items' icons too.
             Text("\(sample.face.face.styleName) \(Image(systemName: "chevron.down"))")
                 .foregroundStyle(.secondary)
                 .tint(.secondary)

@@ -90,7 +90,7 @@ enum SidebarWidth {
     static let minimum: CGFloat = 210
     static let ideal: CGFloat = 240
     static let maximum: CGFloat = 340
-    // Under about 75 pt, where AppKit hides the sidebar; above that AppKit leaves it at its own 148 pt, so a drag from here up stops at `minimum` instead.
+    // Under about 75 pt, where AppKit hides the sidebar. Above that AppKit leaves it at its own 148 pt, so a drag from here up stops at `minimum` instead.
     static let hiding: CGFloat = 60
 
     static func keep(in splitView: NSSplitView) {

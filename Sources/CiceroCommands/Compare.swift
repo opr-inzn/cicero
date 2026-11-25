@@ -260,7 +260,7 @@ enum SampleSheet {
             var setting = CTParagraphStyleSetting(spec: .alignment, valueSize: MemoryLayout<CTTextAlignment>.size, value: bytes.baseAddress!)
             return CTParagraphStyleCreate(&setting, 1)
         }
-        // Each character the font lacks becomes U+FFFC with the delegate, as CoreText otherwise looks for another font anyway and macOS logs an error for each; a word joiner (U+2060, which draws nothing) on either side of it keeps lines breaking where the text's own would.
+        // Each character the font lacks becomes U+FFFC with the delegate, as CoreText otherwise looks for another font anyway and macOS logs an error for each. A word joiner (U+2060, which draws nothing) on either side of it keeps lines breaking where the text's own would.
         var layout = ""
         var missing: [Int] = []
         let scalars = Array(text.unicodeScalars)

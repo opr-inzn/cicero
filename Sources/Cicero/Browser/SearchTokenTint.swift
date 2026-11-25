@@ -29,7 +29,7 @@ enum SearchTokenTint {
             appKit(cell, draw, frame, view)
         }
         let implementation = imp_implementationWithBlock(tinted)
-        // Into NSTokenAttachmentCell itself, which has the method today; added there if it only inherits it.
+        // Into NSTokenAttachmentCell itself, which has the method today, or added there if it only inherits it.
         if !class_addMethod(appKitCell, draw, implementation, method_getTypeEncoding(appKitDraw)) {
             method_setImplementation(appKitDraw, implementation)
         }

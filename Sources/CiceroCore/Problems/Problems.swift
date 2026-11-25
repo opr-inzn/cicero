@@ -718,7 +718,7 @@ struct SpareCopies: Sendable {
         }
         for path in paths {
             guard let known = faces[path], !known.isEmpty else {
-                // A file nothing could read, and still can't, holds nothing to lose; one the library knows nothing else about holds something unknown.
+                // A file nothing could read, and still can't, holds nothing to lose. One the library knows nothing else about holds something unknown.
                 if unreadable.contains(path) && faceCount(of: path) == 0 { continue }
                 return false
             }

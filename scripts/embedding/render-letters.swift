@@ -1,11 +1,11 @@
 // Draws the letters of the fonts in a manifest the way Cicero does (Sources/CiceroCore/Similarity/LetterImages.swift),
-// for train.py to learn from. Reads the files with CoreText; installs and activates nothing.
+// for train.py to learn from. Reads the files with CoreText. Installs and activates nothing.
 //
 //   swiftc -O -parse-as-library scripts/embedding/render-letters.swift \
 //       Sources/CiceroCore/Similarity/LetterImages.swift -o /tmp/render-letters
 //   /tmp/render-letters manifest.json letters
 //
-// The manifest is a list of {"file": path, "variations": {"wght": 400, …}}, as prepare.py writes it; a variable
+// The manifest is a list of {"file": path, "variations": {"wght": 400, …}}, as prepare.py writes it. A variable
 // font's other axes are at their defaults. Writes letters.u8, each entry's squares one after the other (an empty
 // square block for an entry that couldn't be drawn), letters-advances.f32, the letters' advances, 16 floats an
 // entry, letters-strips.u8, its words set in strips, letters-details.u8, its large letters, and letters.json,

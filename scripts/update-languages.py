@@ -93,7 +93,7 @@ def export():
     from hyperglot import Languages, OrthographyStatus
     from hyperglot.parse import list_unique
 
-    # Hyperglot writes a pickle cache into the working directory; keep it out of the repo.
+    # Hyperglot writes a pickle cache into the working directory. Keep it out of the repo.
     os.chdir(tempfile.mkdtemp(prefix="update-languages-"))
 
     languages = Languages()  # Hyperglot's defaults: validity >= draft, Rosetta macrolanguage model

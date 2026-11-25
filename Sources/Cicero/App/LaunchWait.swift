@@ -52,7 +52,7 @@ enum LaunchWait {
         }
         RunLoop.main.add(timer, forMode: .modalPanel)
         app.activate()
-        // VoiceOver can't read it, as the app answers Accessibility only once it has finished launching; finishing the launch early for it makes the app miss its own launch.
+        // VoiceOver can't read it, as the app answers Accessibility only once it has finished launching. Finishing the launch early for it makes the app miss its own launch.
         let response = alert.runModal()
         timer.invalidate()
         alert.window.close()

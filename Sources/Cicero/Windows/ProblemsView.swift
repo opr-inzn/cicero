@@ -37,7 +37,7 @@ struct ProblemsView: View {
                     .padding(24)
                     // Centred by the width outside the scroll view: inside it, a scroll bar that takes room moves the centre whenever the list starts to scroll.
                     .padding(.leading, max(0, (width - 808) / 2))
-                    // The scroll view is only as wide as its content; fill the window so it scrolls anywhere and its bar sits at the edge.
+                    // The scroll view is only as wide as its content. Fill the window so it scrolls anywhere and its bar sits at the edge.
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -251,7 +251,7 @@ private struct MinorProblemGroup: View {
     @State private var isExpanded = true
 
     var body: some View {
-        // DisclosureGroup animates opening but not closing; open instantly too.
+        // DisclosureGroup animates opening but not closing. Open instantly too.
         DisclosureGroup(isExpanded: Binding(get: { isExpanded }, set: { newValue in
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true

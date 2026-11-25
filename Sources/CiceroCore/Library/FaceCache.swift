@@ -61,7 +61,7 @@ enum FaceCache {
                 for _ in 0..<count {
                     let path = try reader.string()
                     var stamp = FaceStamp(modified: try reader.i64(), size: try reader.i64())
-                    // Kept for what it says of files out of reach; one there is read again for what the older layout lacks.
+                    // Kept for what it says of files out of reach. One there is read again for what the older layout lacks.
                     if saved == withoutFigures { stamp.size = -1 }
                     let dateAdded = try reader.optionalDouble().map { Date(timeIntervalSinceReferenceDate: $0) }
                     let faceCount = Int(try reader.u32())

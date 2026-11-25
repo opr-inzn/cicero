@@ -135,7 +135,7 @@ public enum FeatureAlternates {
     static func names(in font: CTFont) -> [String: String] {
         var names: [String: String] = [:]
         for feature in CTFontCopyFeatures(font) as? [[String: Any]] ?? [] {
-            // A feature CoreText has no type of its own for, like a character variant, has its tag and name on the feature, with On and Off as its options; the others have them on their option.
+            // A feature CoreText has no type of its own for, like a character variant, has its tag and name on the feature, with On and Off as its options. The others have them on their option.
             if let tag = feature[kCTFontOpenTypeFeatureTag as String] as? String,
                let name = feature[kCTFontFeatureTypeNameKey as String] as? String {
                 if names[tag] == nil { names[tag] = name }

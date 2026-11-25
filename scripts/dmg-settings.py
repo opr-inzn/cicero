@@ -6,7 +6,7 @@ import mac_alias
 app = defines["app"]  # noqa: F821, both given by make-dmg.sh with -D
 
 # dmgbuild points at the picture with an alias and a bookmark (pBBk). The Finder of macOS 26 goes by the
-# bookmark, can't resolve the one dmgbuild makes up, and shows no picture at all; without it, it uses the alias.
+# bookmark, can't resolve the one dmgbuild makes up, and shows no picture at all. Without it, it uses the alias.
 mac_alias.Bookmark.for_file = staticmethod(lambda path: None)
 
 format = "ULMO"

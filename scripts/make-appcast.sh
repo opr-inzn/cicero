@@ -32,7 +32,7 @@ NOTES=$(awk -v v="$VERSION" '$0 == "## " v { found = 1; next } found && /^## / {
 NOTES=$(sed -E 's#\]\(([^):/\#][^):]*)\)#](https://github.com/opr-inzn/cicero/blob/v'"$VERSION"'/\1)#g' <<<"$NOTES")
 
 # Prints sparkle:edSignature="…" length="…" for the enclosure. The first time, macOS may ask to let
-# sign_update use the key; choose Always Allow.
+# sign_update use the key. Choose Always Allow.
 SIGN_UPDATE=.build/artifacts/sparkle/Sparkle/bin/sign_update
 [[ -x "$SIGN_UPDATE" ]] || swift package resolve
 if [[ -n "${SPARKLE_KEY_FILE:-}" ]]; then
@@ -43,7 +43,7 @@ fi
 [[ "$ENCLOSURE_SIGNATURE" =~ ^sparkle:edSignature=\"[^\"]+\"\ length=\"[0-9]+\"$ ]] ||
     { echo "Unexpected output from sign_update: $ENCLOSURE_SIGNATURE" >&2; exit 1; }
 
-# Sparkle (2.9 and later) shows Markdown notes as they are; only "]]>" would end the CDATA section.
+# Sparkle (2.9 and later) shows Markdown notes as they are. Only "]]>" would end the CDATA section.
 APPCAST=build/appcast.xml
 cat >"$APPCAST" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
