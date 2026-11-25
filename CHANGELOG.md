@@ -2,6 +2,15 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **What’s New** after an update. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
+## 0.13.0
+
+- **A new app icon:** Cicero’s icon is now a map of glyphs, with a gradient in Dark Mode. The menu bar shows a ¶.
+- **Find a look-alike for a font a PDF is missing:** when a PDF carries a font that isn’t in your library, click **Show Similar** next to it to see the families in your library that look most like it.
+- **Better classification:** Cicero guesses more fonts’ classifications correctly, from their letters, their names and the fonts like them.
+- **Rename in the sidebar:** double-click a folder, tag or location, or choose **Rename**, to change its name in place, as in the Finder.
+- **Duplicates is one table:** the extra copies are already selected. Change the selection with the checkboxes, then click **Move Files to Trash**. Each font always keeps at least one file. Duplicates now lists only files that are exactly the same.
+- Performance improvements and bug fixes: Cicero is faster with large libraries, freezes and crashes less, and text fields no longer correct or complete what you type.
+
 ## 0.12.1
 
 - **Sort in every view:** the new Sort button in the toolbar sorts the grid, the specimens and the list by name, date added, foundry, year, rating, status or number of styles. Sorted by date added, fonts are grouped into Today, Yesterday, Previous 7 Days and then months; sorted by year, into years and, before 2010, decades. Cicero keeps your sort when you change the view or quit.
