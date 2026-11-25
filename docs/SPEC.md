@@ -135,7 +135,7 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
 
 ## Browser
 
-- Title = selected item's name (several: "Serif and Script"); subtitle "1.298 families · 716 active" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
+- Title = selected item's name (several: "Serif and Script"); subtitle "1.298 Families · 716 active" (or "… · checking characters, 400 of 1.298" while coverage is computed and the list depends on it).
 - Toolbar, left to right, each in a glass capsule of its own, 8 pt apart like the Info button and the search field
   (ToolbarCapsule: AppKit merges neighbouring items into one capsule, and ToolbarSpacer(.fixed) leaves 16 pt): view switcher
   [List list.bullet | Grid square.grid.2x2 | Specimens rectangle.grid.1x2] · [Preview Options textformat.size] · [Info info.circle] · native search field, with tokens (`SearchToken`), tinted as AppKit draws a tinted token, with the highlight colour as Light mode has it, 2.2 times as saturated, in both modes (the highlight colour itself came out too pale), rather than SwiftUI's grey (`SearchTokenTint`).

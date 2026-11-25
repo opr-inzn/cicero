@@ -54,10 +54,11 @@ struct BrowserView: View {
     }
 
     private func subtitle(_ families: [Family]) -> String {
-        let count = families.count == 1 ? "1 family" : "\(families.count.plain) families"
+        let count = families.count == 1 ? "1 Family" : "\(families.count.plain) Families"
         if let progress = model.coverageProgress, dependsOnCoverage {
             return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)…"
         }
+        if families.isEmpty { return count }
         let counts = model.visibleCounts
         var parts = [count, "\(counts.active.plain) active"]
         let apps = counts.appOnly
@@ -348,6 +349,12 @@ private struct EmptyBrowser: View {
         case .characterSet(let id):
             EmptyState("No Fonts with Every Character", systemImage: "character.textbox",
                        description: Text("None of the fonts in your library include every character in \(model.characterSet(id)?.name ?? "this coverage set")."))
+        case .tag:
+            EmptyState("No Tagged Fonts", systemImage: "tag",
+                       description: Text("Drag fonts onto \(model.selectedItems.count > 1 ? "a" : "the") tag in the sidebar, or right-click\na font and choose Tags."))
+        case .classification:
+            EmptyState("No Fonts", systemImage: "textformat",
+                       description: Text("Drag fonts onto \(model.selectedItems.count > 1 ? "a" : "the") classification in the sidebar, or\nright-click a font and choose Classification."))
         default:
             EmptyState("No Fonts", systemImage: "textformat")
         }

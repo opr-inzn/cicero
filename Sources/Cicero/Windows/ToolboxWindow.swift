@@ -121,7 +121,7 @@ private struct TextTab: View {
 
     private var summary: String {
         guard !query.text.isEmpty else { return "" }
-        let count = matches.count == 1 ? "1 family" : "\(matches.count.plain) families"
+        let count = matches.count == 1 ? "1 Family" : "\(matches.count.plain) Families"
         if let progress = model.coverageProgress {
             return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)…"
         }
