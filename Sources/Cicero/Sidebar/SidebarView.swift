@@ -76,29 +76,31 @@ private struct SidebarContent: View {
 
     var body: some View {
         let editing = model.isEditingSidebar
+        let coverageGroups = model.characterSetGroups
+        let indent = chevronRoom(coverageGroups, editing: editing)
         Section {
-            movableRows(model.libraryRows, in: "library", section: nil)
+            movableRows(model.libraryRows, in: "library", section: nil, indent: indent)
         } header: {
             header
         }
         .notCollapsible()
         ForEach(model.sections) { section in
             if editing || model.isVisible(section.key) {
-                let groups = section == .characterSets ? model.characterSetGroups : []
+                let groups = section == .characterSets ? coverageGroups : []
                 let rows = section == .characterSets ? [] : model.rows(for: section)
                 Section(isExpanded: expansion(section)) {
                     if section == .classifications && model.asksAboutGuessing && !editing {
-                        OrganizeRow().padding(.leading, -Self.chevronRoom)
+                        OrganizeRow().padding(.leading, -indent)
                     }
                     if section == .characterSets {
                         characterSetGroups(groups)
                     } else {
-                        movableRows(rows, in: section.rawValue, section: section)
+                        movableRows(rows, in: section.rawValue, section: section, indent: indent)
                     }
                     if editing && rows.isEmpty && groups.isEmpty {
                         Text("Nothing here yet")
                             .foregroundStyle(.tertiary)
-                            .padding(.leading, -Self.chevronRoom)
+                            .padding(.leading, -indent)
                             .selectionDisabled()
                     }
                 } header: {
@@ -108,13 +110,13 @@ private struct SidebarContent: View {
         }
     }
 
-    private func movableRows(_ rows: [SidebarRow], in list: String, section: SidebarSection?) -> some View {
+    private func movableRows(_ rows: [SidebarRow], in list: String, section: SidebarSection?, indent: CGFloat) -> some View {
         let shownRows = shown(rows)
         let items = shownRows.map(\.item)
         let index = Dictionary(shownRows.enumerated().map { ($1.key, $0) }, uniquingKeysWith: { first, _ in first })
         return ForEach(shownRows) { shownRow in
             let i = index[shownRow.key] ?? 0
-            row(shownRow, section: section, previous: i > 0 ? items[i - 1] : nil, next: i + 1 < items.count ? items[i + 1] : nil)
+            row(shownRow, section: section, previous: i > 0 ? items[i - 1] : nil, next: i + 1 < items.count ? items[i + 1] : nil, indent: indent)
         }
             .onMove { source, destination in
                 var transaction = Transaction(animation: nil)
@@ -139,7 +141,7 @@ private struct SidebarContent: View {
                 get: { model.isGroupExpanded(group.id) },
                 set: { model.setGroupExpanded(group.id, $0) }
             )) {
-                movableRows(group.rows, in: key(group.id), section: .characterSets)
+                movableRows(group.rows, in: key(group.id), section: .characterSets, indent: 0)
             } label: {
                 // In a selectable list only the chevron toggles a group: a tap, not a button, so the title doesn't dim while pressed. Coloured here, or the list greys it while another window is in front.
                 Label {
@@ -267,11 +269,16 @@ private struct SidebarContent: View {
 
     // MARK: Rows
 
-    // The list indents every row as far as a disclosure chevron, which only coverage groups have.
-    static let chevronRoom: CGFloat = 14
+    // The list indents every row as far as a disclosure chevron only while a row with a chevron, a coverage group, is in it, not inside a closed section.
+    private func chevronRoom(_ coverageGroups: [(id: String, title: String, rows: [SidebarRow])], editing: Bool) -> CGFloat {
+        let coverage = SidebarSection.characterSets
+        let hasGroup = (editing || model.isVisible(coverage.key)) && model.isExpanded(coverage)
+            && coverageGroups.contains { !shown($0.rows).isEmpty }
+        return hasGroup ? 14 : 0
+    }
 
     @ViewBuilder
-    private func row(_ row: SidebarRow, section: SidebarSection?, previous: SidebarItem?, next: SidebarItem?) -> some View {
+    private func row(_ row: SidebarRow, section: SidebarSection?, previous: SidebarItem?, next: SidebarItem?, indent: CGFloat) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
         let content = HStack(spacing: 6) {
             if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
@@ -282,7 +289,7 @@ private struct SidebarContent: View {
             }
         }
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
-        .padding(.leading, section == .characterSets ? 0 : -Self.chevronRoom)
+        .padding(.leading, -indent)
         .listRowBackground(SidebarRowBackground(item: row.item, previous: previous, next: next, highlight: highlight))
         .tag(row.item)
         .contextMenu { SidebarRowMenu(row: row, model: model, highlight: highlight) }
