@@ -327,7 +327,7 @@ private struct EmptyBrowser: View {
                        description: Text("Fonts added to your Mac appear here for a week."))
         case .set:
             EmptyState("Empty Folder", systemImage: "folder",
-                       description: Text("Drag fonts onto the folder in the sidebar, or right-click a font and choose Add to Folder."))
+                       description: Text("Drag fonts onto the folder in the sidebar, or right-click\na font and choose Add to Folder."))
         case .smartSet(let id):
             EmptyState("No Matching Fonts", systemImage: "gearshape",
                        description: Text("No fonts in your library match this smart folder’s rules.")) {
