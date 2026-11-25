@@ -5,13 +5,13 @@ import SwiftUI
 extension Color {
     static let canvas = Color(nsColor: .textBackgroundColor)
     static let ink = Color(nsColor: .textColor)
-    static let selectionSeparator = Color(nsColor: NSColor(name: nil) { appearance in
-        .white.withAlphaComponent(appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 0.12 : 0.5)
-    })
     static let sidebarSelection = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? .white.withAlphaComponent(0.12)
-            : .black.withAlphaComponent(0.08)
+            ? .white.withAlphaComponent(0.067)
+            : .black.withAlphaComponent(0.046)
+    })
+    static let selectionSeparator = Color(nsColor: NSColor(name: nil) { appearance in
+        .black.withAlphaComponent(appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 0.25 : 0.06)
     })
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
