@@ -562,13 +562,15 @@ private struct OrganizeRow: View {
 }
 
 private struct SidebarLabel: View {
+    @Environment(\.appearsActive) private var appearsActive
     let row: SidebarRow
     let highlight: SidebarHighlight
     let fit: SidebarFit
 
     var body: some View {
         let style: AnyShapeStyle = highlight.dropTarget == row.item ? AnyShapeStyle(.white)
-            : highlight.selected.contains(row.item) ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary)
+            : highlight.selected.contains(row.item) ? AnyShapeStyle(Color.accentColor.opacity(appearsActive ? 1 : 0.45))
+            : appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
         // On the symbol too: a sidebar styles symbols itself. A tag's dot keeps its own colour.
         Label {
             if highlight.renaming == row.item {
@@ -576,7 +578,7 @@ private struct SidebarLabel: View {
             } else {
                 Text(row.title).lineLimit(1).foregroundStyle(style).sidebarTitle(row.title, key: row.key, fit: fit)
             }
-        } icon: { SidebarIcon(row: row).foregroundStyle(style) }
+        } icon: { SidebarIcon(row: row).foregroundStyle(style).opacity(row.color != nil && !appearsActive ? 0.45 : 1) }
     }
 }
 
