@@ -276,6 +276,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if model == nil { model = Self.launchModel }
+        PlainTyping.install()
         UsageStatistics.sendLaunch()
         PreferencesItem.keepNamed()
         WindowList.start()
