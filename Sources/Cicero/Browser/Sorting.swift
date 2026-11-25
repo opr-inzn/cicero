@@ -115,7 +115,7 @@ struct FamilyGroupHeader: View {
                     .modifier(WindowTitleTint())
                 Text(count == 1 ? "1 family" : "\(count.plain) families")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .modifier(WindowSubtitleTint())
             }
             .padding(.leading, 2)
         }

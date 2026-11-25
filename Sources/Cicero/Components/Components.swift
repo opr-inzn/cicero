@@ -1118,6 +1118,18 @@ struct WindowTitleTint: ViewModifier {
     }
 }
 
+struct WindowSubtitleTint: ViewModifier {
+    @Environment(\.appearsActive) private var appearsActive
+
+    func body(content: Content) -> some View {
+        if appearsActive {
+            content.foregroundStyle(.secondary)
+        } else {
+            content.foregroundStyle(.primary.opacity(0.34))
+        }
+    }
+}
+
 struct InfoButton: View {
     @Environment(AppModel.self) private var model
 

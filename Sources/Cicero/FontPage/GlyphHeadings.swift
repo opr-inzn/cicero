@@ -105,7 +105,7 @@ private struct CategoryBar: View {
             Text(heading.category).font(.headline).modifier(WindowTitleTint())
                 .accessibilityAddTraits(.isHeader)
             if heading.name == nil {
-                Text(heading.detail).font(.callout).foregroundStyle(.secondary)
+                Text(heading.detail).font(.callout).modifier(WindowSubtitleTint())
             }
             Spacer()
         }
