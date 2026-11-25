@@ -1,7 +1,8 @@
 #!/bin/bash
 # Builds build/Cicero.app. Pass --install to also copy it to /Applications.
 #   SIGN_IDENTITY  codesigning identity (default: ad-hoc "-"). A real identity also enables the hardened runtime
-#                  and a secure timestamp, as notarization needs
+#                  and a secure timestamp, as notarization needs. An ad-hoc build is a dev build (-D CICERO_DEV):
+#                  there the Delete key neither deactivates nor moves fonts to the Trash
 #   MEASURE=1      compiles in the app performance runs' measurements (-D CICERO_MEASURE), for
 #                  Tests/E2E/app-perf/build-perf-app.sh only, and keeps the symbols that Instruments shows. Without it,
 #                  a binary that has them is refused, and both binaries are stripped, their symbols kept in
@@ -14,6 +15,7 @@ cd "$(dirname "$0")/.."
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 BUILD=(swift build -c release --arch arm64 -Xswiftc -Xclang-linker -Xswiftc -isysroot -Xswiftc -Xclang-linker -Xswiftc "$SDK")
 [[ "${MEASURE:-}" == 1 ]] && BUILD+=(-Xswiftc -DCICERO_MEASURE)
+[[ "${SIGN_IDENTITY:--}" == "-" ]] && BUILD+=(-Xswiftc -DCICERO_DEV)
 "${BUILD[@]}"
 BIN_DIR="$("${BUILD[@]}" --show-bin-path)"
 

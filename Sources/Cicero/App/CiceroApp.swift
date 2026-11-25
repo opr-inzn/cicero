@@ -198,7 +198,7 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut(.return, modifiers: [.command, .option])
                 .disabled(!selection.contains(where: \.hasTemporarilyActivatable))
             Button("Deactivate", systemImage: "xmark.seal") { model.deactivate(selection) }
-                .keyboardShortcut(.delete, modifiers: [])
+                .keyboardShortcut(DevBuild.deleteKeyShortcut(modifiers: []))
                 .disabled(!selection.contains(where: \.hasDeactivatable))
             Divider()
             Button("Open", systemImage: "macwindow") { model.openFamilyID = selection.first?.id }
@@ -215,7 +215,7 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
             Button("Move to Trash", systemImage: "trash") { model.requestTrash(selection) }
-                .keyboardShortcut(.delete, modifiers: .command)
+                .keyboardShortcut(DevBuild.deleteKeyShortcut(modifiers: .command))
                 .disabled(selection.isEmpty)
             Divider()
             Button("Compare", systemImage: "rectangle.split.1x2") {
@@ -426,5 +426,16 @@ enum WindowList {
         case let id? where id.contains("Settings"): return PreferencesItem.title
         default: return window.title.isEmpty ? nil : window.title
         }
+    }
+}
+
+enum DevBuild {
+    static func deleteKeyShortcut(modifiers: EventModifiers) -> KeyboardShortcut? {
+        #if CICERO_DEV
+        // A dev build runs on the developer's real library, where one stray Delete deactivates or trashes every selected font.
+        nil
+        #else
+        KeyboardShortcut(.delete, modifiers: modifiers)
+        #endif
     }
 }
