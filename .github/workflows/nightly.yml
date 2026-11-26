@@ -1,13 +1,14 @@
 name: Nightly
 
-# Builds and publishes a nightly of main with scripts/nightly.sh, which does nothing when main has no commits since the last release.
+# Builds and publishes a nightly of main with scripts/nightly.sh, which does nothing when main has no commits since the last release or nightly.
+# A scheduled run also does nothing within 6 hours of the last nightly. A run started by hand doesn't wait.
 # It runs on the Mac that releases (a self-hosted runner with the label cicero-release), where the keychain holds the Developer ID
 # certificate and the cicero-notary credentials. The Sparkle key is read from ~/.config/cicero/sparkle-key on that Mac.
 # If the Mac is asleep, the run waits for it, up to a day.
 on:
   schedule:
-    # 03:17 in Germany in winter. Not minute zero, when GitHub's scheduled jobs are busiest.
-    - cron: "17 2 * * *"
+    # Not minute zero, when GitHub's scheduled jobs are busiest.
+    - cron: "17 */2 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -38,4 +39,5 @@ jobs:
       - name: Build and publish
         env:
           GH_TOKEN: ${{ github.token }}
+          CICERO_NIGHTLY_GAP_HOURS: ${{ github.event_name == 'schedule' && '6' || '0' }}
         run: SPARKLE_KEY_FILE="$HOME/.config/cicero/sparkle-key" ./scripts/nightly.sh

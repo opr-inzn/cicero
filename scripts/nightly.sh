@@ -1,6 +1,7 @@
 #!/bin/bash
 # Builds and publishes a nightly of main with release.sh and publish.sh. The nightly workflow (.github/workflows/nightly.yml)
-# runs it each night on the Mac that releases, and it works by hand too. It does nothing when main has no commits since the last release.
+# runs it every 2 hours on the Mac that releases, and it works by hand too. It does nothing when main has no commits since the last
+# release or nightly, or when the last nightly is newer than CICERO_NIGHTLY_GAP_HOURS.
 # The version is the next one with -nightly.<n>: 0.14.0-nightly.3 after v0.13.0 and two nightlies of 0.14.0, or the version in
 # Resources/Info.plist when that isn't released yet. The notes are the "## Unreleased" section of CHANGELOG.md, else the subjects of
 # the commits since the last release. The version, the notes and help/version-history.md change in this copy only, for the build,
@@ -8,6 +9,7 @@
 #   ./scripts/nightly.sh            build and publish a nightly
 #   ./scripts/nightly.sh --dry-run  say which version and notes it would publish, and stop
 #   SPARKLE_KEY_FILE                sign the update with the key in this file, not the keychain's (see make-appcast.sh)
+#   CICERO_NIGHTLY_GAP_HOURS        do nothing when the last nightly was published less than this many hours ago (default 0)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,6 +25,20 @@ TAGGED=$(git tag --points-at HEAD 'v[0-9]*' | head -1)
 if [[ -n "$TAGGED" ]]; then
     echo "No nightly: main is $TAGGED, with no commits since."
     exit 0
+fi
+LAST_NIGHTLY=$(gh release list --limit 100 --json tagName,publishedAt,isDraft --jq \
+    '[.[] | select((.isDraft | not) and (.tagName | test("-nightly\\.[0-9]+$")))] | max_by(.publishedAt) // empty | [.tagName, .publishedAt] | @tsv')
+if [[ -n "$LAST_NIGHTLY" ]]; then
+    IFS=$'\t' read -r NIGHTLY_TAG NIGHTLY_AT <<<"$LAST_NIGHTLY"
+    if [[ "$(gh api "repos/{owner}/{repo}/commits/$NIGHTLY_TAG" --jq .sha)" == "$(git rev-parse HEAD)" ]]; then
+        echo "No nightly: main is $NIGHTLY_TAG, with no commits since."
+        exit 0
+    fi
+    AGE=$(( $(date -u +%s) - $(date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$NIGHTLY_AT" +%s) ))
+    if (( AGE < ${CICERO_NIGHTLY_GAP_HOURS:-0} * 3600 )); then
+        echo "No nightly: $NIGHTLY_TAG was published $(( AGE / 60 )) minutes ago, less than $CICERO_NIGHTLY_GAP_HOURS hours."
+        exit 0
+    fi
 fi
 LAST=$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD)
 
