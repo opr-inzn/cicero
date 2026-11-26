@@ -139,8 +139,9 @@ struct MainWindow: View {
         .overlay(alignment: .bottomLeading) {
             // In-window card rather than NSPopover so hovering doesn't steal focus or reset the button's pointer cursor.
             ZStack {
-                if updates.showsReadyNotes, let version = updates.readyVersion {
-                    UpdateNotesCard(version: version, notes: updates.readyNotes, busy: model.job != nil)
+                if updates.showsReadyNotes, let version = updates.offeredVersion {
+                    UpdateNotesCard(version: version, notes: updates.offeredNotes, downloaded: updates.readyVersion != nil,
+                                    busy: model.job != nil)
                         .padding(.leading, 24)
                         .padding(.bottom, 56)
                         .allowsHitTesting(false)

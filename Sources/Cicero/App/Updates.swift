@@ -30,6 +30,10 @@ final class Updates {
     private(set) var status: Status = .idle
     private(set) var readyVersion: String?
     private(set) var readyNotes: ReleaseNotes?
+    private(set) var available: Release?
+    private(set) var availableNotes: ReleaseNotes?
+    var offeredVersion: String? { readyVersion ?? available?.version }
+    var offeredNotes: ReleaseNotes? { readyVersion != nil ? readyNotes : availableNotes }
     var showsReadyNotes = false
     var switchOffer: Release?
     private(set) var switching: String?
@@ -103,6 +107,14 @@ final class Updates {
         installReady?()
     }
 
+    func restartToUpdate() {
+        if let installReady { return installReady() }
+        guard let available, switching == nil else { return }
+        Task {
+            do { try await replace(with: available) } catch { checkForUpdates() }
+        }
+    }
+
     private func checkIfWaiting() {
         guard controller.updater.canCheckForUpdates else { return }
         if checkWhenReady {
@@ -131,13 +143,17 @@ final class Updates {
         self.latest = latest
     }
 
-    fileprivate func found(_ version: String) {
+    fileprivate func found(_ version: String, release: Release?, notes: ReleaseNotes?) {
         status = .available(version)
+        available = release
+        availableNotes = notes
         checkingNewTrack = false
     }
 
     fileprivate func foundNone() {
         status = .upToDate
+        available = nil
+        availableNotes = nil
         guard checkingNewTrack else { return }
         checkingNewTrack = false
         guard readyVersion == nil else { return }
@@ -164,6 +180,14 @@ final class Updates {
 
     func switchTo(_ release: Release) async {
         guard readyVersion == nil else { return }
+        do {
+            try await replace(with: release)
+        } catch {
+            switchFailure = (release, error.localizedDescription)
+        }
+    }
+
+    private func replace(with release: Release) async throws {
         switching = "Downloading Cicero \(release.version)"
         var staged: URL?
         do {
@@ -175,7 +199,7 @@ final class Updates {
         } catch {
             if let staged { try? FileManager.default.removeItem(at: staged) }
             switching = nil
-            switchFailure = (release, error.localizedDescription)
+            throw error
         }
     }
 }
@@ -232,7 +256,7 @@ private final class Channels: NSObject, SPUUpdaterDelegate {
 
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         let version = "\(item.displayVersionString) (\(item.versionString))"
-        owner?.found(version)
+        owner?.found(version, release: Self.release(item), notes: Self.notes(item))
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
@@ -240,13 +264,16 @@ private final class Channels: NSObject, SPUUpdaterDelegate {
     }
 
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
-        let notes = item.itemDescription.flatMap { ReleaseNotes.sources("## \(item.displayVersionString)\n\($0)").first?.notes }
-        owner?.ready(item.displayVersionString, notes: notes, install: immediateInstallHandler)
+        owner?.ready(item.displayVersionString, notes: Self.notes(item), install: immediateInstallHandler)
         return true
     }
 
     func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?) {
         owner?.finished(error: error)
+    }
+
+    private static func notes(_ item: SUAppcastItem) -> ReleaseNotes? {
+        item.itemDescription.flatMap { ReleaseNotes.sources("## \(item.displayVersionString)\n\($0)").first?.notes }
     }
 
     private static func release(_ item: SUAppcastItem) -> Updates.Release? {

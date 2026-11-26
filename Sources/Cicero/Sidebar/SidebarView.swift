@@ -31,7 +31,7 @@ struct SidebarView: View {
                     .allowsHitTesting(false)
             }
         }
-        .softBottomScrollEdge(updates.readyVersion != nil)
+        .softBottomScrollEdge(updates.offeredVersion != nil)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             SidebarUpdateButton()
         }
@@ -75,8 +75,8 @@ private struct SidebarUpdateButton: View {
 
     var body: some View {
         ZStack {
-            if updates.readyVersion != nil {
-                let busy = model.job != nil
+            if updates.offeredVersion != nil {
+                let busy = model.job != nil || updates.switching != nil
                 button(busy: busy)
                     .pointerStyle(.link)
                     .disabled(busy)
@@ -101,17 +101,17 @@ private struct SidebarUpdateButton: View {
                     .transition(.opacity)
             }
         }
-        .animation(.default, value: updates.readyVersion)
+        .animation(.default, value: updates.offeredVersion)
     }
 
     @ViewBuilder
     private func button(busy: Bool) -> some View {
-        let label = Label("Restart to Update", systemImage: "arrow.down.circle")
+        let label = Label(updates.switching ?? "Restart to Update", systemImage: "arrow.down.circle")
             .font(.callout.weight(.medium))
             .lineLimit(1)
             .foregroundStyle(appearsActive && !busy ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
         if #available(macOS 26, *) {
-            Button { updates.installReadyUpdate() } label: { label }
+            Button { updates.restartToUpdate() } label: { label }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
@@ -123,7 +123,7 @@ private struct SidebarUpdateButton: View {
                     }
                 }
         } else {
-            Button { updates.installReadyUpdate() } label: {
+            Button { updates.restartToUpdate() } label: {
                 label
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -138,15 +138,20 @@ private struct SidebarUpdateButton: View {
 struct UpdateNotesCard: View {
     let version: String
     let notes: ReleaseNotes?
+    let downloaded: Bool
     let busy: Bool
 
     private static let maxItems = 6
 
+    private var heading: String {
+        let state = downloaded ? "Update \(version) downloaded." : "Update \(version) is available."
+        if busy { return "\(state) Cicero can restart when the current task is done." }
+        return downloaded ? "\(state) Click to restart and install." : "\(state) Click to download it and restart."
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(busy
-                 ? "Update \(version) downloaded. Cicero can restart when the current task is done."
-                 : "Update \(version) downloaded. Click to restart and install.")
+            Text(heading)
                 .font(.headline)
             if let notes {
                 ForEach(notes.paragraphs.indices, id: \.self) { index in
