@@ -262,19 +262,7 @@ public struct Vault: Sendable {
         let staging = root.appendingPathComponent(Self.stagingPrefix + UUID().uuidString, isDirectory: true)
         try fm.createDirectory(at: staging, withIntermediateDirectories: false)
         do {
-            var unpacked: [String] = []
-            for item in items {
-                let name = item.lastPathComponent
-                if item.pathExtension.lowercased() == "zip" {
-                    let target = Self.unique(name: (name as NSString).deletingPathExtension, in: staging)
-                    if let bytes = Archive.unzippedSize(of: item) { try LibraryBackup.checkSpace([(root, bytes)]) }
-                    try Self.unzip(item, into: target)
-                    unpacked.append(name)
-                } else {
-                    try fm.copyItem(at: item, to: Self.unique(name: name, in: staging))
-                }
-            }
-            Self.removeLinks(in: staging)
+            let unpacked = try copy(items, into: staging)
             let files = Self.files(in: staging)
             guard !files.isEmpty else { throw VaultError.nothingToAdd }
             let styles = Self.styles(in: staging, files: files)
@@ -287,19 +275,44 @@ public struct Vault: Sendable {
         }
     }
 
+    public func holdsOrIsIn(_ path: String) -> Bool {
+        let paths = Set([path, LibraryScanner.realPath(path)].map { URL(fileURLWithPath: $0).standardizedFileURL.path })
+        let roots = Set([root.path, LibraryScanner.realPath(root.path)].map { URL(fileURLWithPath: $0).standardizedFileURL.path })
+        return paths.contains { path in roots.contains { $0 == path || $0.hasPrefix(path + "/") || path.hasPrefix($0 + "/") } }
+    }
+
+    private func copy(_ items: [URL], into staging: URL) throws -> [String] {
+        let fm = FileManager.default
+        var unpacked: [String] = []
+        for item in items where !holdsOrIsIn(item.path) {
+            let name = item.lastPathComponent
+            if item.pathExtension.lowercased() == "zip" {
+                let base = Self.folderName(for: (name as NSString).deletingPathExtension, fallback: "Archive")
+                if let bytes = Archive.unzippedSize(of: item) { try LibraryBackup.checkSpace([(root, bytes)]) }
+                try Self.unzip(item, into: Self.unique(name: base, in: staging))
+                unpacked.append(name)
+            } else {
+                try fm.copyItem(at: item, to: Self.unique(name: Self.folderName(for: name, fallback: "File"), in: staging))
+            }
+        }
+        Self.removeLinks(in: staging)
+        return unpacked
+    }
+
     public func discard(_ draft: VaultDraft) {
         guard draft.staging.deletingLastPathComponent().standardizedFileURL.path == root.standardizedFileURL.path,
               draft.staging.lastPathComponent.hasPrefix(Self.stagingPrefix) else { return }
         try? FileManager.default.removeItem(at: draft.staging)
     }
 
-    public func removeLeftoverStaging() {
+    public func removeLeftoverStaging(olderThan start: Date) {
         let fm = FileManager.default
         let owners = [root] + Self.visibleFolders(in: root)
         for folder in owners {
-            for item in (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [] {
+            for item in (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.creationDateKey])) ?? [] {
                 if folder == root, item.lastPathComponent.hasPrefix(Self.stagingPrefix) {
-                    try? fm.removeItem(at: item)
+                    let created = (try? item.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? .distantPast
+                    if created < start { try? fm.removeItem(at: item) }
                 } else if item.lastPathComponent.hasPrefix(Self.renamingPrefix) {
                     // A license caught between two names: it comes back under a name of its own, never deleted.
                     try? fm.moveItem(at: item, to: Self.unique(name: "Recovered", in: folder))
@@ -315,6 +328,7 @@ public struct Vault: Sendable {
         let ownerFolder = root.appendingPathComponent(Self.folderName(for: license.owner, fallback: "Me"), isDirectory: true)
         try fm.createDirectory(at: ownerFolder, withIntermediateDirectories: true)
         let folder = Self.unique(name: Self.folderName(for: license.name, fallback: "License"), in: ownerFolder)
+        license.name = Self.name(license.name, in: folder)
         try write(license, in: draft.staging)
         try fm.moveItem(at: draft.staging, to: folder)
         license.folder = folder
@@ -356,8 +370,13 @@ public struct Vault: Sendable {
             }
         }
         license.folder = folder
+        license.name = Self.name(license.name, in: folder)
         try write(license, in: folder)
         return license
+    }
+
+    static func name(_ typed: String, in folder: URL) -> String {
+        folderName(for: typed, fallback: "License") == folder.lastPathComponent ? typed : folder.lastPathComponent
     }
 
     public func relink(_ license: VaultLicense) -> VaultLicense {
@@ -387,16 +406,15 @@ public struct Vault: Sendable {
 
     public func addFiles(_ items: [URL], to license: VaultLicense) throws -> VaultLicense {
         let fm = FileManager.default
-        for item in items {
-            let name = item.lastPathComponent
-            if item.pathExtension.lowercased() == "zip" {
-                if let bytes = Archive.unzippedSize(of: item) { try LibraryBackup.checkSpace([(root, bytes)]) }
-                try Self.unzip(item, into: Self.unique(name: (name as NSString).deletingPathExtension, in: license.folder))
-            } else {
-                try fm.copyItem(at: item, to: Self.unique(name: name, in: license.folder))
-            }
+        let staging = root.appendingPathComponent(Self.stagingPrefix + UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: staging) }
+        _ = try copy(items, into: staging)
+        let staged = (try? fm.contentsOfDirectory(at: staging, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []
+        guard !staged.isEmpty else { throw VaultError.nothingToAdd }
+        for item in staged {
+            try fm.moveItem(at: item, to: Self.unique(name: item.lastPathComponent, in: license.folder))
         }
-        Self.removeLinks(in: license.folder)
         let license = relink(license)
         try write(license, in: license.folder)
         return license
@@ -458,7 +476,30 @@ public struct Vault: Sendable {
         }
     }
 
+    private static func isSafeArchive(_ archive: URL) -> Bool {
+        func run(_ arguments: [String]) -> String? {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/zipinfo")
+            process.arguments = arguments + [archive.path]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return process.terminationStatus == 0 ? String(decoding: data, as: UTF8.self) : nil
+        }
+        // A ZIP file can hold links and "../" names that would write outside the Vault as it unpacks.
+        guard let names = run(["-1"]), let long = run(["-s"]) else { return false }
+        let unsafeName = names.split(separator: "\n").contains { name in
+            name.hasPrefix("/") || name.split(separator: "/").contains("..") || name.contains("\\")
+        }
+        let hasLink = long.split(separator: "\n").contains { $0.hasPrefix("l") }
+        return !unsafeName && !hasLink
+    }
+
     private static func unzip(_ archive: URL, into folder: URL) throws {
+        guard isSafeArchive(archive) else { throw VaultError.unpackFailed(archive.lastPathComponent) }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         process.arguments = ["-x", "-k", archive.path, folder.path]

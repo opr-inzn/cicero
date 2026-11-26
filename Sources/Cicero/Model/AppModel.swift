@@ -251,6 +251,8 @@ final class AppModel {
     var openLicenseID: UUID?
     var trashingLicense: VaultLicense?
     var isAddingToVault = false
+    var vaultRevision = 0
+    @ObservationIgnored var vaultGeneration = 0
     @ObservationIgnored private var heldToast: String?
 
     // MARK: Compare
@@ -456,7 +458,6 @@ final class AppModel {
         started = true
         openWaitingFiles()
         cleanUpVault()
-        reloadVault()
     }
 
     private func restoreLibrary() {

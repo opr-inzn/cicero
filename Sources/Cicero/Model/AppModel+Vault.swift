@@ -28,8 +28,11 @@ extension AppModel {
 
     func reloadVault() {
         let vault = vault
+        let generation = vaultGeneration
         Task {
             let licenses = await Task.detached(priority: .userInitiated) { vault.licenses() }.value
+            guard generation == vaultGeneration else { return }
+            vaultRevision &+= 1
             if licenses != vaultLicenses { vaultLicenses = licenses }
             if let id = openLicenseID, !licenses.contains(where: { $0.id == id }) { openLicenseID = nil }
         }
@@ -37,7 +40,16 @@ extension AppModel {
 
     func cleanUpVault() {
         let vault = vault
-        Task.detached(priority: .utility) { vault.removeLeftoverStaging() }
+        let start = Date()
+        Task {
+            await Task.detached(priority: .userInitiated) { vault.removeLeftoverStaging(olderThan: start) }.value
+            reloadVault()
+        }
+    }
+
+    private func vaultChanged() {
+        vaultGeneration &+= 1
+        vaultRevision &+= 1
     }
 
     func presentAddToVaultPanel() {
@@ -53,8 +65,8 @@ extension AppModel {
 
     func addToVault(_ urls: [URL]) {
         let vault = vault
-        let items = urls.filter(\.isFileURL).map(\.standardizedFileURL).filter { !vault.contains($0.path) }
-        guard !items.isEmpty else { return showToast(urls.count == 1 ? "That file is in the Vault already" : "Those files are in the Vault already") }
+        let items = urls.filter(\.isFileURL).map(\.standardizedFileURL).filter { !vault.holdsOrIsIn($0.path) }
+        guard !items.isEmpty else { return showToast(urls.count == 1 ? "That’s the Vault or a file in it" : "Those are the Vault or files in it") }
         guard !isAddingToVault else { return }
         isAddingToVault = true
         Task {
@@ -80,6 +92,7 @@ extension AppModel {
         Task {
             do {
                 let added = try await Task.detached(priority: .userInitiated) { try vault.add(prompt.draft, as: license) }.value
+                vaultChanged()
                 vaultLicenses.append(added)
                 vaultLicenses = vault.sorted(vaultLicenses)
                 selection = .vault
@@ -97,9 +110,12 @@ extension AppModel {
         guard let index = vaultLicenses.firstIndex(where: { $0.id == license.id }) else { return nil }
         guard vaultLicenses[index] != license else { return license }
         do {
+            let before = vaultLicenses[index].folder.deletingLastPathComponent()
             let saved = try vault.save(license)
+            vaultChanged()
             vaultLicenses[index] = saved
             vaultLicenses = vault.sorted(vaultLicenses)
+            if saved.folder.deletingLastPathComponent().lastPathComponent != before.lastPathComponent { reloadVault() }
             return saved
         } catch {
             showToast("Couldn’t save “\(license.name)”: \(error.localizedDescription)")
@@ -110,11 +126,12 @@ extension AppModel {
 
     func addFiles(_ urls: [URL], to license: VaultLicense) {
         let vault = vault
-        let items = urls.filter(\.isFileURL).map(\.standardizedFileURL).filter { !vault.contains($0.path) }
-        guard !items.isEmpty else { return }
+        let items = urls.filter(\.isFileURL).map(\.standardizedFileURL).filter { !vault.holdsOrIsIn($0.path) }
+        guard !items.isEmpty else { return showToast(urls.count == 1 ? "That’s the Vault or a file in it" : "Those are the Vault or files in it") }
         Task {
             do {
                 let changed = try await Task.detached(priority: .userInitiated) { try vault.addFiles(items, to: license) }.value
+                vaultChanged()
                 if let index = vaultLicenses.firstIndex(where: { $0.id == license.id }) { vaultLicenses[index] = changed }
                 showToast(items.count == 1 ? "Added “\(items[0].lastPathComponent)”" : "Added \(items.count.plain) items")
             } catch {
@@ -127,6 +144,7 @@ extension AppModel {
         trashingLicense = nil
         do {
             _ = try vault.trash(license)
+            vaultChanged()
             vaultLicenses.removeAll { $0.id == license.id }
             if openLicenseID == license.id { openLicenseID = nil }
             showToast("Moved “\(license.name)” to the Trash")
@@ -141,11 +159,7 @@ extension AppModel {
     }
 
     func licenses(of family: Family) -> [VaultLicense] {
-        let names = Set(family.faces.map { $0.face.postScriptName.lowercased() })
-        let key = Self.vaultFamilyKey(family.id)
-        return vaultLicenses.filter { license in
-            license.styles.contains { names.contains($0.postScriptName.lowercased()) || Self.vaultFamilyKey($0.family) == key }
-        }
+        vaultLicenses.filter { !coveredFaces(of: family, by: $0).isEmpty }
     }
 
     func coveredFaces(of family: Family, by license: VaultLicense) -> [LibraryFace] {
@@ -153,7 +167,8 @@ extension AppModel {
         return family.faces.filter { face in
             styles.contains { style in
                 style.postScriptName.lowercased() == face.face.postScriptName.lowercased()
-                    || (Self.vaultFamilyKey(style.family) == Self.vaultFamilyKey(family.id) && Self.vaultStyleKey(style.style) == Self.vaultStyleKey(face.face.styleName))
+                    || (!Self.vaultFamilyKey(style.family).isEmpty && Self.vaultFamilyKey(style.family) == Self.vaultFamilyKey(face.face.familyName)
+                        && Self.vaultStyleKey(style.style) == Self.vaultStyleKey(face.face.styleName))
             }
         }
     }
@@ -180,10 +195,8 @@ extension AppModel {
     // Web fonts are often named like their desktop family with "Web" after it, as in "Söhne Web".
     static func withoutWeb(_ name: String) -> String {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        for suffix in [" Web", "Web", " web"] where trimmed.hasSuffix(suffix) && trimmed.count > suffix.count {
-            return String(trimmed.dropLast(suffix.count)).trimmingCharacters(in: .whitespaces)
-        }
-        return trimmed
+        guard let match = trimmed.wholeMatch(of: #/(.+\S)\s+[Ww][Ee][Bb]/#) else { return trimmed }
+        return String(match.1)
     }
 
     static func versionNumber(_ version: String?) -> String? {

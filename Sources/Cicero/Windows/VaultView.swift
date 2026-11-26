@@ -158,6 +158,8 @@ private struct VaultList: View {
                         Button("Show in Finder") { model.showInFinder(chosen[0]) }
                         Divider()
                         Button("Move to Trash…") { model.trashingLicense = chosen[0] }
+                    } else if chosen.count > 1 {
+                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting(chosen.map(\.folder)) }
                     }
                 } primaryAction: { ids in
                     if ids.count == 1 { model.openLicenseID = ids.first }
@@ -270,7 +272,8 @@ private struct LicensePage: View {
         .navigationTitle(license.name)
         .navigationSubtitle(license.owner)
         .quickLookPreview($previewed)
-        .task(id: model.vaultLicenses.first { $0.id == license.id }?.styles) { refresh() }
+        .task(id: StoredKey(license: model.vaultLicenses.first { $0.id == license.id }, revision: model.vaultRevision)) { refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in save() }
         .task(id: license) {
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
@@ -293,7 +296,9 @@ private struct LicensePage: View {
         edited.owner = edited.owner.trimmingCharacters(in: .whitespacesAndNewlines)
         edited.name = edited.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !edited.owner.isEmpty, !edited.name.isEmpty else { return }
-        if let saved = model.saveLicense(edited), saved.folder != license.folder { license.folder = saved.folder }
+        guard let saved = model.saveLicense(edited) else { return }
+        if saved.folder != license.folder { license.folder = saved.folder }
+        if saved.name != edited.name { license.name = saved.name }
     }
 
     private var details: some View {
@@ -439,6 +444,11 @@ private struct LicensePage: View {
         let path = url.path
         return path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
     }
+}
+
+private struct StoredKey: Equatable {
+    let license: VaultLicense?
+    let revision: Int
 }
 
 private struct DotLabelStyle: LabelStyle {
