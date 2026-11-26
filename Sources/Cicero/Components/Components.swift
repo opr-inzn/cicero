@@ -740,6 +740,7 @@ struct FolderActivationPicker: View {
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
     let options: [(title: String, value: Value)]
     @Binding var selection: Value
+    var accessibilityLabel: String? = nil
 
     func makeNSView(context: Context) -> NSPopUpButton {
         let button = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -758,6 +759,7 @@ struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
             }
         }
         button.selectItem(at: options.firstIndex { $0.value == selection } ?? -1)
+        if let accessibilityLabel { button.setAccessibilityLabel(accessibilityLabel) }
         context.coordinator.onChoose = { index in
             guard options.indices.contains(index) else { return }
             selection = options[index].value

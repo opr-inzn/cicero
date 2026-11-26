@@ -70,30 +70,115 @@ private struct SidebarUpdateButton: View {
     @Environment(AppModel.self) private var model
     @Environment(Updates.self) private var updates
     @Environment(\.appearsActive) private var appearsActive
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var hoverTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
-            if let version = updates.readyVersion {
+            if updates.readyVersion != nil {
                 let busy = model.job != nil
-                Button { updates.installReadyUpdate() } label: {
-                    Label("Restart to Update", systemImage: "arrow.down.circle")
-                        .font(.callout.weight(.medium))
-                        .lineLimit(1)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .contentShape(.capsule)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(appearsActive && !busy ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                .glass(in: .capsule)
-                .disabled(busy)
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 10)
-                .help(busy ? "Cicero can restart when the current task is done" : "Restart Cicero to install version \(version)")
-                .transition(.opacity)
+                button(busy: busy)
+                    .pointerStyle(.link)
+                    .disabled(busy)
+                    .onHover { over in
+                        hoverTask?.cancel()
+                        if over {
+                            hoverTask = Task {
+                                try? await Task.sleep(for: .milliseconds(150))
+                                guard !Task.isCancelled else { return }
+                                updates.showsReadyNotes = true
+                            }
+                        } else {
+                            updates.showsReadyNotes = false
+                        }
+                    }
+                    .onDisappear {
+                        hoverTask?.cancel()
+                        updates.showsReadyNotes = false
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 16)
+                    .transition(.opacity)
             }
         }
         .animation(.default, value: updates.readyVersion)
+    }
+
+    @ViewBuilder
+    private func button(busy: Bool) -> some View {
+        let label = Label("Restart to Update", systemImage: "arrow.down.circle")
+            .font(.callout.weight(.medium))
+            .lineLimit(1)
+            .foregroundStyle(appearsActive && !busy ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+        if #available(macOS 26, *) {
+            Button { updates.installReadyUpdate() } label: { label }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .controlSize(.large)
+                .id(colorScheme)
+                .overlay {
+                    if !appearsActive {
+                        Capsule().stroke(.separator, lineWidth: 0.5)
+                    }
+                }
+        } else {
+            Button { updates.installReadyUpdate() } label: {
+                label
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .contentShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .glass(in: .capsule)
+        }
+    }
+}
+
+struct UpdateNotesCard: View {
+    let version: String
+    let notes: ReleaseNotes?
+    let busy: Bool
+
+    private static let maxItems = 6
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(busy
+                 ? "Update \(version) downloaded. Cicero can restart when the current task is done."
+                 : "Update \(version) downloaded. Click to restart and install.")
+                .font(.headline)
+            if let notes {
+                ForEach(notes.paragraphs.indices, id: \.self) { index in
+                    Text(notes.paragraphs[index])
+                        .font(.callout)
+                }
+                if !notes.items.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(notes.items.prefix(Self.maxItems).enumerated()), id: \.offset) { _, item in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Circle()
+                                    .fill(.secondary)
+                                    .frame(width: 4, height: 4)
+                                    .alignmentGuide(.firstTextBaseline) { $0.height / 2 + 3 }
+                                Text(item)
+                                    .font(.callout)
+                            }
+                        }
+                    }
+                    let extra = notes.items.count - Self.maxItems
+                    if extra > 0 {
+                        Text(extra == 1 ? "Plus 1 more change." : "Plus \(extra) more changes.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(EdgeInsets(top: 13, leading: 14, bottom: 14, trailing: 14))
+        .frame(width: 340, alignment: .leading)
+        .background(Color.canvas, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.separator, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.18), radius: 16, y: 6)
     }
 }
 

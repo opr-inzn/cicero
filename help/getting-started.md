@@ -137,10 +137,11 @@ Closing Cicero’s windows doesn’t quit it, so app folders keep working. Click
 
 ## Keep Cicero up to date
 
-Cicero checks for new versions each time it opens and once a day while it stays open. It downloads a new version in the background and installs it when you quit Cicero.
+Cicero checks for new versions each time it opens and once a day while it stays open. It downloads a new version in the background and installs it when you quit Cicero, or when you click **Restart to Update** at the bottom of the sidebar.
 
-- To check now, choose **Cicero → Check for Updates**
-- To stop checking by itself, open **Preferences → General** and, under **Updates**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
+- To check now, choose **Cicero → Check for Updates** or click **Check Now** in **Preferences → General** under **Updates**
+- To try upcoming changes early, open **Preferences → General** and switch **Update track** from **Stable** to **Nightly**. Switch back to **Stable** anytime
+- To stop checking by itself, turn off **Check for updates automatically** in the same place. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
 - To choose each time whether to install a new version, turn off **Install updates automatically** in the same place. It’s on at first.
 
 Updates come from Cicero’s [releases page on GitHub](https://github.com/opr-inzn/cicero/releases). After an update, Cicero shows what’s new, and **Help → Version History** opens [what changed in each version](version-history.md).

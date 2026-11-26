@@ -119,7 +119,7 @@ public final class LibraryContext: @unchecked Sendable {
         } else if FileManager.default.fileExists(atPath: url.path) {
             throw CommandError(.unreadableUserData, "Cicero’s data can’t be read (\(url.path)).")
         } else {
-            data = .newLibrary
+            data = UserData()
         }
         if data.fontLibraryPath.isEmpty { data.fontLibraryPath = environment.locations.defaultFontLibrary.path }
         return data

@@ -33,7 +33,7 @@ public final class UserDataStore: Sendable {
             // A file that is there but can't be read is never written over: the next save would replace the user's data.
             guard let data = try? Data(contentsOf: fileURL) else {
                 readOnly.withLock { $0 = UserData.unreadableMessage }
-                return .newLibrary
+                return UserData()
             }
             let newer = UserData.isFromNewerVersion(data)
             if newer { readOnly.withLock { $0 = UserData.newerVersionMessage } }
@@ -45,9 +45,9 @@ public final class UserDataStore: Sendable {
             if newer { return UserData() }
             // Keep a damaged file for the user instead of silently writing over it.
             if !setAside() { readOnly.withLock { $0 = UserData.unreadableMessage } }
-            return .newLibrary
+            return UserData()
         }
-        return .newLibrary
+        return UserData()
     }
 
     private func setAside() -> Bool {

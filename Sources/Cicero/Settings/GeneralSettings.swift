@@ -107,6 +107,27 @@ struct GeneralSettings: View {
                 .formRowCentered()
             }
             Section("Updates") {
+                LabeledContent {
+                    if updates.readyVersion != nil {
+                        Button("Restart to Update") { updates.installReadyUpdate() }
+                            .disabled(model.job != nil)
+                    } else if case .available = updates.status {
+                        Button("Update") { updates.checkForUpdates() }
+                            .disabled(!updates.canCheckForUpdates || updates.switching != nil)
+                    } else {
+                        Button("Check Now") { updates.checkForUpdates() }
+                            .disabled(!updates.canCheckForUpdates || updates.switching != nil)
+                    }
+                } label: {
+                    Text("Version \(updates.version) (\(updates.build))")
+                    Text(updateStatus)
+                }
+                LabeledContent {
+                    PopUpPicker(options: Updates.Track.allCases.map { (title: $0.title, value: $0) }, selection: $updates.track,
+                                accessibilityLabel: "Update track")
+                } label: {
+                    Text("Update track")
+                }
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
                 Toggle(isOn: $updates.installsAutomatically) {
                     Text("Install updates automatically")
@@ -120,6 +141,29 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        .confirmationDialog(
+            updates.switchOffer.map(switchTitle) ?? "",
+            isPresented: Binding(get: { updates.switchOffer != nil }, set: { if !$0 { updates.switchOffer = nil } }),
+            presenting: updates.switchOffer
+        ) { release in
+            Button(release.isNightly ? "Switch to \(release.version)" : "Go Back to \(release.version)") { switchTo(release) }
+                .disabled(model.job != nil)
+            // Cancel is the default so Return never replaces the app by accident.
+            Button("Cancel", role: .cancel) {}
+                .keyboardShortcut(.defaultAction)
+        } message: { release in
+            Text(switchMessage(release))
+        }
+        .alert(
+            "Couldn’t switch to Cicero \(updates.switchFailure?.release.version ?? "")",
+            isPresented: Binding(get: { updates.switchFailure != nil }, set: { if !$0 { updates.switchFailure = nil } }),
+            presenting: updates.switchFailure
+        ) { failure in
+            Button("Download \(failure.release.version)") { NSWorkspace.shared.open(failure.release.url) }
+            Button("OK", role: .cancel) {}
+        } message: { failure in
+            Text("\(failure.message) This version stays. You can download Cicero \(failure.release.version) and put it in place of this one yourself.")
+        }
         .onChange(of: appearance) { appearance.apply() }
         .onChange(of: sharesUsageStatistics) {
             guard !sharesUsageStatistics else { return }
@@ -131,6 +175,41 @@ struct GeneralSettings: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem = LoginItem.status
         }
+    }
+
+    private var updateStatus: String {
+        if let switching = updates.switching { return switching }
+        if let version = updates.readyVersion { return "Cicero \(version) is ready to install." }
+        switch updates.status {
+        case .idle: return updates.isNightly ? "Nightly version." : "Stable version."
+        case .checking: return "Checking for updates"
+        case .available(let version): return "Cicero \(version) is available."
+        case .failed(let message): return "Couldn’t check for updates: \(message)"
+        case .upToDate:
+            if updates.isNightly, updates.track == .stable { return "Up to date. The next stable version replaces this nightly." }
+            if !updates.isNightly, updates.track == .nightly { return "Up to date. The next nightly replaces this version." }
+            return "Up to date."
+        }
+    }
+
+    private func switchTo(_ release: Updates.Release) {
+        guard model.job == nil else { return }
+        Task {
+            guard await model.saveSetupSnapshot(named: "Before Switching to \(release.version)", nothingWas: "changed") else { return }
+            guard model.job == nil else { return }
+            await updates.switchTo(release)
+        }
+    }
+
+    private func switchTitle(_ release: Updates.Release) -> String {
+        release.isNightly ? "Switch to Cicero \(release.version)?" : "Go back to Cicero \(release.version)?"
+    }
+
+    private func switchMessage(_ release: Updates.Release) -> String {
+        let steps = "Cicero saves your setup to its Backups folder, replaces this version with Cicero \(release.version), and opens it again."
+        return release.isNightly
+            ? "No nightly is newer than this version. The latest nightly has new features, but may not have every fix this version has. \(steps)"
+            : "No stable version is newer than this nightly. \(steps) Anything this nightly added to your setup that \(release.version) doesn’t know may be lost; the saved setup keeps it."
     }
 
     private var guessingExplanation: String {

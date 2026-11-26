@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
+    @Environment(Updates.self) private var updates
     @State private var promptText = ""
     @FocusState private var isSearchFocused: Bool
     @State private var startFocus = StartFocus()
@@ -134,6 +135,19 @@ struct MainWindow: View {
                 }
             }
             .animation(.snappy, value: model.toast)
+        }
+        .overlay(alignment: .bottomLeading) {
+            // In-window card rather than NSPopover so hovering doesn't steal focus or reset the button's pointer cursor.
+            ZStack {
+                if updates.showsReadyNotes, let version = updates.readyVersion {
+                    UpdateNotesCard(version: version, notes: updates.readyNotes, busy: model.job != nil)
+                        .padding(.leading, 24)
+                        .padding(.bottom, 56)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: updates.showsReadyNotes)
         }
     }
 

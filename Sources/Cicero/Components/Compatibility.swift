@@ -34,15 +34,23 @@ extension View {
     }
 
     @ViewBuilder func softBottomScrollEdge(_ isSoft: Bool = true) -> some View {
-        if #available(macOS 26, *) { scrollEdgeEffectStyle(isSoft ? .soft : nil, for: .bottom) } else { self }
+        if #available(macOS 26, *) {
+            modifier(FreshScrollEdges(edges: .bottom, rest: isSoft ? .soft : nil, refreshes: isSoft))
+        } else {
+            self
+        }
     }
 
     @ViewBuilder func topBarTint() -> some View {
         if #available(macOS 26, *) { background(Color.canvas.opacity(0.75)) } else { self }
     }
 
-    func toolbarGlassFollowsAppearance() -> some View {
-        modifier(FreshScrollEdges())
+    @ViewBuilder func toolbarGlassFollowsAppearance() -> some View {
+        if #available(macOS 26, *) {
+            modifier(FreshScrollEdges(edges: .top, rest: nil))
+        } else {
+            self
+        }
     }
 
     @ViewBuilder func lineHeight(_ points: Double?, natural: Double) -> some View {
@@ -54,22 +62,23 @@ extension View {
     }
 }
 
+@available(macOS 26, *)
 private struct FreshScrollEdges: ViewModifier {
+    let edges: Edge.Set
+    let rest: ScrollEdgeEffectStyle?
+    var refreshes = true
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHard = false
 
     func body(content: Content) -> some View {
-        if #available(macOS 26, *) {
-            content
-                .scrollEdgeEffectStyle(isHard ? .hard : nil, for: .top)
-                .onChange(of: colorScheme) {
-                    // Hard for a moment, so macOS sets the top edges up afresh: on macOS 26 the toolbar's glass over them could keep the old appearance until something scrolled.
-                    isHard = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { isHard = false }
-                }
-        } else {
-            content
-        }
+        content
+            .scrollEdgeEffectStyle(isHard ? .hard : rest, for: edges)
+            .onChange(of: colorScheme) {
+                guard refreshes else { return }
+                // Hard for a moment, so macOS sets the edges up afresh: on macOS 26 glass over them could keep the old appearance until something scrolled.
+                isHard = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { isHard = false }
+            }
     }
 }
 

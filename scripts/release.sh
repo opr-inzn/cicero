@@ -31,7 +31,20 @@ fi
 
 if [[ $# -ge 1 ]]; then
     plutil -replace CFBundleShortVersionString -string "$1" Resources/Info.plist
-    BUILD=$(( $(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' Resources/Info.plist) + 1 ))
+    CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' Resources/Info.plist)
+    BASE="${CURRENT_BUILD%%.*}"
+    if [[ "$1" =~ -nightly\.([0-9]+)$ ]]; then
+        NIGHTLY_NUM="${BASH_REMATCH[1]}"
+        FEED=${CICERO_FEED_URL:-https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml}
+        if FEED_TEXT=$(curl -fsSL --max-time 30 "$FEED" 2>/dev/null); then
+            STABLE=$(awk '/<item>/{b=""} {b=b $0} /<\/item>/{if (b !~ /<sparkle:channel>/) print b}' <<<"$FEED_TEXT" |
+                sed -n 's|.*<sparkle:version>\([0-9.]*\)</sparkle:version>.*|\1|p' | sort -V | tail -1)
+            [[ -n "$STABLE" ]] && BASE="$STABLE"
+        fi
+        BUILD="$BASE.$NIGHTLY_NUM"
+    else
+        BUILD=$(( BASE + 1 ))
+    fi
     plutil -replace CFBundleVersion -string "$BUILD" Resources/Info.plist
 fi
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)

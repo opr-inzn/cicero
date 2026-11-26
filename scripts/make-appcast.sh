@@ -2,11 +2,17 @@
 # Writes build/appcast.xml, the feed Sparkle reads for updates, for build/Cicero-<version>.dmg (made by
 # release.sh). The DMG is signed with the EdDSA key whose public half is SUPublicEDKey in Info.plist, and
 # that version's section of CHANGELOG.md becomes the release notes. publish.sh runs this and uploads the
-# feed with the DMG, so https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml (SUFeedURL)
-# always describes the latest version.
+# feed to the latest stable release, so https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml
+# (SUFeedURL) always describes the latest version.
+#
+# A nightly (0.14.0-nightly.1) goes in Sparkle's "nightly" channel, which only the Nightly track is offered,
+# next to the stable item of the published feed, so the Stable track keeps its offer. A stable fix (0.13.1)
+# keeps a published nightly of a newer version (0.14.0-nightly.2); the stable version it leads to (0.14.0)
+# becomes the feed's only item.
 #   ./scripts/make-appcast.sh             the DMG of the version in Resources/Info.plist
 #   ./scripts/make-appcast.sh <dmg>       another DMG of that version
 #   SPARKLE_KEY_FILE  sign with the private key in this file instead of the keychain's "cicero" account
+#   CICERO_FEED_URL   read the published feed from here instead of GitHub (for tests; a file:// URL works)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -39,6 +45,32 @@ fi
 [[ "$ENCLOSURE_SIGNATURE" =~ ^sparkle:edSignature=\"[^\"]+\"\ length=\"[0-9]+\"$ ]] ||
     { echo "Unexpected output from sign_update: $ENCLOSURE_SIGNATURE" >&2; exit 1; }
 
+CHANNEL=
+KEPT_ITEMS=
+FEED_URL=${CICERO_FEED_URL:-https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml}
+items() { awk '/<item>/{b=""; i=1} i{b=b $0 "\n"} /<\/item>/{printf "%s%c", b, 0; i=0}' <<<"$1"; }
+if [[ "$VERSION" =~ -nightly\.[0-9]+$ ]]; then
+    CHANNEL=$'\n            <sparkle:channel>nightly</sparkle:channel>'
+    PUBLISHED=$(curl -fsSL --max-time 30 "$FEED_URL") ||
+        { echo "Couldn't read the published feed at $FEED_URL; a nightly's feed must keep the stable version." >&2; exit 1; }
+    while IFS= read -r -d '' item; do
+        [[ "$item" == *"<sparkle:channel>"* ]] || KEPT_ITEMS+="$item"
+    done < <(items "$PUBLISHED")
+    [[ "$KEPT_ITEMS" == *"<sparkle:version>"* ]] ||
+        { echo "The published feed has no stable version to keep; publish a stable version first." >&2; exit 1; }
+elif PUBLISHED=$(curl -fsSL --max-time 30 "$FEED_URL" 2>/dev/null); then
+    while IFS= read -r -d '' item; do
+        [[ "$item" == *"<sparkle:channel>nightly</sparkle:channel>"* ]] || continue
+        NIGHTLY_VER=$(sed -n 's|.*<sparkle:shortVersionString>\(.*\)</sparkle:shortVersionString>.*|\1|p' <<<"$item")
+        BASE="${NIGHTLY_VER%%-nightly.*}"
+        if [[ -n "$BASE" && "$BASE" != "$VERSION" && "$(printf '%s\n%s\n' "$VERSION" "$BASE" | sort -V | tail -1)" == "$BASE" ]]; then
+            KEPT_ITEMS+="$item"
+        fi
+    done < <(items "$PUBLISHED")
+else
+    echo "Warning: couldn't read the published feed at $FEED_URL; any existing nightly item was not kept." >&2
+fi
+
 # Only "]]>" ends an XML CDATA section.
 APPCAST=build/appcast.xml
 cat >"$APPCAST" <<EOF
@@ -54,13 +86,13 @@ cat >"$APPCAST" <<EOF
             <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
             <sparkle:version>$BUILD</sparkle:version>
             <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>$MINIMUM_SYSTEM</sparkle:minimumSystemVersion>
+            <sparkle:minimumSystemVersion>$MINIMUM_SYSTEM</sparkle:minimumSystemVersion>$CHANNEL
             <description sparkle:format="markdown"><![CDATA[
 ${NOTES//]]>/]]]]><![CDATA[>}
 ]]></description>
             <enclosure url="https://github.com/opr-inzn/cicero/releases/download/v$VERSION/Cicero-$VERSION-$BUILD.dmg" $ENCLOSURE_SIGNATURE type="application/octet-stream"/>
         </item>
-    </channel>
+${KEPT_ITEMS}    </channel>
 </rss>
 EOF
 xmllint --noout "$APPCAST"

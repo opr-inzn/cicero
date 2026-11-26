@@ -21,7 +21,6 @@ struct CiceroApp: App {
         AppDelegate.launchModel = model
         NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
-                Appearance.applySaved()
                 model.start()
                 LibraryFocus.shared.start()
                 model.appSets.start(model)
@@ -274,6 +273,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
     private var waiting: [URL] = []
     private var addsFonts = false
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Before SwiftUI opens any window, so macOS 26 builds glass and window chrome in the saved appearance.
+        Appearance.applySaved()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if model == nil { model = Self.launchModel }

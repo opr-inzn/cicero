@@ -50,13 +50,6 @@ public struct UserData: Codable, Equatable, Sendable {
 
     public init() {}
 
-    public static var newLibrary: UserData {
-        var data = UserData()
-        data.licenseStatusesAdded = false
-        data.updateLicenseTags()
-        return data
-    }
-
     public static let licenseTags: [(name: String, color: TagColor)] = [
         ("Licensed", .green), ("Unlicensed", .red), ("Open Source", .blue), ("Trial", .orange),
     ]
