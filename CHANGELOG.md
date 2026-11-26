@@ -12,9 +12,6 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Updates install themselves:** with **Install updates automatically** on in Settings → General, Cicero downloads a new version in the background and installs it when you quit. When an update is ready, a **Restart to Update** button shows at the bottom of the sidebar.
 - **Try new features first:** choose **Update track → Nightly** in Settings → General to get a new version most days, before it’s finished.
 - **Conflicts:** every group is now one table, with one bar to move the selected files to the Trash.
-- A family whose fonts are gone from a folder now says “now missing”.
-- Previews of fonts that draw above their own ascent are centered.
-- Cicero no longer has a menu bar icon.
 - Performance improvements and bug fixes: Cicero is faster with large libraries, freezes and crashes less, and text fields no longer correct or complete what you type.
 
 ## 0.12.1
