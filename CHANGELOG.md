@@ -9,6 +9,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Licenses in the Info panel:** a family’s licenses show in the Info panel, each with its owner and how many of the family’s styles it covers.
 - The fonts in the Vault stay out of your library: Cicero doesn’t list them, turn them on, or offer to remove them as duplicates. Deleting a license moves it to the Trash.
 - **Back Up Library** includes the Vault, and **Restore Library** puts back the licenses that aren’t in the Vault.
+- A new library starts with no tags, so you can make the ones you need. The libraries you have keep their tags.
 
 ## 0.13.0
 

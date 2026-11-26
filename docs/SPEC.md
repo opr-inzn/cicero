@@ -64,11 +64,12 @@ Closing every window leaves Cicero running, so app folders and Adobe documents' 
     Menus start with Activate Folder, Activate Temporarily and Deactivate Folder
     (Activate Smart Folder, Deactivate Smart Folder), for every family the row shows; then Rename Folder, Delete Folder
     (an app folder's too); Edit Smart Folder, Delete Smart Folder.
-  - **Tags** (`SidebarSection.tags`; a family has any number, the license tags to begin with, on no family; called
+  - **Tags** (`SidebarSection.tags`; a family has any number, none to begin with; called
     License in 0.5 to 0.5.2, when a family had one at a time; + new tag: the New Tag sheet, a name and a
     row of colour dots, None, the Finder's seven and sand, starting on the first colour no tag has; an empty name
-    is the colour's; a name that's taken says so and can't be created). A new library starts with Licensed (green),
-    Unlicensed (red), Open Source (blue) and Trial (orange); up to 0.9.1 also Licensed + Non-Commercial (sand),
+    is the colour's; a name that's taken says so and can't be created). A new library starts with no tags (`UserData.newLibrary`;
+    until 0.13 it started with Licensed (green), Unlicensed (red), Open Source (blue) and Trial (orange), which a
+    library from before 0.5 still gets once as it loads; up to 0.9.1 also Licensed + Non-Commercial (sand),
     Partially Licensed (yellow) and Public Domain (purple), which a library from then loses once as it loads, each
     when in its colour, on no family and in no smart folder. One row per tag in the order they were made, a dot in its colour (a picture,
     not a tinted symbol, which the list darkened on the accent colour; or tag when it has none). Menu:

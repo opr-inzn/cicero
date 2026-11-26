@@ -224,16 +224,9 @@ Smart folders with a **Times Activated** or **Last Activated** rule, made with a
 
 ## Tags
 
-Mark families with tags, which show as colored dots next to their names in the list, grid and specimens. A family can have as many tags as you like. Cicero comes with tags for keeping track of what you may do with each family, given to no family to begin with:
+Mark families with tags, which show as colored dots next to their names in the list, grid and specimens. A family can have as many tags as you like. A new library starts with no tags: make the ones you need with **+** next to **Tags** in the sidebar.
 
-| Tag | Color |
-| --- | --- |
-| Licensed | Green |
-| Unlicensed | Red |
-| Open Source | Blue |
-| Trial | Orange |
-
-They’re tags like any other: rename them, delete them, or make your own. Libraries from before Cicero 0.5 get these too, once, and keep their own tags; the Red, Yellow and Green tags a library started with go if you never used them. Libraries from Cicero 0.9.1 and before also lose the Licensed + Non-Commercial, Partially Licensed and Public Domain tags they started with, once, if you never used them. From 0.5 to 0.6 a family had one tag at a time; the tags families had then, they keep.
+Libraries from Cicero 0.13 and before keep the tags they have. Up to Cicero 0.13, a new library started with four tags: **Licensed** (green), **Unlicensed** (red), **Open Source** (blue) and **Trial** (orange). They’re tags like any other: rename them, delete them, or keep them. Libraries from before Cicero 0.5 get these four too, once, and keep their own tags; the Red, Yellow and Green tags a library started with go if you never used them. Libraries from Cicero 0.9.1 and before also lose the Licensed + Non-Commercial, Partially Licensed and Public Domain tags they started with, once, if you never used them. From 0.5 to 0.6 a family had one tag at a time; the tags families had then, they keep.
 
 ### Tag fonts
 
