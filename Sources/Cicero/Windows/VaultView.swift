@@ -191,7 +191,7 @@ private struct VaultList: View {
         let licenses = model.vaultLicenses.count
         guard licenses > 0 else { return "" }
         let owners = model.vaultOwners.count
-        return "\(licenses == 1 ? "1 license" : "\(licenses.plain) licenses") · \(owners == 1 ? "1 owner" : "\(owners.plain) owners")"
+        return "\(licenses == 1 ? "1 License" : "\(licenses.plain) Licenses") · \(owners == 1 ? "1 Owner" : "\(owners.plain) Owners")"
     }
 
     private var shownLicenses: [VaultLicense] {
