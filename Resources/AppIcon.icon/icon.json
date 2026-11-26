@@ -1,132 +1,147 @@
 {
-  "fill-specializations" : [
+  "fill-specializations": [
     {
-      "value" : "system-light"
+      "value": {
+        "linear-gradient": [
+          "srgb:0.21961,0.63922,1.00000,1.00000",
+          "srgb:0.01961,0.43137,0.92157,1.00000"
+        ],
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
+          },
+          "stop": {
+            "x": 0.5,
+            "y": 1
+          }
+        }
+      }
     },
     {
-      "appearance" : "dark",
-      "value" : {
-        "linear-gradient" : [
+      "appearance": "dark",
+      "value": {
+        "linear-gradient": [
           "srgb:0.18431,0.18431,0.18431,1.00000",
           "srgb:0.07843,0.07843,0.07843,1.00000"
         ],
-        "orientation" : {
-          "start" : {
-            "x" : 0.5,
-            "y" : 0
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
           },
-          "stop" : {
-            "x" : 0.5,
-            "y" : 1
+          "stop": {
+            "x": 0.5,
+            "y": 1
           }
         }
       }
     }
   ],
-  "groups" : [
+  "groups": [
     {
-      "layers" : [
+      "layers": [
         {
-          "fill-specializations" : [
+          "fill-specializations": [
             {
-              "value" : {
-                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              "value": {
+                "solid": "srgb:0.03922,0.51765,1.00000,1.00000"
               }
             },
             {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
               }
             }
           ],
-          "glass" : false,
-          "image-name" : "selected-letter.svg",
-          "name" : "C"
+          "glass": false,
+          "image-name": "selected-letter.svg",
+          "name": "C"
         },
         {
-          "fill-specializations" : [
+          "fill-specializations": [
             {
-              "value" : {
-                "solid" : "srgb:0.03922,0.51765,1.00000,1.00000"
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,0.85000"
               }
             },
             {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "srgb:0.06275,0.57647,0.98039,1.00000"
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.06275,0.57647,0.98039,1.00000"
               }
             }
           ],
-          "glass" : true,
-          "image-name" : "selected-circle.svg",
-          "name" : "Selected Circle"
+          "glass": true,
+          "image-name": "selected-circle.svg",
+          "name": "Selected Circle"
         }
       ],
-      "name" : "Selected",
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.40000000000000002
+      "name": "Selected",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.4
       },
-      "specular" : true,
-      "translucency" : {
-        "enabled" : false,
-        "value" : 0.5
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
       }
     },
     {
-      "layers" : [
+      "layers": [
         {
-          "fill-specializations" : [
+          "fill-specializations": [
             {
-              "value" : {
-                "solid" : "srgb:0.10980,0.10980,0.11765,1.00000"
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
               }
             },
             {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "srgb:0.94902,0.94902,0.96863,1.00000"
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.94902,0.94902,0.96863,1.00000"
               }
             }
           ],
-          "glass" : false,
-          "image-name" : "letters.svg",
-          "name" : "Letters"
+          "glass": false,
+          "image-name": "letters.svg",
+          "name": "Letters"
         },
         {
-          "fill-specializations" : [
+          "fill-specializations": [
             {
-              "value" : {
-                "solid" : "srgb:0.95686,0.95686,0.95686,1.00000"
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,0.20000"
               }
             },
             {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "srgb:0.16471,0.16471,0.16471,1.00000"
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.16471,0.16471,0.16471,1.00000"
               }
             }
           ],
-          "glass" : true,
-          "image-name" : "circles.svg",
-          "name" : "Circles"
+          "glass": true,
+          "image-name": "circles.svg",
+          "name": "Circles"
         }
       ],
-      "name" : "Glyphs",
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.40000000000000002
+      "name": "Glyphs",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.4
       },
-      "specular" : true,
-      "translucency" : {
-        "enabled" : false,
-        "value" : 0.5
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
       }
     }
   ],
-  "supported-platforms" : {
-    "squares" : [
+  "supported-platforms": {
+    "squares": [
       "macOS"
     ]
   }
