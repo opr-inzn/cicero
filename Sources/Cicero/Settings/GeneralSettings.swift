@@ -108,6 +108,11 @@ struct GeneralSettings: View {
             }
             Section("Updates") {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
+                Toggle(isOn: $updates.installsAutomatically) {
+                    Text("Install updates automatically")
+                    Text("Cicero downloads a new version in the background and installs it when you quit Cicero.")
+                }
+                .disabled(!updates.checksAutomatically)
                 Toggle(isOn: $sharesUsageStatistics) {
                     Text("Share usage statistics")
                     Text("Each time Cicero opens, it sends TelemetryDeck its version, the macOS version and a random number for this Mac.")

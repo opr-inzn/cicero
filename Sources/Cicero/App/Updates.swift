@@ -8,6 +8,9 @@ final class Updates {
     var checksAutomatically: Bool {
         didSet { controller.updater.automaticallyChecksForUpdates = checksAutomatically }
     }
+    var installsAutomatically: Bool {
+        didSet { controller.updater.automaticallyDownloadsUpdates = installsAutomatically }
+    }
 
     @ObservationIgnored private let controller = SPUStandardUpdaterController(
         startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
@@ -16,6 +19,7 @@ final class Updates {
 
     init() {
         checksAutomatically = controller.updater.automaticallyChecksForUpdates
+        installsAutomatically = controller.updater.automaticallyDownloadsUpdates
         guard isAvailable else { return }
         controller.startUpdater()
         if checksAutomatically { controller.updater.checkForUpdatesInBackground() }
