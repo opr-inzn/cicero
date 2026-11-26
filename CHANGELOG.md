@@ -2,6 +2,12 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **Help → What’s New in Cicero**. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
+## Unreleased
+
+- **Random sample texts:** in the preview text’s **Presets** menu, and when you Control-click the sample text on a font page, choose **Pangram** for a random pangram, or **Wikipedia** for a text from a random article in the language you choose. Your Mac’s languages show first, and the others are in **Other Languages**.
+- **Updates come sooner:** Cicero looks for a new version every 4 hours, not once a day.
+- **Restart to Update at once:** when Cicero finds an update, the **Restart to Update** button shows at the bottom of the sidebar, also before the update is downloaded. Click it to download the update and restart.
+
 ## 0.13.0
 
 - **A new app icon:** Cicero’s icon is now a map of glyphs, blue in Light Mode and dark in Dark Mode.
