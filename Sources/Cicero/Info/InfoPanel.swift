@@ -284,6 +284,7 @@ private struct InfoRows: View {
             row("Status", face.state.label)
             TagsRow(family: family)
             RatingRow(family: family)
+            LicensesRow(family: family)
             ClassificationRow(family: family)
             if let info = info?.value {
                 ForEach(Array(info.rows.enumerated()), id: \.offset) { _, row in
@@ -388,6 +389,72 @@ private struct TagsRow: View {
                 }
             }
         }
+    }
+}
+
+private struct LicensesRow: View {
+    @Environment(AppModel.self) private var model
+    let family: Family
+
+    var body: some View {
+        let licenses = model.licenses(of: family)
+        if !licenses.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Licenses").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Show in Vault") { open(nil) }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                }
+                ForEach(licenses) { license in
+                    let covered = model.coveredFaces(of: family, by: license)
+                    let isPartial = covered.count < family.faces.count
+                    Button { open(license) } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(license.owner).font(.callout.weight(.semibold))
+                                Spacer(minLength: 4)
+                                KindChips(kinds: license.kinds)
+                            }
+                            Text(detail(license, covered: covered)).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.background.opacity(0.6), in: .rect(cornerRadius: 8))
+                        .overlay(alignment: .leading) {
+                            if isPartial {
+                                UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 8).fill(.orange).frame(width: 3)
+                            }
+                        }
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .help(isPartial ? "This license covers only some styles" : "Open this license in the Vault")
+                }
+            }
+        }
+    }
+
+    private func detail(_ license: VaultLicense, covered: [LibraryFace]) -> String {
+        let total = family.faces.count
+        let version = license.styles.compactMap { AppModel.versionNumber($0.version) }.first
+        var text = covered.count == total ? (total == 1 ? "Its 1 style" : "All \(total.plain) styles")
+            : "\(covered.count.plain) of \(total.plain) styles"
+        if covered.count < total, !covered.isEmpty, covered.count <= 4 {
+            text += ": " + covered.map(\.face.styleName).listed()
+        }
+        if let version { text += " · \(version)" }
+        if !license.name.isEmpty { text += " · \(license.name)" }
+        return text
+    }
+
+    private func open(_ license: VaultLicense?) {
+        model.openFamilyID = nil
+        model.selection = .vault
+        model.openLicenseID = license?.id
     }
 }
 

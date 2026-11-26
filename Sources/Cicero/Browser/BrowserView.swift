@@ -8,6 +8,8 @@ struct BrowserView: View {
     var body: some View {
         if model.selection == .problems {
             ProblemsView()
+        } else if model.selection == .vault {
+            VaultView()
         } else {
             browser
         }

@@ -170,10 +170,18 @@ public struct Vault: Sendable {
         var result: [VaultLicense] = []
         for ownerFolder in Self.visibleFolders(in: root) {
             for folder in Self.visibleFolders(in: ownerFolder) {
-                var license = Self.details(in: folder) ?? VaultLicense(
-                    owner: ownerFolder.lastPathComponent, name: folder.lastPathComponent,
-                    added: (try? folder.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date(timeIntervalSince1970: 0)
-                )
+                var license: VaultLicense
+                if let details = Self.details(in: folder) {
+                    license = details
+                } else {
+                    let files = Self.files(in: folder)
+                    license = VaultLicense(
+                        owner: ownerFolder.lastPathComponent, name: folder.lastPathComponent, kinds: Self.kinds(of: files),
+                        added: (try? folder.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date(timeIntervalSince1970: 0),
+                        styles: Self.styles(in: folder, files: files)
+                    )
+                    try? write(license, in: folder)
+                }
                 if Self.folderName(for: license.owner) != ownerFolder.lastPathComponent { license.owner = ownerFolder.lastPathComponent }
                 if Self.folderName(for: license.name) != folder.lastPathComponent { license.name = folder.lastPathComponent }
                 license.folder = folder

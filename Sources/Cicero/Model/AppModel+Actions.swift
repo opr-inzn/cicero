@@ -544,7 +544,9 @@ extension AppModel {
 
     func addFolders(_ urls: [URL]) {
         let existing = Set(data.folders.map(\.path))
-        let paths = urls.map(\.standardizedFileURL.path)
+        let vault = self.vault
+        let paths = urls.map(\.standardizedFileURL.path).filter { !vault.contains($0) }
+        guard !paths.isEmpty else { return showToast("The Vault can’t be a location: its fonts stay out of your library") }
         let new = paths.filter { !existing.contains($0) }
         guard !new.isEmpty else {
             let name = URL(fileURLWithPath: paths.first ?? "").lastPathComponent
@@ -933,6 +935,7 @@ extension AppModel {
             SidebarRow(key: "library.recent", title: "Recents", icon: "tray.and.arrow.down", item: .recent),
             data.showSystemFonts ? SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system) : nil,
             SidebarRow(key: "library.problems", title: "Conflicts", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
+            SidebarRow(key: "library.vault", title: "Vault", icon: "archivebox", item: .vault),
         ].compactMap { $0 }
         return data.sidebar.ordered(rows, in: "library", key: \.key)
     }
@@ -1095,7 +1098,7 @@ extension AppModel {
 
     func sidebarList(of item: SidebarItem) -> String {
         switch item {
-        case .all, .active, .inactive, .temporary, .system, .recent, .problems: "library"
+        case .all, .active, .inactive, .temporary, .system, .recent, .problems, .vault: "library"
         case .folder: SidebarSection.folders.rawValue
         case .set, .smartSet: SidebarSection.sets.rawValue
         case .tag: SidebarSection.tags.rawValue

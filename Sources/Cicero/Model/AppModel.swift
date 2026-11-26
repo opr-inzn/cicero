@@ -245,6 +245,12 @@ final class AppModel {
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
     private(set) var toastUndo: (() -> Void)?
+    private(set) var toastAction: ToastAction?
+    var vaultLicenses: [VaultLicense] = []
+    var vaultAdd: VaultAddPrompt?
+    var openLicenseID: UUID?
+    var trashingLicense: VaultLicense?
+    var isAddingToVault = false
     @ObservationIgnored private var heldToast: String?
 
     // MARK: Compare
@@ -449,6 +455,8 @@ final class AppModel {
         guard !started else { return }
         started = true
         openWaitingFiles()
+        cleanUpVault()
+        reloadVault()
     }
 
     private func restoreLibrary() {
@@ -933,18 +941,29 @@ final class AppModel {
 
     static let undoTime = Duration.seconds(6)
 
-    func showToast(_ message: String, undo: (() -> Void)? = nil) {
+    func showToast(_ message: String, undo: (() -> Void)? = nil, action: ToastAction? = nil) {
         let message = message.isEmpty || ".!?…".contains(message.last!) ? message : message + "."
         if importing != nil || earlierImportPrompt != nil { return heldToast = message }
         toast = message
         toastUndo = undo
+        toastAction = action
         toastTask?.cancel()
         toastTask = Task { [weak self] in
-            try? await Task.sleep(for: undo == nil ? .seconds(3) : Self.undoTime)
+            try? await Task.sleep(for: undo == nil && action == nil ? .seconds(3) : Self.undoTime)
             guard !Task.isCancelled else { return }
             self?.toast = nil
             self?.toastUndo = nil
+            self?.toastAction = nil
         }
+    }
+
+    func runToastAction() {
+        let action = toastAction
+        toastTask?.cancel()
+        toast = nil
+        toastUndo = nil
+        toastAction = nil
+        action?.run(self)
     }
 
     private func showHeldToast() {
@@ -958,6 +977,7 @@ final class AppModel {
         toastTask?.cancel()
         toast = nil
         toastUndo = nil
+        toastAction = nil
         undo?()
     }
 
@@ -1035,6 +1055,8 @@ final class AppModel {
         _ = showsGuessingQuestion
         _ = showsBackupSheet
         _ = restorePrompt != nil
+        _ = vaultAdd != nil
+        _ = trashingLicense != nil
     }
 
     var isShowingPrompt: Bool { isAsking(overActivationSheets: false) }
@@ -1045,7 +1067,7 @@ final class AppModel {
             || replacePrompt != nil || openAppsReplacePrompt != nil || trashPlan != nil || textPrompt != nil || newTagRequest != nil
             || editingSmartSet != nil || editingAppsForSet != nil || editingCharacterSet != nil || !deletingCharacterSets.isEmpty
             || isClearingCaches || importing != nil || earlierImportPrompt != nil || showsGuessingQuestion || showsBackupSheet
-            || restorePrompt != nil
+            || restorePrompt != nil || vaultAdd != nil || trashingLicense != nil
     }
 
     func startJob(_ new: LibraryJob) -> Bool {

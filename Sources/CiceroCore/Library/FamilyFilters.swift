@@ -1,7 +1,7 @@
 import Foundation
 
 public enum SidebarItem: Hashable, Sendable {
-    case all, active, inactive, system, problems
+    case all, active, inactive, system, problems, vault
     case recent
     case temporary
     case folder(UUID)
@@ -94,7 +94,7 @@ public struct FamilyFilters {
         case .recent:
             let cutoff = now.addingTimeInterval(-Double(Self.recentDays) * 86_400)
             return { $0.lastAdded.map { $0 > cutoff } ?? false }
-        case .problems: return { _ in false }
+        case .problems, .vault: return { _ in false }
         case .folder(let id): return { $0.folderIDs.contains(id) }
         case .set(let id):
             let members = Set(data.sets.first { $0.id == id }?.memberFamilies ?? [])

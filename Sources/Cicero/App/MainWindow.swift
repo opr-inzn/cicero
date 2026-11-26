@@ -69,6 +69,7 @@ struct MainWindow: View {
             if let id = model.editingAppsForSet { AppSetEditor(setID: id) }
         }
         .backupSheet(isPresented: $model.showsBackupSheet)
+        .sheet(item: $model.vaultAdd) { VaultAddSheet(prompt: $0) }
         .restoreSheet(contents: $model.restorePrompt)
         .alert(
             "Deactivate Other Styles Too?",
@@ -120,6 +121,12 @@ struct MainWindow: View {
                         Text(toast)
                         if model.toastUndo != nil {
                             Button("Undo") { model.undoToast() }
+                                .buttonStyle(.plain)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.tint)
+                        }
+                        if let action = model.toastAction {
+                            Button(action.title) { model.runToastAction() }
                                 .buttonStyle(.plain)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.tint)

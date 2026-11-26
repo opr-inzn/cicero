@@ -392,7 +392,7 @@ private struct SidebarRowMenu: View {
         case .foundry: "Foundries"
         case .classification: "Classifications"
         case .characterSet: "Coverage Sets"
-        case .all, .active, .inactive, .temporary, .system, .recent, .problems: "Items"
+        case .all, .active, .inactive, .temporary, .system, .recent, .problems, .vault: "Items"
         }
     }
 
@@ -685,7 +685,7 @@ private final class FittingTextField: NSTextField {
 private extension SidebarItem {
     var isLibrary: Bool {
         switch self {
-        case .all, .active, .inactive, .temporary, .recent, .system, .problems: true
+        case .all, .active, .inactive, .temporary, .recent, .system, .problems, .vault: true
         default: false
         }
     }

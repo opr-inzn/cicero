@@ -56,6 +56,7 @@ extension AppModel {
         case .set(let id): return data.sets.contains { $0.id == id } ? selection : nil
         case .tag(let name): return data.tags.contains(name) ? selection : nil
         case .folder(let id): return id == WatchedFolder.addedFilesID || dropLocation(id) != nil ? selection : nil
+        case .vault: return selection
         default: return nil
         }
     }
@@ -109,13 +110,23 @@ extension AppModel {
     }
 
     private func open(_ urls: [URL], target: SidebarItem?) {
+        if target == .vault {
+            if let id = openLicenseID, let license = vaultLicenses.first(where: { $0.id == id }) { return addFiles(urls, to: license) }
+            return addToVault(urls)
+        }
+        let vault = self.vault
         let fileURLs = urls.filter(\.isFileURL).map(\.standardizedFileURL)
         let imports = importFiles(among: fileURLs)
-        let candidates = fileURLs.filter { !imports.contains($0) }
+        let outside = fileURLs.filter { !imports.contains($0) && !vault.contains($0.path) }
+        guard !outside.isEmpty || fileURLs.count == imports.count else {
+            return showToast("Fonts in the Vault stay there. Copy them out in the Finder to add them")
+        }
+        let candidates = outside
+        let skipped = vault.skippedPrefixes
         let readFolders = readFolders
         let totalCount = urls.count
         Task {
-            let classified = await Task.detached(priority: .userInitiated) { () -> (folders: [URL], files: [String], seen: Set<String>, documents: [URL], webFonts: Set<String>) in
+            let classified = await Task.detached(priority: .userInitiated) { () -> (folders: [URL], files: [String], seen: Set<String>, documents: [URL], webFonts: [URL]) in
                 let realFolders = readFolders.compactMap { folder in Self.realPath(folder).map { (folder, $0) } }
                 let lookup = PathLookup(addedFiles: [], libraryPaths: [], folders: readFolders, realFolders: realFolders)
                 let fm = FileManager.default
@@ -124,7 +135,7 @@ extension AppModel {
                 var seen = Set<String>()
                 var documents: [URL] = []
                 // Web fonts are left out: Adobe apps don't see them in a Fonts folder, and set blank text in them used in place.
-                var webFonts: Set<String> = []
+                var webFonts: [URL] = []
                 for url in candidates {
                     var isDirectory: ObjCBool = false
                     guard fm.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
@@ -138,7 +149,7 @@ extension AppModel {
                     } else if DocumentFonts.fileExtensions.contains(pathExtension) {
                         documents.append(url)
                     } else if ["woff", "woff2"].contains(pathExtension) {
-                        webFonts.insert(pathExtension.uppercased())
+                        webFonts.append(url)
                     }
                 }
                 return (folders, files, seen, documents, webFonts)
@@ -151,7 +162,10 @@ extension AppModel {
             if let document = documents.first { findFonts(in: document) }
             guard !folders.isEmpty || !files.isEmpty else {
                 guard documents.isEmpty, imports.isEmpty else { return }
-                if !webFonts.isEmpty { return showToast("Cicero doesn’t support web fonts like \(webFonts.sorted().listed())") }
+                if !webFonts.isEmpty {
+                    let kinds = Set(webFonts.map { $0.pathExtension.uppercased() }).sorted().listed()
+                    return showToast("Cicero can’t use web fonts like \(kinds)", action: ToastAction(title: "Save in Vault") { $0.addToVault(webFonts) })
+                }
                 return showToast(totalCount == 1 ? "That isn’t a font Cicero can read" : "Those aren’t fonts Cicero can read")
             }
             var method: InstallMethod?
@@ -165,7 +179,7 @@ extension AppModel {
             }
             var expandedFiles = files
             var seen = seenFiles
-            let found = await Task.detached(priority: .userInitiated) { opened.flatMap(LibraryScanner.fontFiles(in:)) }.value
+            let found = await Task.detached(priority: .userInitiated) { opened.flatMap { LibraryScanner.fontFiles(in: $0, skipping: skipped) } }.value
             let lookup = pathLookup()
             for raw in found {
                 let path = lookup.libraryPath(of: raw)

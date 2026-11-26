@@ -319,6 +319,9 @@ extension ActivationEngine {
         if [locations.support, locations.caches, locations.inactiveFolder].contains(where: { isIn($0.path) }) {
             return "Cicero uses that folder for its own files."
         }
+        if isIn(locations.vault.standardizedFileURL.path) || isIn(locations.vault.resolvingSymlinksInPath().path) {
+            return "That folder is in the Vault, whose fonts stay out of your library."
+        }
         let inactive = [locations.inactiveFolder.standardizedFileURL.path, locations.inactiveFolder.resolvingSymlinksInPath().path]
         if inactive.contains(where: { $0.hasPrefix(path + "/") || $0.hasPrefix(resolved + "/") }),
            (try? fm.contentsOfDirectory(atPath: path))?.allSatisfy({ $0 == ".DS_Store" }) == true {
