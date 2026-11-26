@@ -11,6 +11,11 @@ What changed in each version of Cicero, newest first. To download a version, see
 - **Better classification:** Cicero guesses more fonts’ classifications correctly, from their letters, their names and the fonts like them.
 - **Rename in the sidebar:** double-click a folder, tag or location, or choose **Rename**, to change its name in place, as in the Finder.
 - **Duplicates is one table:** the extra copies are already selected. Change the selection with the checkboxes, then click **Move Files to Trash**. Each font always keeps at least one file. Duplicates now lists only files that are exactly the same.
+- **Updates install themselves:** with **Install updates automatically** on in Settings → General, Cicero downloads a new version in the background and installs it when you quit. When an update is ready, a **Restart to Update** button shows at the bottom of the sidebar.
+- **Try new features first:** choose **Update track → Nightly** in Settings → General to get a new version most days, before it’s finished.
+- **Conflicts:** every group is now one table, with one bar to move the selected files to the Trash.
+- A family whose fonts are gone from a folder now says “now missing”.
+- Previews of fonts that draw above their own ascent are centered.
 - Cicero no longer has a menu bar icon.
 - Performance improvements and bug fixes: Cicero is faster with large libraries, freezes and crashes less, and text fields no longer correct or complete what you type.
 
