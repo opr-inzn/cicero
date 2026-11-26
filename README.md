@@ -58,7 +58,7 @@ Bug reports, sample fonts, sample texts, ideas and pull requests are all welcome
 
 ## Roadmap
 
-Coming next: **subfolders** in Locations and Folders, and a search field that **searches licenses and descriptions**. How they could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
+Coming next: **subfolders** in Locations and Folders, a search field that **searches licenses and descriptions**, and a **Vault** for your licenses and the files Cicero can’t use, like web fonts, with a license for each client. How they could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
 
 ## Privacy
 

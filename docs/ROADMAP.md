@@ -1,8 +1,8 @@
 # Roadmap
 
 Features that could come next, roughly in the order they'd come, with how each could work, what's still open and
-about how big it is (S: a few hours, M: about a day). Nothing here is promised; the order changes as Cicero does.
-What's done is in the [changelog](../CHANGELOG.md).
+about how big it is (S: a few hours, M: about a day, L: several days). Nothing here is promised; the order changes as
+Cicero does. What's done is in the [changelog](../CHANGELOG.md).
 
 ## Next
 
@@ -41,6 +41,38 @@ match as they do now: each word must begin a word somewhere in the family. Show 
 - How to show why a family was found when the word isn't in its name: a line under the card, or the Info panel opened
   to it.
 - Libraries saved before: whether Cicero reads every font again once, or fills in the texts as it opens each file.
+
+### Vault (L)
+
+**What.** A place for your fonts' licenses and the files that come with them that Cicero can't use: license PDFs,
+receipts, web fonts (WOFF and WOFF2) and the ZIP a foundry sends. One family can have several licenses, one for each
+client: Söhne for one client with all 12 styles, and for another with only 2 styles of an older version. Dropping a web
+font now only says Cicero can't use it, and licenses are kept only as tags and notes.
+
+**How.**
+- Vault is an item in the sidebar's Library section, listing licenses grouped by owner. A license has an owner (a name
+  you type, with the ones used before suggested), a name, kinds (Desktop, Web, App, Trial, Other), a project or domain,
+  a date, an end date, a note, its files and the styles it covers.
+- Dropping files or a ZIP on Vault, or Save in Vault on the web font toast, opens a sheet. Cicero copies the files into
+  ~/Cicero/Vault/Owner/License (it never moves the originals), unpacks a ZIP, guesses the kinds from the files (OTF
+  gives Desktop, WOFF2 gives Web) and links each font file to its style in the library, style by style, not by family.
+- A license's page shows its details, the styles it covers with the library's version beside each, and its files, with
+  Quick Look and Show in Finder.
+- The Info panel lists a family's licenses, each with its owner and how many of the styles it covers, never only
+  "Licensed". A license that covers only some styles is marked.
+- The Vault's fonts aren't in the library: not scanned, listed or turned on. Conflicts, Replace and Move to Trash never
+  touch them. Deleting a license moves it and its files to the Trash, with Undo. Files stay exactly as they came.
+- Back Up Library gets "Include the Vault", on by default, with its count and size: the license PDFs are the proof.
+
+**Open.**
+- Whether a ZIP is kept too, next to its unpacked files, so everything stays as it came, at twice the space.
+- Whether one Vault item is enough, or each owner gets its own sidebar item.
+- Whether the font page's styles table shows whom each style is licensed for.
+- Whether Cicero can read the names in WOFF and WOFF2 files to link them, or links web fonts through the desktop fonts
+  next to them.
+- Later, not in the first version: turning on a license's own version of a font for an old job (through Use Copy
+  From), and exporting one owner's files for a developer or a printer. Installing fonts from the Vault stays out until
+  then, since an old version could replace a newer one.
 
 ## Not planned
 
