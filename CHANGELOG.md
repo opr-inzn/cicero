@@ -2,6 +2,14 @@
 
 Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **Help → What’s New in Cicero**. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
+## 0.14.0b1
+
+- **The Vault:** keep your fonts’ licenses together with the files that come with them, even the ones Cicero can’t use, like web fonts (WOFF and WOFF2), license PDFs, receipts and the ZIP files foundries send. Choose **Vault** in the sidebar and drop the files there, or click **Save in Vault** when you drop a web font. Cicero copies them into ~/Cicero/Vault. The originals stay where they are.
+- **A license for each client:** each license has an owner, a name you type, like “Me” or a client’s name, so one family can have several licenses, one for each client. Cicero links a license to the styles it has, not to the whole family, and shows each style’s version next to the one in your library.
+- **Licenses in the Info panel:** a family’s licenses show in the Info panel, each with its owner and how many of the family’s styles it covers.
+- The fonts in the Vault stay out of your library: Cicero doesn’t list them, turn them on, or offer to remove them as duplicates. Deleting a license moves it to the Trash.
+- **Back Up Library** includes the Vault, and **Restore Library** puts back the licenses that aren’t in the Vault.
+
 ## 0.13.0
 
 - **A new app icon:** Cicero’s icon is now a map of glyphs, with a gradient in Dark Mode.
