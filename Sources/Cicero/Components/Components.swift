@@ -1006,6 +1006,8 @@ struct PreviewOptionsButton: View {
 private struct PreviewOptions: View {
     @Environment(PreviewSettings.self) private var preview
     let own: OwnPreviewOptions?
+    @State private var failure: String?
+    private var sources: SampleSources { .shared }
 
     var body: some View {
         @Bindable var preview = preview
@@ -1017,19 +1019,30 @@ private struct PreviewOptions: View {
                     .noAutoFill()
                 HStack {
                     Menu("Presets\u{200A}") {
-                        ForEach(preview.savedPresets, id: \.self) { sample in
-                            Button(Self.title(of: sample)) { text.wrappedValue = sample }
+                        Section("Random") {
+                            RandomTextMenu(current: { text.wrappedValue }, wholeParagraph: false, started: { failure = nil },
+                                           apply: { text.wrappedValue = $0 }, showMessage: { failure = $0 })
                         }
                         if !preview.savedPresets.isEmpty {
-                            Divider()
+                            Section("Saved") {
+                                ForEach(preview.savedPresets, id: \.self) { sample in
+                                    Button(Self.title(of: sample)) { text.wrappedValue = sample }
+                                }
+                            }
                         }
-                        ForEach(PreviewSettings.presets, id: \.self) { sample in
-                            Button(sample) { text.wrappedValue = sample }
+                        Section {
+                            ForEach(PreviewSettings.presets, id: \.self) { sample in
+                                Button(sample) { text.wrappedValue = sample }
+                            }
                         }
                     }
                     .menuStyle(.button)
                     .buttonStyle(.borderless)
                     .fixedSize()
+                    if sources.loading > 0 {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
                     Spacer()
                     if preview.isSavedPreset(text.wrappedValue) {
                         Button("Remove Preset") { preview.savedPresets.removeAll { $0 == text.wrappedValue } }
@@ -1039,6 +1052,16 @@ private struct PreviewOptions: View {
                             .disabled(!preview.canSavePreset(text.wrappedValue))
                             .help("Save the current preview text as a preset")
                     }
+                }
+                if let article = sources.source(of: text.wrappedValue) {
+                    Link("From Wikipedia: \(article.title)", destination: article.url)
+                        .font(.caption)
+                        .help("Open the article. Wikipedia’s texts are under the CC BY-SA 4.0 license.")
+                }
+                if let failure {
+                    Text(failure)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
                 // ß in capitals is SS, as the text is set in every font, not all of which have ẞ.
                 LabeledContent("Case") {
@@ -1060,6 +1083,7 @@ private struct PreviewOptions: View {
                 }
             }
         }
+        .onChange(of: text.wrappedValue) { failure = nil }
         .formStyle(.grouped)
         .popoverFormMargins()
         .frame(width: 340)

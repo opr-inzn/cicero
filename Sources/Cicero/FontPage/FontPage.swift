@@ -526,7 +526,8 @@ private struct TesterText: View {
         let lowered = Self.lowered(in: font, room: room)
         SampleEditor(text: text, glyphs: glyphs, defaultText: defaultText, family: family.id, face: face, font: font,
                      kerning: kerning, lineHeight: lineHeightPoints, alignment: alignment.paragraph, margin: 24,
-                     roomAbove: room.above, roomBelow: room.below, caseChange: caseChange) {
+                     roomAbove: room.above, roomBelow: room.below, caseChange: caseChange,
+                     showMessage: { model.showToast($0) }) {
             FamilyMenu(families: [family], model: model)
         }
             .frame(minHeight: 280)
