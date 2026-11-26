@@ -12,6 +12,7 @@
 #   ./scripts/publish.sh                  publish the version in Resources/Info.plist
 #   CICERO_SKIP_VERSION_CHECK=1 ./scripts/publish.sh   replace a published version in place: move its tag to HEAD and push it first
 #   ./scripts/publish.sh --allow-unsigned publish even if the DMG isn't notarized
+#   CICERO_NIGHTLY_BUILD=1   for nightly.sh: a nightly's version, notes and version history aren't committed
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,7 +34,9 @@ NOTES=$(awk -v v="$VERSION" '$0 == "## " v { found = 1; next } found && /^## / {
 [[ -n "${NOTES//[[:space:]]/}" ]] || { echo "Add a \"## $VERSION\" section to CHANGELOG.md first." >&2; exit 1; }
 grep -qx "## $VERSION" help/version-history.md || { echo "help/version-history.md doesn't have $VERSION: run scripts/make-version-history.sh and commit it." >&2; exit 1; }
 
-if [[ -n "$(git status --porcelain)" ]] || [[ "$(git rev-parse HEAD)" != "$(git rev-parse '@{u}')" ]]; then
+BUILD_ONLY=()
+[[ -n "$NIGHTLY" && -n "${CICERO_NIGHTLY_BUILD:-}" ]] && BUILD_ONLY=(':!Resources/Info.plist' ':!CHANGELOG.md' ':!help/version-history.md')
+if [[ -n "$(git status --porcelain -- . ${BUILD_ONLY[@]+"${BUILD_ONLY[@]}"})" ]] || [[ "$(git rev-parse HEAD)" != "$(git rev-parse '@{u}')" ]]; then
     echo "Commit and push your changes first, so the release tag matches the published code." >&2
     exit 1
 fi

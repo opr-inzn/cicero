@@ -1,0 +1,41 @@
+name: Nightly
+
+# Builds and publishes a nightly of main with scripts/nightly.sh, which does nothing when main has no commits since the last release.
+# It runs on the Mac that releases (a self-hosted runner with the label cicero-release), where the keychain holds the Developer ID
+# certificate and the cicero-notary credentials. The Sparkle key is read from ~/.config/cicero/sparkle-key on that Mac.
+# If the Mac is asleep, the run waits for it, up to a day.
+on:
+  schedule:
+    # 03:17 in Germany in winter. Not minute zero, when GitHub's scheduled jobs are busiest.
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  nightly:
+    name: Build and publish a nightly
+    if: github.repository == 'opr-inzn/cicero' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, macOS, ARM64, cicero-release]
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          clean: false
+
+      # Keeps .build, so SwiftPM doesn't fetch and build every package again each night.
+      - name: Remove what earlier runs left
+        run: git clean -ffdx -e .build
+
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: SPARKLE_KEY_FILE="$HOME/.config/cicero/sparkle-key" ./scripts/nightly.sh
