@@ -31,9 +31,9 @@ jobs:
           fetch-depth: 0
           clean: false
 
-      # Keeps .build, so SwiftPM doesn't fetch and build every package again each night.
+      # Keeps .build, so SwiftPM doesn’t fetch and build every package again each night, and the download counts publish.sh saves.
       - name: Remove what earlier runs left
-        run: git clean -ffdx -e .build
+        run: git clean -ffdx -e .build -e docs/downloads.tsv
 
       - name: Build and publish
         env:
