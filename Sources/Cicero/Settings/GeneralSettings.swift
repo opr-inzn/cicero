@@ -67,7 +67,7 @@ struct GeneralSettings: View {
                 }
                 Toggle(isOn: $model.data.activatesDocumentFonts) {
                     Text("Auto-activate fonts in Adobe apps")
-                    Text("When you open a document in InDesign, Illustrator or Photoshop, Cicero activates the fonts it needs from your library until the app quits. InDesign and Illustrator still show their Missing Fonts dialog, and the app can take a few seconds to use the fonts. macOS asks once for each app whether Cicero may control it. Use with caution.")
+                    Text("When you open a document in InDesign, Illustrator or Photoshop, Cicero activates the fonts it needs from your library until the app quits. InDesign and Illustrator still show their Missing Fonts dialog, and the app can take a few seconds to use the fonts. macOS asks once for each app whether Cicero may control it.")
                 }
             }
             Section("Library") {
@@ -78,7 +78,7 @@ struct GeneralSettings: View {
                 }
                 Toggle(isOn: $model.data.showAdobeAppFolders) {
                     Text("Show fonts installed for proofing in Adobe apps")
-                    Text("Lists the fonts in folders that Adobe apps load automatically for font testing. [Learn how to test fonts in Adobe apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps).")
+                    Text("Lists the fonts in folders that Adobe apps load automatically for font testing.\n[Learn how to test fonts in Adobe apps](https://glyphsapp.com/learn/testing-your-fonts-in-adobe-apps).")
                 }
                 Toggle(isOn: $model.guessesClassifications) {
                     Text("Classify fonts automatically")
