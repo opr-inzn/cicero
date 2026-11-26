@@ -98,7 +98,8 @@ final class AppModel {
             }
             if !data.showSystemFonts, oldValue.showSystemFonts { deselect { $0 == .system } }
             if data.customCharacterSets != oldValue.customCharacterSets { characterSetLookup.reset() }
-            if data.tags != oldValue.tags || data.familyTags != oldValue.familyTags || data.tagColors != oldValue.tagColors {
+            if data.tags != oldValue.tags || data.familyTags != oldValue.familyTags || data.tagColors != oldValue.tagColors
+                || data.sidebar.order["tags"] != oldValue.sidebar.order["tags"] {
                 refreshTagDots()
             }
             if data.showAdobeAppFolders != oldValue.showAdobeAppFolders { rescan() }
@@ -964,8 +965,9 @@ final class AppModel {
 
     private func refreshTagDots() {
         var dots: [String: [TagDot]] = [:]
+        let order = data.orderedTags
         for family in data.familyTags.keys {
-            let tags = data.tags(of: family).map { TagDot(name: $0, color: data.tagColors[$0]) }
+            let tags = data.tags(of: family, in: order).map { TagDot(name: $0, color: data.tagColors[$0]) }
             if !tags.isEmpty { dots[family] = tags }
         }
         if dots != tagDots { tagDots = dots }

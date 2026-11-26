@@ -222,9 +222,17 @@ public struct UserData: Codable, Equatable, Sendable {
         }
     }
 
+    public var orderedTags: [String] {
+        sidebar.ordered(tags, in: "tags") { "tag.\($0)" }
+    }
+
     public func tags(of family: String) -> [String] {
+        tags(of: family, in: orderedTags)
+    }
+
+    public func tags(of family: String, in order: [String]) -> [String] {
         guard let names = familyTags[family], !names.isEmpty else { return [] }
-        return tags.filter(names.contains)
+        return order.filter(names.contains)
     }
 }
 

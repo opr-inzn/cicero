@@ -83,7 +83,7 @@ public enum ListCommand {
             return try FindCommand.run(options, in: context)
         case .tags:
             let counts = Dictionary(grouping: families.flatMap { context.data.tags(of: $0.id) }, by: { $0 }).mapValues(\.count)
-            answer.set("tags", context.data.tags.map { tag -> JSON in
+            answer.set("tags", context.data.orderedTags.map { tag -> JSON in
                 var object = JSONObject()
                 object.set("name", tag)
                 object.set("color", context.data.tagColors[tag]?.rawValue)

@@ -196,7 +196,7 @@ private struct RuleRow: View {
         case .classification:
             options(model.classificationNames.map { ($0, $0) })
         case .tag:
-            options(model.data.tags.map { ($0, $0) }, empty: "No tags yet", colors: model.data.tagColors)
+            options(model.data.orderedTags.map { ($0, $0) }, empty: "No tags yet", colors: model.data.tagColors)
         case .rating:
             options([("0", "No Rating")] + (1...5).reversed().map { (String($0), Rating.stars($0)) })
         case .set:

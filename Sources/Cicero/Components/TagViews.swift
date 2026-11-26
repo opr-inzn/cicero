@@ -130,7 +130,7 @@ struct TagMenuItems: View {
     let model: AppModel
 
     var body: some View {
-        ForEach(model.data.tags, id: \.self) { tag in
+        ForEach(model.data.orderedTags, id: \.self) { tag in
             Toggle(isOn: Binding(
                 get: { families.allSatisfy { model.hasTag(tag, $0) } },
                 set: { model.setTag(tag, $0, for: families) }
