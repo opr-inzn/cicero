@@ -302,9 +302,13 @@ private final class SampleTextView: NSTextView {
     }
 
     func replaceText(with string: String) {
-        guard let storage = textStorage else { return }
+        guard let window, let storage = textStorage else { return }
+        if hasMarkedText() {
+            inputContext?.discardMarkedText()
+            unmarkText()
+        }
+        if !(window.firstResponder is NSText) { window.makeFirstResponder(self) }
         let all = NSRange(location: 0, length: storage.length)
-        window?.makeFirstResponder(self)
         breakUndoCoalescing()
         guard shouldChangeText(in: all, replacementString: string) else { return }
         let attributes = typingAttributes.filter { $0.key != .sampleGlyph && $0.key != .glyphInfo }
@@ -386,7 +390,7 @@ private struct SampleMenu<Content: View>: View {
             .disabled(!hasSelection)
         Button("Paste", systemImage: "doc.on.clipboard") { view?.paste(nil) }
         Divider()
-        RandomTextMenu(current: { view?.string ?? "" }, wholeParagraph: true,
+        RandomTextMenu(current: { view?.window == nil ? nil : view?.string }, wholeParagraph: true,
                        apply: { (view as? SampleTextView)?.replaceText(with: $0) }, showMessage: showMessage)
         if let article = SampleSources.shared.source(of: view?.string ?? "") {
             Button("Open “\(article.title)” on Wikipedia", systemImage: "safari") { NSWorkspace.shared.open(article.url) }

@@ -997,8 +997,8 @@ struct PreviewOptionsButton: View {
 
 private struct PreviewOptions: View {
     @Environment(PreviewSettings.self) private var preview
-    @Environment(AppModel.self) private var model
     let own: OwnPreviewOptions?
+    @State private var failure: String?
     private var sources: SampleSources { .shared }
 
     var body: some View {
@@ -1012,18 +1012,20 @@ private struct PreviewOptions: View {
                 HStack {
                     Menu("Presets\u{200A}") {
                         Section("Random") {
-                            RandomTextMenu(current: { text.wrappedValue }, wholeParagraph: false,
-                                           apply: { text.wrappedValue = $0 }, showMessage: { model.showToast($0) })
-                        }
-                        Divider()
-                        ForEach(preview.savedPresets, id: \.self) { sample in
-                            Button(Self.title(of: sample)) { text.wrappedValue = sample }
+                            RandomTextMenu(current: { text.wrappedValue }, wholeParagraph: false, started: { failure = nil },
+                                           apply: { text.wrappedValue = $0 }, showMessage: { failure = $0 })
                         }
                         if !preview.savedPresets.isEmpty {
-                            Divider()
+                            Section("Saved") {
+                                ForEach(preview.savedPresets, id: \.self) { sample in
+                                    Button(Self.title(of: sample)) { text.wrappedValue = sample }
+                                }
+                            }
                         }
-                        ForEach(PreviewSettings.presets, id: \.self) { sample in
-                            Button(sample) { text.wrappedValue = sample }
+                        Section {
+                            ForEach(PreviewSettings.presets, id: \.self) { sample in
+                                Button(sample) { text.wrappedValue = sample }
+                            }
                         }
                     }
                     .menuStyle(.button)
@@ -1048,6 +1050,11 @@ private struct PreviewOptions: View {
                         .font(.caption)
                         .help("Open the article. Wikipedia’s texts are under the CC BY-SA 4.0 license.")
                 }
+                if let failure {
+                    Text(failure)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
                 // ß in capitals is SS, as the text is set in every font, not all of which have ẞ.
                 LabeledContent("Case") {
                     CaseButtons { text.wrappedValue = $0.apply(to: text.wrappedValue) }
@@ -1068,6 +1075,7 @@ private struct PreviewOptions: View {
                 }
             }
         }
+        .onChange(of: text.wrappedValue) { failure = nil }
         .formStyle(.grouped)
         .popoverFormMargins()
         .frame(width: 340)

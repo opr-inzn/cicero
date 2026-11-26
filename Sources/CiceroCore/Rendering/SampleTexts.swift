@@ -55,13 +55,32 @@ public struct WikipediaArticle: Hashable, Sendable {
     public let text: String
     public let url: URL
 
-    public func opening(length: Int) -> String {
-        var end = text.startIndex
-        text.enumerateSubstrings(in: text.startIndex..., options: .bySentences) { _, range, _, stop in
-            end = range.upperBound
-            if text.distance(from: text.startIndex, to: end) >= length { stop = true }
+    public var opening: String {
+        let wide = Wikipedia.wideLanguages.contains(language)
+        let length = wide ? 30 : 60, maximum = wide ? 55 : 110
+        let start = text.startIndex
+        func count(to end: String.Index) -> Int { text[start..<end].trimmingCharacters(in: .whitespaces).count }
+        var end = start
+        text.enumerateSubstrings(in: start..., options: .bySentences) { _, range, _, stop in
+            if end > start, count(to: range.upperBound) > maximum {
+                stop = true
+            } else {
+                end = range.upperBound
+                stop = count(to: end) >= length
+            }
         }
-        return String(text[..<end]).trimmingCharacters(in: .whitespaces)
+        guard count(to: end) > maximum else { return String(text[..<end]).trimmingCharacters(in: .whitespaces) }
+        // Thai and Lao end sentences with a space, not a stop, so their first sentence can be the whole paragraph.
+        var cut = start
+        text.enumerateSubstrings(in: start..<end, options: .byWords) { _, range, _, stop in
+            if text.distance(from: start, to: range.upperBound) > maximum {
+                stop = true
+            } else {
+                cut = range.upperBound
+            }
+        }
+        if cut == start { cut = text.index(start, offsetBy: maximum) }
+        return String(text[..<cut]).trimmingCharacters(in: .whitespaces) + "…"
     }
 }
 
@@ -72,6 +91,8 @@ public enum Wikipedia {
         "lt", "lv", "mk", "ml", "mn", "mr", "ms", "my", "ne", "nl", "no", "pa", "pl", "pt", "ro", "ru", "si", "sk", "sl",
         "sq", "sr", "sv", "sw", "ta", "te", "th", "tl", "tr", "uk", "ur", "uz", "vi", "zh",
     ]
+
+    static let wideLanguages: Set = ["ja", "ko", "zh"]
 
     public enum Failure: Error {
         case noAnswer
@@ -91,18 +112,25 @@ public enum Wikipedia {
         else { throw Failure.noAnswer }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 8
+        configuration.timeoutIntervalForResource = 15
+        configuration.urlCache = nil
         let session = URLSession(configuration: configuration)
         defer { session.finishTasksAndInvalidate() }
         var request = URLRequest(url: url)
         request.setValue("Cicero/\(version) (https://cicero.maximilianinzinger.com)", forHTTPHeaderField: "User-Agent")
-        for _ in 0..<4 {
+        let minimum = wideLanguages.contains(language) ? 30 : 80
+        for _ in 0..<6 {
+            try Task.checkCancellation()
             let (data, response) = try await session.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw Failure.noAnswer }
-            let summary = try JSONDecoder().decode(Summary.self, from: data)
-            let text = summary.extract.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-            guard summary.type == "standard", text.count >= 80, let page = URL(string: summary.content_urls.desktop.page)
+            let status = (response as? HTTPURLResponse)?.statusCode
+            if status == 404 { continue }
+            guard status == 200 else { throw Failure.noAnswer }
+            guard let summary = try? JSONDecoder().decode(Summary.self, from: data),
+                  summary.type == "standard", let title = summary.title,
+                  let text = summary.extract?.split(whereSeparator: \.isWhitespace).joined(separator: " "), text.count >= minimum,
+                  let page = summary.content_urls?.desktop.page.flatMap(URL.init(string:)), page.scheme == "https"
             else { continue }
-            return WikipediaArticle(language: language, title: summary.title, text: text, url: page)
+            return WikipediaArticle(language: language, title: title, text: text, url: page)
         }
         throw Failure.noAnswer
     }
@@ -113,12 +141,12 @@ public enum Wikipedia {
 
     private struct Summary: Decodable {
         struct Links: Decodable {
-            struct Page: Decodable { let page: String }
+            struct Page: Decodable { let page: String? }
             let desktop: Page
         }
-        let type: String
-        let title: String
-        let extract: String
-        let content_urls: Links
+        let type: String?
+        let title: String?
+        let extract: String?
+        let content_urls: Links?
     }
 }
