@@ -38,9 +38,7 @@ struct FontPage: View {
                     Header(family: family)
                     Divider()
                     TypeTester(family: family)
-                    if family.faces.count > 1 {
-                        StyleRows(family: family)
-                    }
+                    StyleRows(family: family)
                     // Not the styles in this lazy stack: their rows, far taller than glyph rows, made it lay the page out again and again at full CPU.
                     LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
                         if let shown {
