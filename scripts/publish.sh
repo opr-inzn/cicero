@@ -6,8 +6,8 @@
 # and .../latest/download/appcast.xml offers it as an update. If that version's release exists, its files
 # are replaced in place, and the replaced files' download counts are added to docs/downloads.tsv first (local only, in .gitignore).
 #
-# A stable version (0.14.0) is published from main and becomes the latest release. A nightly (0.14.0-nightly.1) is
-# published from nightly as a pre-release, so the latest download link stays on the stable version, and its feed
+# Both are published from main. A stable version (0.14.0) becomes the latest release. A nightly (0.14.0-nightly.1)
+# is published as a pre-release, so the latest download link stays on the stable version, and its feed
 # (stable + nightly) replaces appcast.xml on the latest stable release.
 #   ./scripts/publish.sh                  publish the version in Resources/Info.plist
 #   CICERO_SKIP_VERSION_CHECK=1 ./scripts/publish.sh   replace a published version in place: move its tag to HEAD and push it first
@@ -19,10 +19,10 @@ VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resource
 DMG="build/Cicero-$VERSION.dmg"
 [[ -f "$DMG" ]] || { echo "Missing $DMG — run ./scripts/release.sh first." >&2; exit 1; }
 
-if [[ "$VERSION" =~ -nightly\.[0-9]+$ ]]; then BRANCH=nightly; else BRANCH=main; fi
+if [[ "$VERSION" =~ -nightly\.[0-9]+$ ]]; then NIGHTLY=1; else NIGHTLY=; fi
 CURRENT=$(git rev-parse --abbrev-ref HEAD)
-[[ "$CURRENT" == "$BRANCH" ]] ||
-    { echo "Cicero $VERSION is published from $BRANCH, and this is $CURRENT." >&2; exit 1; }
+[[ "$CURRENT" == main ]] ||
+    { echo "Cicero $VERSION is published from main, and this is $CURRENT." >&2; exit 1; }
 
 if [[ "${1:-}" != "--allow-unsigned" ]] && ! xcrun stapler validate "$DMG" >/dev/null 2>&1; then
     echo "$DMG isn't notarized. Run ./scripts/release.sh, or pass --allow-unsigned." >&2
@@ -53,7 +53,7 @@ cp "$DMG" "$ASSET_DIR/Cicero.dmg"
 cp "$DMG" "$ASSET_DIR/Cicero-$VERSION-$BUILD.dmg"
 cp build/appcast.xml "$ASSET_DIR/appcast.xml"
 COUNTS=docs/downloads.tsv
-if [[ "$BRANCH" == nightly ]]; then
+if [[ -n "$NIGHTLY" ]]; then
     LATEST=$(gh release view --json tagName --jq .tagName)
     NIGHTLY_ASSETS=("$ASSET_DIR/Cicero.dmg" "$ASSET_DIR/Cicero-$VERSION-$BUILD.dmg")
     SAVED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
