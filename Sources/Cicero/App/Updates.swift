@@ -182,7 +182,6 @@ final class Updates {
 
 private final class Channels: NSObject, SPUUpdaterDelegate {
     static let key = "getsNightlyUpdates"
-    static let legacyBetaKey = "getsBetaUpdates"
     static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
     static let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
 
@@ -198,7 +197,6 @@ private final class Channels: NSObject, SPUUpdaterDelegate {
 
     static var getsNightlies: Bool {
         if UserDefaults.standard.object(forKey: key) != nil { return UserDefaults.standard.bool(forKey: key) }
-        if UserDefaults.standard.object(forKey: legacyBetaKey) != nil { return UserDefaults.standard.bool(forKey: legacyBetaKey) }
         return isNightly(version)
     }
 
