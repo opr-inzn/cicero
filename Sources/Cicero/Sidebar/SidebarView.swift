@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
+    @Environment(Updates.self) private var updates
     @State private var pendingSelection: Set<SidebarItem>?
     @State private var pace = SelectionPace()
     @State private var highlight = SidebarHighlight()
@@ -29,6 +30,10 @@ struct SidebarView: View {
                     .padding(4)
                     .allowsHitTesting(false)
             }
+        }
+        .softBottomScrollEdge(updates.readyVersion != nil)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            SidebarUpdateButton()
         }
         .background { SidebarSnapReader(fit: fit) }
         .onChange(of: shown, initial: true) { highlight.selected = shown }
@@ -58,6 +63,37 @@ struct SidebarView: View {
             pendingSelection = nil
             model.selectSidebarItems(items)
         }
+    }
+}
+
+private struct SidebarUpdateButton: View {
+    @Environment(AppModel.self) private var model
+    @Environment(Updates.self) private var updates
+    @Environment(\.appearsActive) private var appearsActive
+
+    var body: some View {
+        ZStack {
+            if let version = updates.readyVersion {
+                let busy = model.job != nil
+                Button { updates.installReadyUpdate() } label: {
+                    Label("Restart to Update", systemImage: "arrow.down.circle")
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(appearsActive && !busy ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .glass(in: .capsule)
+                .disabled(busy)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 10)
+                .help(busy ? "Cicero can restart when the current task is done" : "Restart Cicero to install version \(version)")
+                .transition(.opacity)
+            }
+        }
+        .animation(.default, value: updates.readyVersion)
     }
 }
 

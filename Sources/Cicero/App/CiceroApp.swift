@@ -40,6 +40,7 @@ struct CiceroApp: App {
             MainWindow()
                 .environment(model)
                 .environment(preview)
+                .environment(updates)
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
                     TextEditingKeys.install()
@@ -113,8 +114,13 @@ struct CiceroCommands: Commands {
             Button("About Cicero", systemImage: "info.circle") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
-            Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
-                .disabled(!updates.isAvailable)
+            if updates.readyVersion != nil {
+                Button("Restart to Update", systemImage: "arrow.down.circle") { updates.installReadyUpdate() }
+                    .disabled(model.job != nil)
+            } else {
+                Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
+                    .disabled(!updates.isAvailable)
+            }
             if CommandLineTool.State.shared.installed {
                 Button("Cicero CLI Installed", systemImage: "checkmark") { CommandLineTool.install(model: model) }
             } else {

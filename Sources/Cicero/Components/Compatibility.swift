@@ -33,6 +33,10 @@ extension View {
         if #available(macOS 26, *) { scrollEdgeEffectStyle(isHard ? .hard : nil, for: .top) } else { self }
     }
 
+    @ViewBuilder func softBottomScrollEdge(_ isSoft: Bool = true) -> some View {
+        if #available(macOS 26, *) { scrollEdgeEffectStyle(isSoft ? .soft : nil, for: .bottom) } else { self }
+    }
+
     @ViewBuilder func topBarTint() -> some View {
         if #available(macOS 26, *) { background(Color.canvas.opacity(0.75)) } else { self }
     }
