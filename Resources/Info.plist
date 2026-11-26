@@ -69,6 +69,8 @@
 	<string>https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>p8/wzpFF92Vv02vbxUcR2H2pe2vbKNt3JyM63vu4HuE=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>14400</integer>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
