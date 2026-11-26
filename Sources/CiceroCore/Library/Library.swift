@@ -12,13 +12,14 @@ public struct Locations: Sendable {
     public var defaultFontLibrary: URL
     // In the home folder, not in Application Support, which apps that remove an app delete with it, fonts and all.
     public var inactiveFolder: URL
+    public var vault: URL
 
     public var formerDefaultFontLibrary: URL {
         defaultFontLibrary.deletingLastPathComponent().appendingPathComponent("Font Library", isDirectory: true)
     }
 
     public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [],
-                adobeFontsInAdobeApps: URL? = nil, adobeFontsList: URL? = nil, defaultFontLibrary: URL? = nil, inactiveFolder: URL? = nil) {
+                adobeFontsInAdobeApps: URL? = nil, adobeFontsList: URL? = nil, defaultFontLibrary: URL? = nil, inactiveFolder: URL? = nil, vault: URL? = nil) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
@@ -31,6 +32,7 @@ public struct Locations: Sendable {
         self.defaultFontLibrary = defaultFontLibrary
         self.inactiveFolder = inactiveFolder
             ?? defaultFontLibrary.deletingLastPathComponent().appendingPathComponent("Inactive", isDirectory: true)
+        self.vault = vault ?? defaultFontLibrary.deletingLastPathComponent().appendingPathComponent("Vault", isDirectory: true)
     }
 
     public static var standard: Locations {
@@ -401,6 +403,7 @@ public final class LibraryScanner: Sendable {
             }
             func isIn(_ folder: URL) -> Bool { path.hasPrefix(folder.path + "/") }
             if locations.systemFonts.contains(where: isIn) || locations.isInInactiveFolder(path) { return nil }
+            if Vault(locations: locations).contains(path) { continue }
             let fontsFolder = [locations.userFonts, locations.allUsersFonts].first(where: isIn)
             let folders = input.folders.filter { path.hasPrefix($0.path + "/") }
             let adobe = locations.adobeFontsInAdobeApps.flatMap { isIn($0) ? $0 : nil }
@@ -625,6 +628,7 @@ public final class LibraryScanner: Sendable {
         }
         let inactive = locations.inactiveFolders.map { WatchedFolder(id: WatchedFolder.inactiveFolderID, path: $0.path) }
         let inactivePaths = inactive.flatMap { [$0.path + "/", Self.realPath($0.path) + "/"] }
+        let vaultPaths = Vault(locations: locations).skippedPrefixes
         for folder in input.folders + inactive {
             if folder.id != WatchedFolder.adobeAppsID && folder.id != WatchedFolder.inactiveFolderID,
                let availability = FolderAvailability.of(folder.path) {
@@ -633,7 +637,7 @@ public final class LibraryScanner: Sendable {
                 reach.folderPaths.append(folder.path + "/")
                 continue
             }
-            let skipped = folder.id == WatchedFolder.inactiveFolderID ? [] : inactivePaths
+            let skipped = (folder.id == WatchedFolder.inactiveFolderID ? [] : inactivePaths) + vaultPaths
             let add = { (path: String, stamp: FaceStamp) in
                 if found[path] == nil {
                     found[path] = FoundFile(stamp: stamp, isActive: false)
@@ -680,8 +684,10 @@ public final class LibraryScanner: Sendable {
     }
 
     private func addActive(_ urls: [URL], to found: inout [String: FoundFile], linked: [(real: String, chosen: String)]) {
+        let vault = Vault(locations: locations)
         for url in urls {
             var path = url.path(percentEncoded: false)
+            if vault.contains(path) { continue }
             if found[path] == nil, let folder = linked.first(where: { path.hasPrefix($0.real) }) {
                 let chosen = folder.chosen + path.dropFirst(folder.real.count)
                 if found[chosen] != nil { path = chosen }
@@ -736,6 +742,13 @@ public final class LibraryScanner: Sendable {
             options: includingHidden ? [.skipsPackageDescendants] : [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return }
         for case let url as URL in enumerator {
+            if !skipping.isEmpty, url.hasDirectoryPath {
+                let path = url.path(percentEncoded: false)
+                let folder = path.hasSuffix("/") ? path : path + "/"
+                let chosenFolder = resolved != chosen && folder.hasPrefix(resolved) ? chosen + folder.dropFirst(resolved.count) : folder
+                if skipping.contains(folder) || skipping.contains(chosenFolder) { enumerator.skipDescendants() }
+                continue
+            }
             guard FontFormat.fileExtensions.contains(url.pathExtension.lowercased()),
                   let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
                   let modified = values.contentModificationDate, let size = values.fileSize
@@ -753,9 +766,9 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    public static func fontFiles(in folder: URL) -> [String] {
+    public static func fontFiles(in folder: URL, skipping: [String] = []) -> [String] {
         var paths: [String] = []
-        enumerate(folder) { path, _ in paths.append(path) }
+        enumerate(folder, skipping: skipping) { path, _ in paths.append(path) }
         return paths
     }
 
