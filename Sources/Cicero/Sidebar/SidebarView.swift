@@ -284,10 +284,6 @@ private struct SidebarContent: View {
         let content = HStack(spacing: 6) {
             if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
             SidebarLabel(row: row, highlight: highlight, fit: fit)
-            if row.badge > 0 {
-                Spacer(minLength: 4)
-                Text(row.badge.plain).foregroundStyle(.secondary).monospacedDigit().padding(.trailing, 4)
-            }
         }
         .opacity(model.isEditingSidebar && hidden ? 0.45 : 1)
         .padding(.leading, -indent)

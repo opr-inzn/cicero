@@ -14,7 +14,7 @@ public enum ProblemKind: String, CaseIterable, Sendable {
         case .sharedNames: "Shared Style Names"
         case .missing: "Missing Files"
         case .unreadable: "Damaged or Unreadable Files"
-        case .external: "Fonts on External Disks"
+        case .external: "Unavailable Fonts"
         case .duplicates: "Duplicates"
         }
     }
@@ -22,17 +22,17 @@ public enum ProblemKind: String, CaseIterable, Sendable {
     public var explanation: String {
         switch self {
         case .installedTwice:
-            "The same font is active from more than one file. macOS uses only one of them, so apps may get an older version. Keep one and remove the other copies."
+            "The same font is active from more than one file. macOS uses only one of them, so apps may get an older version. Keep one and remove the other copies. Selected files go to the Trash."
         case .sharedNames:
-            "Some fonts, often variable ones, give each style a short name of its own, like “Bold”. When two active fonts use the same name, macOS gives it to only one of them, and a document can open in the wrong font. Usually there’s nothing to do. If it happens, deactivate the font you don’t need, or get a newer version."
+            "Some fonts, often variable ones, give styles a short name like “Bold”. When two active fonts share a name, macOS assigns it to only one, so a document may open in the wrong font. Usually you don’t need to do anything. If a document uses the wrong font, deactivate the one you don’t need or get a newer version."
         case .missing:
-            "Cicero remembers these files, but they’re gone. Fonts activated in place stop working when their files move or their disk is disconnected."
+            "Cicero remembers these files or families, but they can’t be found. They may have been moved or deleted."
         case .unreadable:
-            "Cicero couldn’t read these files. They may be damaged, or not font files at all."
+            "Cicero couldn’t read these files. They may be damaged or not valid font files. Select any you want to move to the Trash."
         case .external:
-            "These fonts are used from an external disk or a server. They become inactive when it’s disconnected."
+            "These fonts are installed from their own folder on a disk or location that isn’t available now, so they’re inactive. Connect the disk or make the location available again, or forget them if it’s gone for good."
         case .duplicates:
-            "The same font file appears more than once in the same folder. Selected files go to the Trash. Each font keeps at least one file."
+            "The same font file appears more than once in the same location. You can move selected files to the Trash, and Cicero always keeps at least one copy of each font."
         }
     }
 }
@@ -77,15 +77,15 @@ public enum ProblemFix: Hashable, Sendable {
         case .deactivate: "Deactivate"
         case .trash(let paths): paths.count == 1 ? "Move to Trash" : "Move Extra Copies to Trash"
         case .forgetInPlace, .forgetInstalledCopy: "Forget"
-        case .removeFromSet: "Remove from Folder"
-        case .installCopy: "Install a Copy Instead"
-        case .removeFromAdobeFonts: "Remove in Adobe Fonts"
+        case .removeFromSet: "Forget Family"
+        case .installCopy: "Install a Copy"
+        case .removeFromAdobeFonts: "Manage in Adobe Fonts"
         }
     }
 
     public var isForget: Bool {
         switch self {
-        case .forgetInPlace, .forgetInstalledCopy: true
+        case .forgetInPlace, .forgetInstalledCopy, .removeFromSet: true
         default: false
         }
     }
@@ -105,10 +105,13 @@ public struct Problem: Identifiable, Hashable, Sendable {
     public var extraCopies: [String]
     public var copyGroups: [[String]]
     public var trashable: Set<String>
+    public var newest: Set<String>
+    public var leavesAdobeFonts: Set<String>
 
     public init(id: String, kind: ProblemKind, title: String, family: String? = nil, summary: String, files: [ProblemFile], fixes: [ProblemFix],
                 fileFixes: [String: [ProblemFix]], folderFixes: [String: [ProblemFix]] = [:], newestFolder: String? = nil,
-                extraCopies: [String] = [], copyGroups: [[String]] = [], trashable: Set<String> = []) {
+                extraCopies: [String] = [], copyGroups: [[String]] = [], trashable: Set<String> = [], newest: Set<String> = [],
+                leavesAdobeFonts: Set<String> = []) {
         self.id = id
         self.kind = kind
         self.title = title
@@ -122,6 +125,8 @@ public struct Problem: Identifiable, Hashable, Sendable {
         self.extraCopies = extraCopies
         self.copyGroups = copyGroups
         self.trashable = trashable
+        self.newest = newest
+        self.leavesAdobeFonts = leavesAdobeFonts
     }
 
     public var folders: [ProblemFolder] {
@@ -218,29 +223,25 @@ public enum ProblemDetector {
                 case .allUsers: return "Installed for all users"
                 case .app: return "Comes with an app"
                 case .adobeFonts: return "Adobe Fonts"
-                case .fontsFolder:
-                    let inside = path.dropFirst(locations.userFonts.path.count + 1).split(separator: "/").dropLast()
-                    return inside.isEmpty ? "In your Fonts folder" : "In “\(inside.joined(separator: "/"))” in your Fonts folder"
-                case .inPlace: return "Used where it is"
+                case .fontsFolder: return "Active"
+                case .inPlace:
+                    return data.fontLibrary.map { path.hasPrefix($0.path + "/") } == true ? "Active" : "Active from its own folder"
                 case .temporary(.untilQuit): return "Active until Cicero quits"
                 case .temporary(.whileAppsRun): return "Active while its app is open"
                 case .otherApp: return "Activated by another app"
                 }
             }
             if ActiveSource.isAdobeFonts(path) { return "Active in Adobe apps" }
-            if locations.isInInactiveFolder(path) { return "In Cicero’s Inactive folder" }
-            if let folder = folders.first(where: { path.hasPrefix($0.path + "/") }) {
-                return folder.appName.map { "Active in \(FaceState.appDescription($0))" } ?? "In \(folder.displayName)"
-            }
+            if let app = folders.first(where: { path.hasPrefix($0.path + "/") })?.appName { return "Active in \(FaceState.appDescription(app))" }
             return "Inactive"
         }
 
         func unreachable(_ path: String) -> String? {
-            if let volume = Reachability.disconnectedVolume(of: path) { return "on “\(volume)”, which isn’t connected" }
+            if let volume = Reachability.disconnectedVolume(of: path) { return "Disk “\(volume)” isn’t connected" }
             guard let folder = folders.first(where: { library.unavailableFolders[$0.id] != nil && path.hasPrefix($0.path + "/") }) else { return nil }
             return library.unavailableFolders[folder.id] == .noAccess
-                ? "in “\(folder.displayName)”, which Cicero isn’t allowed to read"
-                : "in “\(folder.displayName)”, which can’t be found"
+                ? "No access to “\(folder.displayName)”"
+                : "“\(folder.displayName)” can’t be found"
         }
 
         func isInWatchedFolder(_ path: String) -> Bool {
@@ -273,6 +274,12 @@ public enum ProblemDetector {
                 if ra != rb { return ra < rb }
                 return a > b
             }!
+        }
+
+        func newest(of paths: [String]) -> Set<String> {
+            let numbers = paths.map(versionNumber)
+            guard let top = numbers.max(by: { $0.lexicographicallyPrecedes($1) }), numbers.contains(where: { $0.lexicographicallyPrecedes(top) }) else { return [] }
+            return Set(zip(paths, numbers).filter { $0.1 == top }.map(\.0))
         }
 
         func newestFolder(of paths: [String]) -> String? {
@@ -321,11 +328,19 @@ public enum ProblemDetector {
             let folderFixes = folderFixes(paths, fileFixes) { folder, trashing in
                 copies.allSatisfy { $0.contains { !folder.contains($0) } } && (!trashing || context.copies.areSpare(folder))
             }
+            let trashable = paths.filter { !ActivationEngine.isProtected($0) && context.copies.areSpare([$0]) }
+            // Only after the trash alert warns that Creative Cloud can take the Adobe Fonts copy left away at any time, losing the font.
+            var withAdobeFonts = SpareCopies(context.library, countingAdobeFonts: true)
+            let leavesAdobeFonts = paths.filter { path in
+                !trashable.contains(path) && !ActivationEngine.isProtected(path) && !ActiveSource.isAdobeFonts(path) && withAdobeFonts.areSpare([path])
+            }
             problems.append(Problem(
                 id: "installedTwice.\(family.id)", kind: .installedTwice, title: family.name, family: family.id,
                 summary: copies.count == 1 ? "Active from \(paths.count) files." : "\(copies.count) styles active from \(paths.count) files.",
                 files: files, fixes: [], fileFixes: fileFixes, folderFixes: folderFixes,
-                newestFolder: context.newestFolder(of: paths)
+                newestFolder: context.newestFolder(of: paths),
+                copyGroups: copies.map { $0.sorted() }, trashable: Set(trashable + leavesAdobeFonts), newest: context.newest(of: paths),
+                leavesAdobeFonts: Set(leavesAdobeFonts)
             ))
             styles.append(copies)
         }
@@ -423,11 +438,11 @@ public enum ProblemDetector {
 
             let families = sorted(Array(component))
             var summary = names.count == 1
-                ? "One style in each has the same PostScript name, \(names[0])."
-                : "Some of their styles have the same PostScript names: \(abridged(names).listed())."
+                ? "These fonts share the PostScript name “\(names[0])”."
+                : "These fonts share these PostScript names: \(abridged(names).listed())."
             let winners = problemFiles.filter { !$0.preferredFor.isEmpty }
             if winners.map(\.preferredFor.count).reduce(0, +) == names.count {
-                summary += " macOS gives \(names.count == 1 ? "that name" : "those names") to \(winners.map { $0.title! }.listed())."
+                summary += " macOS assigns \(names.count == 1 ? "it" : "them") to \(winners.map { $0.title! }.listed())."
             }
             return Problem(
                 id: "sharedNames.\(families.joined(separator: "|"))", kind: .sharedNames,
@@ -549,7 +564,7 @@ public enum ProblemDetector {
             }
             problems.append(Problem(
                 id: "duplicate.\(family.id)", kind: .duplicates, title: family.name, family: family.id,
-                summary: styles == 1 ? "In \(paths.count) files." : "\(styles) styles in \(paths.count) files.",
+                summary: styles == 1 ? "Inactive, in \(paths.count) files." : "\(styles) inactive styles in \(paths.count) files.",
                 files: paths.map { context.file($0) },
                 fixes: extras.isEmpty ? [] : [.trash(extras)],
                 fileFixes: Dictionary(uniqueKeysWithValues: paths.map { ($0, [ProblemFix.reveal([$0])]) }),
@@ -587,17 +602,18 @@ public enum ProblemDetector {
         for path in context.data.records.inPlace.sorted() where !fm.fileExists(atPath: path) && context.unreachable(path) == nil {
             problems.append(Problem(
                 id: "missing.inplace.\(path)", kind: .missing, title: (path as NSString).lastPathComponent,
-                summary: "Used where it was.",
-                files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Used where it was")],
+                summary: "Installed from its own folder, now missing.",
+                files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Installed from its own folder, now missing")],
                 fixes: [.forgetInPlace(path)], fileFixes: [:]
             ))
         }
-        for (path, origin) in context.data.records.installedCopies.sorted(by: { $0.key < $1.key }) where !fm.fileExists(atPath: path) {
+        for path in context.data.records.installedCopies.keys.sorted() where !fm.fileExists(atPath: path) {
             let inLibrary = context.data.fontLibrary.map { path.hasPrefix($0.path + "/") } ?? false
+            let place = inLibrary ? "Cicero’s Library" : (context.locations.userFonts.path as NSString).abbreviatingWithTildeInPath
             problems.append(Problem(
                 id: "missing.copy.\(path)", kind: .missing, title: (path as NSString).lastPathComponent,
-                summary: "Installed from “\((origin as NSString).lastPathComponent)”.",
-                files: [ProblemFile(path: path, version: nil, modified: nil, detail: inLibrary ? "Was in Cicero’s Library" : "Was in your Fonts folder")],
+                summary: "Copy missing from \(place).",
+                files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Copy missing from \(place)")],
                 fixes: [.forgetInstalledCopy(path)], fileFixes: [:]
             ))
         }
@@ -605,7 +621,7 @@ public enum ProblemDetector {
             for family in set.memberFamilies where context.library.family(family) == nil && !context.library.offlineFamilies.contains(family) {
                 problems.append(Problem(
                     id: "missing.set.\(set.id.uuidString).\(family)", kind: .missing, title: family,
-                    summary: "In the folder “\(set.name)”, but not in the library.",
+                    summary: "Listed in “\(set.name)”, but its fonts are missing.",
                     files: [], fixes: [.removeFromSet(set.id, family: family)], fileFixes: [:]
                 ))
             }
@@ -623,7 +639,8 @@ public enum ProblemDetector {
                 id: "unreadable.\(path)", kind: .unreadable, title: (path as NSString).lastPathComponent,
                 summary: context.detail(of: path) + ".",
                 files: [ProblemFile(path: path, version: nil, modified: Context.modified(path), detail: context.detail(of: path))],
-                fixes: fixes, fileFixes: [:]
+                fixes: fixes, fileFixes: [:],
+                trashable: ActivationEngine.isProtected(path) ? [] : [path]
             )
         }
     }
@@ -631,46 +648,16 @@ public enum ProblemDetector {
     // MARK: External
 
     private static func external(_ context: inout Context) -> [Problem] {
-        var problems: [Problem] = []
         let fontLibrary = context.data.fontLibrary.map { $0.path + "/" }
-        var volumes: [String: String?] = [:]
-        var families: [String: Family]?
-        for path in context.data.records.inPlace.sorted() where !(fontLibrary.map(path.hasPrefix) ?? false) {
-            let exists = FileManager.default.fileExists(atPath: path)
-            if !exists, let place = context.unreachable(path) {
-                problems.append(Problem(
-                    id: "external.\(path)", kind: .external, title: (path as NSString).lastPathComponent,
-                    summary: "Used where it is, \(place).",
-                    files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Currently unavailable")],
-                    fixes: [.forgetInPlace(path)], fileFixes: [:]
-                ))
-                continue
-            }
-            guard exists else { continue }
-            let folder = (path as NSString).deletingLastPathComponent
-            if volumes[folder] == nil { volumes[folder] = .some(externalVolumeName(of: path)) }
-            guard let volume = volumes[folder] ?? nil else { continue }
-            if families == nil {
-                families = [:]
-                for family in context.library.families {
-                    for face in family.faces where families?[face.face.path] == nil { families?[face.face.path] = family }
-                }
-            }
-            let family = families?[path]
-            problems.append(Problem(
-                id: "external.\(path)", kind: .external, title: family?.name ?? (path as NSString).lastPathComponent,
-                summary: "Used where it is, on \(volume).",
-                files: [context.file(path)], fixes: [.installCopy(path), .reveal([path])], fileFixes: [:]
-            ))
+        return context.data.records.inPlace.sorted().compactMap { path in
+            guard !(fontLibrary.map(path.hasPrefix) ?? false), !FileManager.default.fileExists(atPath: path), let place = context.unreachable(path) else { return nil }
+            return Problem(
+                id: "external.\(path)", kind: .external, title: (path as NSString).lastPathComponent,
+                summary: "\(place).",
+                files: [ProblemFile(path: path, version: nil, modified: nil, detail: "Currently unavailable")],
+                fixes: [.forgetInPlace(path)], fileFixes: [:]
+            )
         }
-        return problems
-    }
-
-    private static func externalVolumeName(of path: String) -> String? {
-        let keys: Set<URLResourceKey> = [.volumeIsRemovableKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsEjectableKey, .volumeLocalizedNameKey]
-        guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: keys) else { return nil }
-        let external = values.volumeIsRemovable == true || values.volumeIsEjectable == true || values.volumeIsInternal == false || values.volumeIsLocal == false
-        return external ? values.volumeLocalizedName.map { "“\($0)”" } ?? "an external disk" : nil
     }
 }
 
@@ -698,13 +685,13 @@ struct SpareCopies: Sendable {
     private var faceCounts: [String: Int] = [:]
     private var fileIDs: [String: FileID?] = [:]
 
-    init(_ library: Library) {
+    init(_ library: Library, countingAdobeFonts: Bool = false) {
         unreadable = Set(library.unreadableFiles)
         for family in library.families {
             for face in family.faces {
                 let key = FaceKey(face.face)
                 // A copy from Adobe Fonts is Creative Cloud's to take away whenever it likes, and one only Adobe apps load no other app has: it leaves no file of the user's spare.
-                let paths = ([face.face.path] + face.otherCopies).filter { !ActiveSource.isAdobeFonts($0) }
+                let paths = ([face.face.path] + face.otherCopies).filter { countingAdobeFonts || !ActiveSource.isAdobeFonts($0) }
                 files[key] = paths
                 for path in paths { faces[path, default: []].insert(key) }
             }

@@ -175,6 +175,7 @@ struct MainWindow: View {
                 parts.append("\(files) \(names), which will be removed too.")
             }
         }
+        if plan.leavesOnlyAdobeFonts { parts.append("Only the copy from Adobe Fonts will be left. Creative Cloud can remove it at any time.") }
         if plan.protectedCount > 0 { parts.append("Files that come with macOS or an app stay where they are.") }
         parts.append(plan.paths.count == 1 ? "You can put it back from the Trash." : "You can put them back from the Trash.")
         return parts.joined(separator: " ")

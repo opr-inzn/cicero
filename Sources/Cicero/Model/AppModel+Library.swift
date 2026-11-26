@@ -43,7 +43,6 @@ struct SidebarRow: Identifiable, Hashable {
     var title: String
     var icon: String
     var item: SidebarItem
-    var badge = 0
     var color: TagColor?
 
     var id: String { key }

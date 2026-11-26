@@ -17,7 +17,7 @@ New to Cicero? Start with [Getting started](getting-started.md). To open this gu
 5. **[Character sets and languages](character-sets.md)**\
    [Character sets](character-sets.md#character-sets) · [Your own sets](character-sets.md#make-your-own-coverage-set) · [Character Toolbox](character-sets.md#the-character-toolbox) · [Languages](character-sets.md#how-cicero-decides-a-font-supports-a-language)
 6. **[Conflicts](problems.md)**\
-   [Installed Twice](problems.md#installed-twice) · [Missing Files](problems.md#missing-files) · [Damaged or Unreadable Files](problems.md#damaged-or-unreadable-files) · [Fonts on External Disks](problems.md#fonts-on-external-disks) · [Duplicates](problems.md#duplicates) · [Shared Style Names](problems.md#shared-style-names)
+   [Extra Copies](problems.md#extra-copies) · [Missing Files](problems.md#missing-files) · [Damaged or Unreadable Files](problems.md#damaged-or-unreadable-files) · [Unavailable Fonts](problems.md#unavailable-fonts) · [Shared Style Names](problems.md#shared-style-names)
 7. **[Export, backup and restore](export-and-backup.md)**\
    [Export fonts](export-and-backup.md#export-fonts) · [Back up](export-and-backup.md#back-up-your-library) · [Restore](export-and-backup.md#restore-a-backup)
 8. **[Troubleshooting](troubleshooting.md)**\

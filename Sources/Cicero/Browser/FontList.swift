@@ -643,12 +643,18 @@ private struct HeaderCell: View {
     }
 }
 
-private struct ColumnDivider: View {
+struct ColumnDivider: View {
     let resize: (CGFloat) -> Void
     let endResize: () -> Void
     let fit: () -> Void
     @GestureState private var isResizing = false
     @State private var isOver = false
+
+    init(resize: @escaping (CGFloat) -> Void, endResize: @escaping () -> Void, fit: @escaping () -> Void) {
+        self.resize = resize
+        self.endResize = endResize
+        self.fit = fit
+    }
 
     var body: some View {
         Rectangle().fill(.separator).frame(width: 1, height: 16)

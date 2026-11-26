@@ -255,6 +255,7 @@ public struct TrashPlan: Sendable, Identifiable {
     public var removedFamilies: [String]
     public var includesCopies: Bool
     public var spareCopiesOf: Library?
+    public var leavesOnlyAdobeFonts = false
 
     public init(title: String, paths: [String], otherFamilies: [String], protectedCount: Int, removedFamilies: [String],
                 includesCopies: Bool = true, spareCopiesOf: Library? = nil) {
@@ -747,7 +748,7 @@ public struct ActivationEngine: Sendable {
         var records = records
         // Checked again right before trashing, as a copy may have gone since the plan was made.
         if let library = plan.spareCopiesOf {
-            var copies = SpareCopies(library)
+            var copies = SpareCopies(library, countingAdobeFonts: plan.leavesOnlyAdobeFonts)
             guard copies.areSpare(Set(plan.paths)) else {
                 let message = plan.paths.count == 1 ? "Kept the file: it holds the only copy of a font" : "Kept the files: some hold the only copy of a font"
                 return ActivationResult(records: records, succeeded: 0, failed: plan.paths, message: message)

@@ -932,7 +932,7 @@ extension AppModel {
                 ? SidebarRow(key: "library.temporary", title: "Temporary", icon: "clock", item: .temporary) : nil,
             SidebarRow(key: "library.recent", title: "Recents", icon: "tray.and.arrow.down", item: .recent),
             data.showSystemFonts ? SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system) : nil,
-            SidebarRow(key: "library.problems", title: "Conflicts", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
+            SidebarRow(key: "library.problems", title: "Conflicts", icon: "exclamationmark.triangle", item: .problems),
         ].compactMap { $0 }
         return data.sidebar.ordered(rows, in: "library", key: \.key)
     }
@@ -1310,13 +1310,17 @@ extension AppModel {
     }
 
     func forgetAll(of problems: [Problem]) {
-        var inPlace: [String] = [], copies: [String] = []
+        var inPlace: [String] = [], copies: [String] = [], members: [(set: UUID, family: String)] = []
         for fix in problems.flatMap(\.fixes) {
             switch fix {
             case .forgetInPlace(let path): inPlace.append(path)
             case .forgetInstalledCopy(let path): copies.append(path)
+            case .removeFromSet(let id, let family): members.append((id, family))
             default: break
             }
+        }
+        for (id, members) in Dictionary(grouping: members, by: \.set) {
+            if let index = data.sets.firstIndex(where: { $0.id == id }) { data.sets[index].remove(families: Set(members.map(\.family))) }
         }
         enqueue { model in
             if !copies.isEmpty {
@@ -1336,7 +1340,10 @@ extension AppModel {
         var seen = Set<String>()
         let paths = (chosen ?? problems.flatMap(\.extraCopies)).filter { seen.insert($0).inserted }
         guard var plan = engine.spareCopiesTrashPlan(paths, families: Set(problems.compactMap(\.family)), in: library) else { return }
-        plan.title = plan.paths.count == 1 ? "1 Extra Copy" : "\(plan.paths.count.plain) Extra Copies"
+        plan.leavesOnlyAdobeFonts = problems.contains { !$0.leavesAdobeFonts.isDisjoint(with: plan.paths) }
+        if !problems.contains(where: { $0.kind == .unreadable }) {
+            plan.title = plan.paths.count == 1 ? "1 Extra Copy" : "\(plan.paths.count.plain) Extra Copies"
+        }
         ask { [plan] in $0.trashPlan = plan }
     }
 }
