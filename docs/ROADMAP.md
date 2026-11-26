@@ -73,6 +73,32 @@ font now only says Cicero can't use it, and licenses are kept only as tags and n
   From), and exporting one owner's files for a developer or a printer. Installing fonts from the Vault stays out until
   then, since an old version could replace a newer one.
 
+### Pangrams and Wikipedia texts
+
+**What.** Two new sources for the preview text and the font page's type tester: a random pangram, and the start of a
+random Wikipedia article in a language you choose. The presets are four fixed texts now, all Latin, so a font made for
+Arabic or Japanese is hard to try with real text.
+
+**How.**
+- Pangrams come with the app, a few dozen, so they work offline. Each click gives one that wasn't shown just before.
+- Wikipedia texts come from Wikipedia's own API (`https://<language>.wikipedia.org/api/rest_v1/page/random/summary`),
+  which needs no key. Cicero sends nothing about your fonts.
+- The language is the Mac's, or for a font made for another script, a language of that script (`ScriptSample` already
+  finds a font's main script).
+- Under a Wikipedia text, a line names the article and links to it, as its license (CC BY-SA) asks. The line goes away
+  when you change the text.
+- While Cicero waits, the old text stays. Offline, the Wikipedia button is off and Pangram still works.
+- `cicero compare` and the MCP `compare` tool get `--sample pangram|wikipedia` and `--language`, next to `--text`.
+
+**Open.**
+- Where the buttons go in Preview Options: two items at the top of Presets, a row of buttons under the text field with a
+  language menu, or two small buttons in the field.
+- In the type tester: whether a click on its new button gives a pangram at once, with a menu for the rest, or always
+  opens the menu.
+- The language: the Mac's, the font's script, or a menu to choose any language.
+- Whether Cicero asks once before its first Wikipedia request, or only says so in the privacy policy.
+- Where the pangrams come from: Wikipedia's list of pangrams, ones written for Cicero, or both, without the crude ones.
+
 ## Not planned
 
 Buying fonts inside Cicero, font subscription and rental services, and team servers with accounts: Cicero has no
