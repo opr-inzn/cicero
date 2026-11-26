@@ -207,7 +207,7 @@ private struct SidebarContent: View {
         }
         .padding(.trailing, 10)
         // Behind a header inside the list, so the outline view is among its superviews.
-        .background(OutlineViewSetup(drag: drag, highlight: highlight, isPageOpen: { [model] in model.openFamilyID != nil }, isEditing: { [model] in model.isEditingSidebar }, reselect: { [model] in if model.openFamilyID != nil { model.openFamilyID = nil } else { model.scrollsToTop += 1 } }) { [model] in model.dragOutOfSidebar($0) })
+        .background(OutlineViewSetup(drag: drag, highlight: highlight, isPageOpen: { [model] in model.openFamilyID != nil || model.openLicenseID != nil }, isEditing: { [model] in model.isEditingSidebar }, reselect: { [model] in if model.openLicenseID != nil { model.openLicenseID = nil } else if model.openFamilyID != nil { model.openFamilyID = nil } else { model.scrollsToTop += 1 } }) { [model] in model.dragOutOfSidebar($0) })
     }
 
     private func sectionHeader(_ section: SidebarSection) -> some View {
@@ -247,6 +247,8 @@ private struct SidebarContent: View {
             plus("New coverage set") { model.ask { $0.editingCharacterSet = CustomCharacterSet(name: "", characters: "") } }
         case .classifications:
             plus("New classification") { model.newClassification() }
+        case .vault:
+            plus("Add files to the Vault") { model.presentAddToVaultPanel() }
         case .foundries:
             EmptyView()
         }
@@ -312,6 +314,18 @@ private struct SidebarContent: View {
                     highlight.dropTarget = nil
                     _ = model.handleDrop(drags, on: row.item)
                 })
+        } else if row.item.isVault {
+            content
+                .background(FontDropTarget(files: .init(isOver: { isOver in
+                    if isOver {
+                        if highlight.dropTarget != row.item { highlight.dropTarget = row.item }
+                    } else if highlight.dropTarget == row.item {
+                        highlight.dropTarget = nil
+                    }
+                }) { urls in
+                    highlight.dropTarget = nil
+                    model.addToVault(urls, owner: row.item.vaultOwner)
+                }))
         } else {
             content
         }
@@ -358,6 +372,11 @@ private struct SidebarRowMenu: View {
                     model.deleteClassifications(Set(own))
                 }
             }
+        case .vault, .vaultOwner:
+            if rows.count == 1 {
+                Button("Add Files…", systemImage: "plus") { model.presentAddToVaultPanel(owner: row.item.vaultOwner) }
+            }
+            Button("Show in Finder", systemImage: "folder") { model.showVaultFolders(of: rows.map(\.item)) }
         case .characterSet:
             let ids = Set(rows.compactMap { if case .characterSet(let id) = $0.item { id } else { nil } })
             let custom = model.data.customCharacterSets.filter { ids.contains($0.setID) }
@@ -392,7 +411,8 @@ private struct SidebarRowMenu: View {
         case .foundry: "Foundries"
         case .classification: "Classifications"
         case .characterSet: "Coverage Sets"
-        case .all, .active, .inactive, .temporary, .system, .recent, .problems, .vault: "Items"
+        case .vault, .vaultOwner: "Owners"
+        case .all, .active, .inactive, .temporary, .system, .recent, .problems: "Items"
         }
     }
 
@@ -685,7 +705,7 @@ private final class FittingTextField: NSTextField {
 private extension SidebarItem {
     var isLibrary: Bool {
         switch self {
-        case .all, .active, .inactive, .temporary, .recent, .system, .problems, .vault: true
+        case .all, .active, .inactive, .temporary, .recent, .system, .problems: true
         default: false
         }
     }

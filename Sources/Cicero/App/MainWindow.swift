@@ -21,17 +21,28 @@ struct MainWindow: View {
         } detail: {
             // A stack in a split view's detail column swaps the whole column for a page pushed onto it, dropping whatever is around the stack: each page makes room for the Info panel and takes dropped files.
             NavigationStack(path: Binding(
-                get: { model.openFamilyID.map { [$0] } ?? [] },
-                set: { model.openFamilyID = $0.last }
+                get: { model.openFamilyID.map { [DetailRoute.family($0)] } ?? model.openLicenseID.map { [DetailRoute.license($0)] } ?? [] },
+                set: { path in
+                    switch path.last {
+                    case .family(let id): model.openLicenseID = nil; model.openFamilyID = id
+                    case .license(let id): model.openFamilyID = nil; model.openLicenseID = id
+                    case nil: model.openFamilyID = nil; model.openLicenseID = nil
+                    }
+                }
             )) {
                 BrowserView()
                     // Here rather than in BrowserView, so switching its view doesn't make the toolbar again.
                     .toolbar { BrowserToolbar() }
-                    .modifier(DetailPage(isCovered: model.openFamilyID != nil))
-                    // A page of its own for each family, so one opened from another's starts at the top rather than scrolled where the other was.
-                    .navigationDestination(for: String.self) { FontPage(familyID: $0).id($0).modifier(DetailPage()) }
+                    .modifier(DetailPage(isCovered: model.openFamilyID != nil || model.openLicenseID != nil))
+                    .navigationDestination(for: DetailRoute.self) { route in
+                        switch route {
+                        // A page of its own for each family, so one opened from another's starts at the top rather than scrolled where the other was.
+                        case .family(let id): FontPage(familyID: id).id(id).modifier(DetailPage())
+                        case .license(let id): LicenseDestination(id: id).modifier(DetailPage())
+                        }
+                    }
             }
-            .transaction(value: model.openFamilyID) { transaction in
+            .transaction(value: [model.openFamilyID, model.openLicenseID?.uuidString]) { transaction in
                 transaction.animation = nil
                 transaction.disablesAnimations = true
             }
@@ -70,6 +81,7 @@ struct MainWindow: View {
         }
         .backupSheet(isPresented: $model.showsBackupSheet)
         .sheet(item: $model.vaultAdd) { VaultAddSheet(prompt: $0) }
+        .vaultTrashAlert(model: model)
         .restoreSheet(contents: $model.restorePrompt)
         .alert(
             "Deactivate Other Styles Too?",
@@ -367,6 +379,11 @@ private extension MainWindow {
         autoHide.grownTo = frame
         window.animator().setFrame(frame, display: true)
     }
+}
+
+private enum DetailRoute: Hashable {
+    case family(String)
+    case license(UUID)
 }
 
 private struct DetailPage: ViewModifier {

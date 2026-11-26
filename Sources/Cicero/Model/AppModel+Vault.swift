@@ -9,6 +9,7 @@ struct ToastAction {
 struct VaultAddPrompt: Identifiable {
     let id = UUID()
     var draft: VaultDraft
+    var owner = ""
 }
 
 struct LicenseMatch {
@@ -35,7 +36,37 @@ extension AppModel {
             vaultRevision &+= 1
             if licenses != vaultLicenses { vaultLicenses = licenses }
             if let id = openLicenseID, !licenses.contains(where: { $0.id == id }) { openLicenseID = nil }
+            keepVaultSelection()
         }
+    }
+
+    func vaultOwnerItem(_ owner: String) -> SidebarItem? {
+        vaultOwners.first { $0.lowercased() == owner.lowercased() }.map { .vaultOwner($0) }
+    }
+
+    private func keepVaultSelection() {
+        guard selectedItems.contains(where: { $0.vaultOwner != nil }) else { return }
+        let kept = Set(selectedItems.compactMap { item in item.vaultOwner.map(vaultOwnerItem) ?? item })
+        guard kept != selectedItems else { return }
+        let open = openLicenseID
+        if kept.isEmpty {
+            selection = .vault
+        } else if kept.count == 1 {
+            selection = kept.first
+        } else {
+            selectSidebarItems(kept)
+        }
+        openLicenseID = open
+    }
+
+    func showVaultFolders(of items: [SidebarItem]) {
+        let root = vault.root
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let folders = items.compactMap { item -> URL? in
+            guard let owner = item.vaultOwner else { return item == .vault ? root : nil }
+            return vaultLicenses.first { $0.owner.lowercased() == owner.lowercased() }?.folder.deletingLastPathComponent()
+        }
+        NSWorkspace.shared.activateFileViewerSelecting(folders)
     }
 
     func cleanUpVault() {
@@ -52,7 +83,7 @@ extension AppModel {
         vaultRevision &+= 1
     }
 
-    func presentAddToVaultPanel() {
+    func presentAddToVaultPanel(owner: String? = nil) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
@@ -60,10 +91,10 @@ extension AppModel {
         panel.prompt = "Add"
         panel.message = "Choose licenses, receipts, fonts, web fonts or a ZIP file. Cicero copies them into the Vault. The originals stay where they are."
         guard panel.runModal() == .OK else { return }
-        addToVault(panel.urls)
+        addToVault(panel.urls, owner: owner)
     }
 
-    func addToVault(_ urls: [URL]) {
+    func addToVault(_ urls: [URL], owner: String? = nil) {
         let vault = vault
         let items = urls.filter(\.isFileURL).map(\.standardizedFileURL).filter { !vault.holdsOrIsIn($0.path) }
         guard !items.isEmpty else { return showToast(urls.count == 1 ? "That’s the Vault or a file in it" : "Those are the Vault or files in it") }
@@ -73,7 +104,7 @@ extension AppModel {
             defer { isAddingToVault = false }
             do {
                 let draft = try await Task.detached(priority: .userInitiated) { try vault.stage(items) }.value
-                ask { $0.vaultAdd = VaultAddPrompt(draft: draft) }
+                ask { $0.vaultAdd = VaultAddPrompt(draft: draft, owner: owner ?? "") }
             } catch {
                 showToast(error.localizedDescription)
             }
@@ -95,7 +126,7 @@ extension AppModel {
                 vaultChanged()
                 vaultLicenses.append(added)
                 vaultLicenses = vault.sorted(vaultLicenses)
-                selection = .vault
+                selection = selection?.vaultOwner == nil ? .vault : vaultOwnerItem(added.owner)
                 openLicenseID = added.id
                 showToast("“\(added.name)” is in the Vault")
             } catch {
@@ -113,8 +144,18 @@ extension AppModel {
             let before = vaultLicenses[index].folder.deletingLastPathComponent()
             let saved = try vault.save(license)
             vaultChanged()
+            let ownerBefore = vaultLicenses[index].owner
             vaultLicenses[index] = saved
             vaultLicenses = vault.sorted(vaultLicenses)
+            let oldOwner = ownerBefore.lowercased()
+            if saved.owner.lowercased() != oldOwner, selectedItems.contains(where: { $0.vaultOwner?.lowercased() == oldOwner }),
+               let item = vaultOwnerItem(saved.owner) {
+                let items = Set(selectedItems.map { $0.vaultOwner?.lowercased() == oldOwner ? item : $0 })
+                let open = openLicenseID
+                if items.count == 1 { selection = item } else { selectSidebarItems(items) }
+                openLicenseID = open
+            }
+            keepVaultSelection()
             if saved.folder.deletingLastPathComponent().lastPathComponent != before.lastPathComponent { reloadVault() }
             return saved
         } catch {
@@ -147,6 +188,7 @@ extension AppModel {
             vaultChanged()
             vaultLicenses.removeAll { $0.id == license.id }
             if openLicenseID == license.id { openLicenseID = nil }
+            keepVaultSelection()
             showToast("Moved “\(license.name)” to the Trash")
         } catch {
             showToast("Couldn’t move “\(license.name)” to the Trash: \(error.localizedDescription)")
@@ -203,6 +245,14 @@ extension AppModel {
         guard let version else { return nil }
         let match = version.firstMatch(of: #/\d+(\.\d+)+/#)
         return match.map { String($0.output.0) } ?? version
+    }
+}
+
+extension SidebarItem {
+    var isVault: Bool { self == .vault || vaultOwner != nil }
+
+    var vaultOwner: String? {
+        if case .vaultOwner(let owner) = self { owner } else { nil }
     }
 }
 

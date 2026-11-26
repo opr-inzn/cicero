@@ -922,7 +922,12 @@ extension AppModel {
     // MARK: Sidebar
 
     var sections: [SidebarSection] {
-        data.sidebar.ordered(SidebarSection.allCases, in: "sections", key: \.key)
+        var sections = data.sidebar.ordered(SidebarSection.allCases, in: "sections", key: \.key)
+        if data.sidebar.order["sections"]?.contains(SidebarSection.vault.key) == false, let index = sections.firstIndex(of: .vault) {
+            sections.remove(at: index)
+            sections.insert(.vault, at: sections.firstIndex(of: .tags).map { $0 + 1 } ?? sections.endIndex)
+        }
+        return sections
     }
 
     var libraryRows: [SidebarRow] {
@@ -935,7 +940,6 @@ extension AppModel {
             SidebarRow(key: "library.recent", title: "Recents", icon: "tray.and.arrow.down", item: .recent),
             data.showSystemFonts ? SidebarRow(key: "library.system", title: "System Fonts", icon: "apple.logo", item: .system) : nil,
             SidebarRow(key: "library.problems", title: "Conflicts", icon: "exclamationmark.triangle", item: .problems, badge: problems.count { !$0.kind.isMinor }),
-            SidebarRow(key: "library.vault", title: "Vault", icon: "archivebox", item: .vault),
         ].compactMap { $0 }
         return data.sidebar.ordered(rows, in: "library", key: \.key)
     }
@@ -970,6 +974,9 @@ extension AppModel {
                 + data.smartSets.map { SidebarRow(key: "smartset.\($0.id)", title: $0.name, icon: "gearshape", item: .smartSet($0.id)) }
         case .tags:
             return data.tags.map { SidebarRow(key: "tag.\($0)", title: $0, icon: SidebarSection.tags.icon, item: .tag($0), color: data.tagColors[$0]) }
+        case .vault:
+            return [SidebarRow(key: "vault.all", title: "All Licenses", icon: "archivebox", item: .vault)]
+                + vaultOwners.map { SidebarRow(key: "vault.owner.\($0.lowercased())", title: $0, icon: "person", item: .vaultOwner($0)) }
         case .foundries:
             return foundryNames.map { SidebarRow(key: "foundry.\($0)", title: $0, icon: "building.2", item: .foundry($0)) }
         case .classifications:
@@ -1078,6 +1085,7 @@ extension AppModel {
             selectedItems = items
             selectedIDs = []
             openFamilyID = nil
+            openLicenseID = nil
         }
     }
 
@@ -1087,6 +1095,9 @@ extension AppModel {
         let anchor = added.count == 1 ? added.first! : selection.flatMap { items.contains($0) ? $0 : nil } ?? items.first!
         let list = sidebarList(of: anchor)
         guard list != "library" else { return [anchor] }
+        if list == SidebarSection.vault.rawValue {
+            return anchor == .vault ? [.vault] : items.filter { $0.vaultOwner != nil }
+        }
         return items.filter { sidebarList(of: $0) == list }
     }
 
@@ -1098,7 +1109,8 @@ extension AppModel {
 
     func sidebarList(of item: SidebarItem) -> String {
         switch item {
-        case .all, .active, .inactive, .temporary, .system, .recent, .problems, .vault: "library"
+        case .all, .active, .inactive, .temporary, .system, .recent, .problems: "library"
+        case .vault, .vaultOwner: SidebarSection.vault.rawValue
         case .folder: SidebarSection.folders.rawValue
         case .set, .smartSet: SidebarSection.sets.rawValue
         case .tag: SidebarSection.tags.rawValue

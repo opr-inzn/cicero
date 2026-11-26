@@ -7,18 +7,32 @@ struct VaultView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        VaultList()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.canvas)
+            .task { model.reloadVault() }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.reloadVault() }
+    }
+}
+
+struct LicenseDestination: View {
+    @Environment(AppModel.self) private var model
+    let id: UUID
+
+    var body: some View {
         Group {
-            if let license = model.openLicenseID.flatMap({ id in model.vaultLicenses.first { $0.id == id } }) {
+            if let license = model.vaultLicenses.first(where: { $0.id == id }) {
                 LicensePage(original: license).id(license.id)
-            } else {
-                VaultList()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.canvas)
-        .task { model.reloadVault() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.reloadVault() }
-        .alert(
+    }
+}
+
+extension View {
+    func vaultTrashAlert(model: AppModel) -> some View {
+        alert(
             model.trashingLicense.map { "Move “\($0.name)” for \($0.owner) to the Trash?" } ?? "",
             isPresented: Binding(get: { model.trashingLicense != nil }, set: { if !$0 { model.trashingLicense = nil } }),
             presenting: model.trashingLicense
@@ -71,27 +85,6 @@ struct KindChips: View {
     }
 }
 
-struct EndsLabel: View {
-    let ends: Date?
-
-    var body: some View {
-        if let ends {
-            let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: .now), to: Calendar.current.startOfDay(for: ends)).day ?? 0
-            VStack(alignment: .leading, spacing: 1) {
-                Text(ends, format: .dateTime.day().month(.abbreviated).year())
-                if days < 0 {
-                    Text("Ended").font(.caption)
-                } else if days <= 14 {
-                    Text(days == 0 ? "Today" : days == 1 ? "Tomorrow" : "In \(days.plain) days").font(.caption)
-                }
-            }
-            .foregroundStyle(days <= 14 ? Color.orange : Color.primary)
-        } else {
-            Text("No end").foregroundStyle(.secondary)
-        }
-    }
-}
-
 // MARK: - List
 
 private struct VaultList: View {
@@ -127,7 +120,7 @@ private struct VaultList: View {
                     }
                     .width(min: 160, ideal: 220)
                     TableColumn("Styles") { license in
-                        Text(license.styles.isEmpty ? "None" : license.styles.count == 1 ? "1 style" : "\(license.styles.count.plain) styles")
+                        Text(license.styles.isEmpty ? "None" : license.styles.count == 1 ? "1 Style" : "\(license.styles.count.plain) Styles")
                             .foregroundStyle(license.styles.isEmpty ? .secondary : .primary)
                     }
                     .width(min: 60, ideal: 80)
@@ -140,14 +133,12 @@ private struct VaultList: View {
                     .width(min: 100, ideal: 160)
                     TableColumn("Added") { Text($0.added, format: .dateTime.day().month(.abbreviated).year()) }
                         .width(min: 80, ideal: 100)
-                    TableColumn("Ends") { EndsLabel(ends: $0.ends) }
-                        .width(min: 80, ideal: 100)
                 } rows: {
                     ForEach(groups) { group in
                         Section {
                             ForEach(group.licenses) { TableRow($0) }
                         } header: {
-                            Text(group.owner).bold() + Text("  \(group.licenses.count == 1 ? "1 license" : "\(group.licenses.count.plain) licenses")").foregroundStyle(.secondary)
+                            Text(group.owner).bold() + Text("  \(group.licenses.count == 1 ? "1 License" : "\(group.licenses.count.plain) Licenses")").fontWeight(.regular).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -174,7 +165,7 @@ private struct VaultList: View {
                         .lineLimit(1)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Add Files…") { model.presentAddToVaultPanel() }
+                    Button("Add Files…") { model.presentAddToVaultPanel(owner: owners.count == 1 ? model.selection?.vaultOwner : nil) }
                 }
                 .font(.callout)
                 .padding(.horizontal, 14)
@@ -183,21 +174,33 @@ private struct VaultList: View {
             }
             .topBarTint()
         }
-        .navigationTitle("Vault")
+        .navigationTitle(owners.isEmpty ? "Vault" : model.selectionTitle)
         .navigationSubtitle(subtitle)
     }
 
+    private var owners: Set<String> {
+        model.selectedItems.contains(.vault) ? [] : Set(model.selectedItems.compactMap { $0.vaultOwner?.lowercased() })
+    }
+
+    private var ownersLicenses: [VaultLicense] {
+        let owners = owners
+        return owners.isEmpty ? model.vaultLicenses : model.vaultLicenses.filter { owners.contains($0.owner.lowercased()) }
+    }
+
     private var subtitle: String {
-        let licenses = model.vaultLicenses.count
-        guard licenses > 0 else { return "" }
-        let owners = model.vaultOwners.count
-        return "\(licenses == 1 ? "1 License" : "\(licenses.plain) Licenses") · \(owners == 1 ? "1 Owner" : "\(owners.plain) Owners")"
+        let shown = ownersLicenses
+        guard !shown.isEmpty else { return "" }
+        let licenses = shown.count == 1 ? "1 License" : "\(shown.count.plain) Licenses"
+        if owners.count == 1 { return licenses }
+        let count = Set(shown.map { $0.owner.lowercased() }).count
+        return "\(licenses) · \(count == 1 ? "1 Owner" : "\(count.plain) Owners")"
     }
 
     private var shownLicenses: [VaultLicense] {
         let words = model.searchText.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
-        guard !words.isEmpty else { return model.vaultLicenses }
-        return model.vaultLicenses.filter { license in
+        let licenses = ownersLicenses
+        guard !words.isEmpty else { return licenses }
+        return licenses.filter { license in
             let text = ([license.owner, license.name, license.project, license.note] + license.families + license.kinds.map(\.title)).joined(separator: " ").lowercased()
             return words.allSatisfy(text.contains)
         }
@@ -222,13 +225,11 @@ private struct LicensePage: View {
     @State private var license: VaultLicense
     @State private var files: [VaultFile] = []
     @State private var matches: [LicenseMatch] = []
-    @State private var endsOn: Bool
     @State private var hasDate: Bool
     @State private var previewed: URL?
 
     init(original: VaultLicense) {
         _license = State(initialValue: original)
-        _endsOn = State(initialValue: original.ends != nil)
         _hasDate = State(initialValue: original.date != nil)
     }
 
@@ -247,14 +248,6 @@ private struct LicensePage: View {
         .topBar {
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
-                    Button {
-                        save()
-                        model.openLicenseID = nil
-                    } label: {
-                        Label("Vault", systemImage: "chevron.backward")
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tint)
                     Spacer()
                     Button("Show in Finder") { model.showInFinder(license) }
                     Button("Move to Trash…") {
@@ -280,6 +273,7 @@ private struct LicensePage: View {
             save()
         }
         .onDisappear { save() }
+        .onExitCommand { model.openLicenseID = nil }
     }
 
     private func refresh() {
@@ -318,19 +312,11 @@ private struct LicensePage: View {
                     }
                 }
                 .onChange(of: hasDate) { license.date = $1 ? (license.date ?? .now) : nil }
-                LabeledContent("Ends") {
-                    HStack {
-                        Toggle("Ends", isOn: $endsOn).labelsHidden()
-                        DatePicker("Ends", selection: Binding(get: { license.ends ?? .now }, set: { license.ends = $0 }), displayedComponents: .date)
-                            .labelsHidden()
-                            .disabled(!endsOn)
-                    }
-                }
-                .onChange(of: endsOn) { license.ends = $1 ? (license.ends ?? .now) : nil }
                 TextField("Note", text: $license.note, prompt: Text("Seats, order number, whom to ask"), axis: .vertical)
-                    .lineLimit(3...8)
+                    .lineLimit(1...8)
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
             .scrollDisabled(true)
             .padding(.horizontal, -20)
             Text("Kept in \(Self.shortPath(license.folder))")
@@ -407,7 +393,7 @@ private struct LicensePage: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Files").font(.headline)
-                Text(files.count == 1 ? "1 file" : "\(files.count.plain) files").foregroundStyle(.secondary)
+                Text(files.count == 1 ? "1 File" : "\(files.count.plain) Files").foregroundStyle(.secondary)
                 Spacer()
                 Button("Add Files…") { addFiles() }
             }
@@ -561,15 +547,14 @@ struct KindToggles: View {
 struct VaultAddSheet: View {
     @Environment(AppModel.self) private var model
     let prompt: VaultAddPrompt
-    @State private var owner = ""
+    @State private var owner: String
     @State private var name: String
     @State private var kinds: [VaultLicense.Kind]
     @State private var project = ""
-    @State private var endsOn = false
-    @State private var ends = Date.now
 
     init(prompt: VaultAddPrompt) {
         self.prompt = prompt
+        _owner = State(initialValue: prompt.owner)
         _name = State(initialValue: prompt.draft.suggestedName)
         _kinds = State(initialValue: prompt.draft.kinds)
     }
@@ -598,12 +583,6 @@ struct VaultAddSheet: View {
                 TextField("Name", text: $name)
                 LabeledContent("Kind") { KindToggles(kinds: $kinds) }
                 TextField("Project or domain", text: $project, prompt: Text("Optional"))
-                LabeledContent("Ends") {
-                    HStack {
-                        Toggle("Ends", isOn: $endsOn).labelsHidden()
-                        DatePicker("Ends", selection: $ends, displayedComponents: .date).labelsHidden().disabled(!endsOn)
-                    }
-                }
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
@@ -636,8 +615,7 @@ struct VaultAddSheet: View {
     }
 
     private func add() {
-        let license = VaultLicense(owner: trimmed(owner), name: trimmed(name), kinds: kinds, project: trimmed(project),
-                                   ends: endsOn ? ends : nil, added: .now)
+        let license = VaultLicense(owner: trimmed(owner), name: trimmed(name), kinds: kinds, project: trimmed(project), added: .now)
         model.finishAdding(prompt, as: license)
     }
 

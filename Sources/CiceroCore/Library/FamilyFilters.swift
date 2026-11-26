@@ -11,6 +11,7 @@ public enum SidebarItem: Hashable, Sendable {
     case foundry(String)
     case classification(String)
     case characterSet(String)
+    case vaultOwner(String)
 }
 
 extension LibraryFace {
@@ -94,7 +95,7 @@ public struct FamilyFilters {
         case .recent:
             let cutoff = now.addingTimeInterval(-Double(Self.recentDays) * 86_400)
             return { $0.lastAdded.map { $0 > cutoff } ?? false }
-        case .problems, .vault: return { _ in false }
+        case .problems, .vault, .vaultOwner: return { _ in false }
         case .folder(let id): return { $0.folderIDs.contains(id) }
         case .set(let id):
             let members = Set(data.sets.first { $0.id == id }?.memberFamilies ?? [])

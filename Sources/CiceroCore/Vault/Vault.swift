@@ -27,14 +27,13 @@ public struct VaultLicense: Codable, Equatable, Identifiable, Sendable {
     public var kinds: [Kind]
     public var project: String
     public var date: Date?
-    public var ends: Date?
     public var note: String
     public var added: Date
     public var styles: [Style]
     public var folder: URL
 
     public init(id: UUID = UUID(), owner: String, name: String, kinds: [Kind] = [], project: String = "", date: Date? = nil,
-                ends: Date? = nil, note: String = "", added: Date = Date(), styles: [Style] = [],
+                note: String = "", added: Date = Date(), styles: [Style] = [],
                 folder: URL = URL(fileURLWithPath: "/", isDirectory: true)) {
         self.id = id
         self.owner = owner
@@ -42,14 +41,13 @@ public struct VaultLicense: Codable, Equatable, Identifiable, Sendable {
         self.kinds = kinds
         self.project = project
         self.date = date
-        self.ends = ends
         self.note = note
         self.added = added
         self.styles = styles
         self.folder = folder
     }
 
-    private enum CodingKeys: String, CodingKey { case id, owner, name, kinds, project, date, ends, note, added, styles }
+    private enum CodingKeys: String, CodingKey { case id, owner, name, kinds, project, date, note, added, styles }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -60,7 +58,6 @@ public struct VaultLicense: Codable, Equatable, Identifiable, Sendable {
         kinds = Kind.allCases.filter { kindNames.contains($0.rawValue) }
         project = (try? c.decode(String.self, forKey: .project)) ?? ""
         date = try? c.decode(Date.self, forKey: .date)
-        ends = try? c.decode(Date.self, forKey: .ends)
         note = (try? c.decode(String.self, forKey: .note)) ?? ""
         added = (try? c.decode(Date.self, forKey: .added)) ?? Date(timeIntervalSince1970: 0)
         styles = (try? c.decode([Style].self, forKey: .styles)) ?? []
@@ -75,7 +72,6 @@ public struct VaultLicense: Codable, Equatable, Identifiable, Sendable {
         try c.encode(kinds.map(\.rawValue), forKey: .kinds)
         try c.encode(project, forKey: .project)
         try c.encodeIfPresent(date, forKey: .date)
-        try c.encodeIfPresent(ends, forKey: .ends)
         try c.encode(note, forKey: .note)
         try c.encode(added, forKey: .added)
         try c.encode(styles, forKey: .styles)
@@ -88,11 +84,6 @@ public struct VaultLicense: Codable, Equatable, Identifiable, Sendable {
 
     public func covers(postScriptName: String) -> Bool {
         styles.contains { $0.postScriptName == postScriptName }
-    }
-
-    public func ends(within days: Int, of now: Date = Date()) -> Bool {
-        guard let ends else { return false }
-        return ends.timeIntervalSince(now) < Double(days) * 24 * 60 * 60
     }
 }
 
@@ -175,10 +166,11 @@ public struct Vault: Sendable {
                     license = details
                 } else {
                     let files = Self.files(in: folder)
+                    let styles = Self.styles(in: folder, files: files)
                     license = VaultLicense(
-                        owner: ownerFolder.lastPathComponent, name: folder.lastPathComponent, kinds: Self.kinds(of: files),
+                        owner: ownerFolder.lastPathComponent, name: folder.lastPathComponent, kinds: Self.kinds(of: files, styles: styles),
                         added: (try? folder.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date(timeIntervalSince1970: 0),
-                        styles: Self.styles(in: folder, files: files)
+                        styles: styles
                     )
                     try? write(license, in: folder)
                 }
@@ -233,11 +225,22 @@ public struct Vault: Sendable {
         return styles
     }
 
-    public static func kinds(of files: [VaultFile]) -> [VaultLicense.Kind] {
+    public static func kinds(of files: [VaultFile], styles: [VaultLicense.Style] = []) -> [VaultLicense.Kind] {
+        let trials = styles.filter(isTrial)
         var kinds: [VaultLicense.Kind] = []
-        if files.contains(where: { $0.kind == .font }) { kinds.append(.desktop) }
-        if files.contains(where: { $0.kind == .webFont }) { kinds.append(.web) }
+        if styles.isEmpty || trials.count < styles.count {
+            if files.contains(where: { $0.kind == .font }) { kinds.append(.desktop) }
+            if files.contains(where: { $0.kind == .webFont }) { kinds.append(.web) }
+        }
+        if !trials.isEmpty { kinds.append(.trial) }
         return kinds
+    }
+
+    // PostScript names run words together, as in ABCReproUnlicensedTrial-Bold, and "trial" alone is inside Industrial.
+    static func isTrial(_ style: VaultLicense.Style) -> Bool {
+        let words = Set(style.family.lowercased().split { !$0.isLetter })
+        return words.contains("trial") || words.contains("unlicensed")
+            || style.postScriptName.contains(#/(Trial|Unlicensed|TRIAL|UNLICENSED)(?![a-z])/#)
     }
 
     private static func details(in folder: URL) -> VaultLicense? {
@@ -267,7 +270,7 @@ public struct Vault: Sendable {
             guard !files.isEmpty else { throw VaultError.nothingToAdd }
             let styles = Self.styles(in: staging, files: files)
             return VaultDraft(staging: staging, sources: items.map(\.lastPathComponent), files: files, styles: styles,
-                              kinds: Self.kinds(of: files), suggestedName: Self.suggestedName(styles: styles, items: items),
+                              kinds: Self.kinds(of: files, styles: styles), suggestedName: Self.suggestedName(styles: styles, items: items),
                               unpackedArchives: unpacked)
         } catch {
             try? fm.removeItem(at: staging)

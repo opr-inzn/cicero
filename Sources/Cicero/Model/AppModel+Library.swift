@@ -2,7 +2,7 @@ import Foundation
 import CiceroCore
 
 enum SidebarSection: String, CaseIterable, Identifiable {
-    case folders, sets, tags, foundries, classifications, characterSets
+    case folders, sets, tags, vault, foundries, classifications, characterSets
 
     var id: String { rawValue }
     var key: String { "section.\(rawValue)" }
@@ -13,6 +13,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .folders: "Locations"
         case .sets: "Folders"
         case .tags: "Tags"
+        case .vault: "Vault"
         case .foundries: "Foundries"
         case .classifications: "Classifications"
         case .characterSets: "Coverage"
@@ -24,6 +25,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .folders: "folder"
         case .sets: "folder"
         case .tags: "tag"
+        case .vault: "archivebox"
         case .foundries: "building.2"
         case .classifications: "textformat"
         case .characterSets: "character.textbox"

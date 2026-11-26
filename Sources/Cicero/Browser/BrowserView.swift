@@ -8,7 +8,7 @@ struct BrowserView: View {
     var body: some View {
         if model.selection == .problems {
             ProblemsView()
-        } else if model.selection == .vault {
+        } else if model.selection?.isVault == true {
             VaultView()
         } else {
             browser

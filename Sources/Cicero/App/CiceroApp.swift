@@ -170,9 +170,12 @@ struct CiceroCommands: Commands {
             Divider()
             Menu("Sort By", systemImage: "arrow.up.arrow.down") { SortMenuItems(model: model) }
             Divider()
-            Button("Back", systemImage: "chevron.backward") { model.openFamilyID = nil }
+            Button("Back", systemImage: "chevron.backward") {
+                model.openFamilyID = nil
+                model.openLicenseID = nil
+            }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
-                .disabled(model.openFamilyID == nil)
+                .disabled(model.openFamilyID == nil && model.openLicenseID == nil)
             Divider()
             Button("Zoom In", systemImage: "plus.magnifyingglass") {
                 if let size = compareSize { compareSize = CompareWindow.bigger(than: size) }

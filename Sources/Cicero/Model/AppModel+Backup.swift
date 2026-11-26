@@ -23,7 +23,7 @@ extension AppModel {
         switch item {
         case .folder(WatchedFolder.adobeFontsID): false
         case .set, .smartSet, .tag, .folder, .foundry, .classification, .characterSet: true
-        case .all, .active, .inactive, .temporary, .system, .recent, .problems, .vault: false
+        case .all, .active, .inactive, .temporary, .system, .recent, .problems, .vault, .vaultOwner: false
         }
     }
 

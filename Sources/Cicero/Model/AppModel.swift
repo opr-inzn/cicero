@@ -144,6 +144,7 @@ final class AppModel {
             guard oldValue != selection else { return }
             selectedIDs = []
             openFamilyID = nil
+            openLicenseID = nil
         }
     }
     var selectedItems: Set<SidebarItem> = [.all] {

@@ -51,12 +51,15 @@ extension AppModel {
     }
 
     var targetForAddedFiles: SidebarItem? {
+        if openFamilyID == nil, similarFamilyID == nil, documentList == nil, externalSimilar == nil, selection?.isVault == true {
+            return selectedItems.count == 1 ? selection : .vault
+        }
         guard openFamilyID == nil, similarFamilyID == nil, documentList == nil, externalSimilar == nil, selectedItems.count == 1, let selection else { return nil }
         switch selection {
         case .set(let id): return data.sets.contains { $0.id == id } ? selection : nil
         case .tag(let name): return data.tags.contains(name) ? selection : nil
         case .folder(let id): return id == WatchedFolder.addedFilesID || dropLocation(id) != nil ? selection : nil
-        case .vault: return selection
+        case .vault, .vaultOwner: return selection
         default: return nil
         }
     }
@@ -110,9 +113,9 @@ extension AppModel {
     }
 
     private func open(_ urls: [URL], target: SidebarItem?) {
-        if target == .vault {
+        if let target, target.isVault {
             if let id = openLicenseID, let license = vaultLicenses.first(where: { $0.id == id }) { return addFiles(urls, to: license) }
-            return addToVault(urls)
+            return addToVault(urls, owner: target.vaultOwner)
         }
         let vault = self.vault
         let fileURLs = urls.filter(\.isFileURL).map(\.standardizedFileURL)
