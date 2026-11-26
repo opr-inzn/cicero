@@ -110,7 +110,7 @@ struct GeneralSettings: View {
                 Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
                 Toggle(isOn: $updates.installsAutomatically) {
                     Text("Install updates automatically")
-                    Text("Cicero downloads a new version in the background and installs it when you quit Cicero.")
+                    Text("Downloads updates in the background and installs them when you quit Cicero.")
                 }
                 .disabled(!updates.checksAutomatically)
                 Toggle(isOn: $sharesUsageStatistics) {
