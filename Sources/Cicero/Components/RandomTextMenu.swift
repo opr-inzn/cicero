@@ -12,11 +12,12 @@ struct RandomTextMenu: View {
 
     var body: some View {
         Button("Pangram", systemImage: "die.face.5") { apply(Pangrams.random(other: current() ?? "")) }
+        let shortList = sources.shortList
         Menu {
-            ForEach(sources.shortList, id: \.self) { item($0) }
+            ForEach(shortList, id: \.self) { item($0) }
             Divider()
             Menu("Other Languages") {
-                ForEach(SampleSources.byName, id: \.self) { item($0) }
+                ForEach(SampleSources.byName.filter { !shortList.contains($0) }, id: \.self) { item($0) }
             }
         } label: {
             Label { Text("Wikipedia") } icon: { Image(nsImage: .wikipedia) }
