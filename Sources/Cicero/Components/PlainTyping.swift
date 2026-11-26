@@ -8,6 +8,8 @@ enum PlainTyping {
     static func install() {
         guard !isInstalled else { return }
         isInstalled = true
+        // AppKit adds AutoFill to the context menu of every editable text view, whatever its content type, unless this is off before the first menu opens.
+        UserDefaults.standard.register(defaults: ["NSAutoFillSystemInsertMenuEnabled": false])
         // Before AppKit's own becomeFirstResponder, which is where AutoFill and the field editor's setup look at these.
         hook(NSTextView.self) { view in
             guard let textView = view as? NSTextView, textView.isEditable else { return }
