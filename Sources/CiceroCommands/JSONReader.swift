@@ -1,9 +1,6 @@
 import Foundation
 
 extension JSON {
-    /// Reads JSON text back into a value whose objects keep their fields in order: Cicero's reply to a request (see
-    /// `Requests`), which the command prints as it is. Numbers without a fraction or an exponent are `int`s; `null` is
-    /// left out of objects and arrays, as the contract has no nulls. Nil when the text isn't JSON.
     public init?(text: String) {
         var reader = Reader(scalars: Array(text.unicodeScalars))
         guard let value = reader.value(), reader.atEnd else { return nil }
@@ -45,7 +42,6 @@ extension JSON {
             return true
         }
 
-        /// A null, which an object or array leaves out.
         mutating func null() -> Bool {
             skipSpace()
             return word("null")
@@ -151,8 +147,6 @@ extension JSON {
 }
 
 extension CommandError {
-    /// The error in an answer (`{ "schema": 1, "error": {…} }`), as Cicero replied it to a request; nil for an answer
-    /// that isn't one.
     public init?(answer: JSON) {
         guard let error = answer["error"], case .string(let code)? = error["code"], let known = Code(rawValue: code) else { return nil }
         var message = ""

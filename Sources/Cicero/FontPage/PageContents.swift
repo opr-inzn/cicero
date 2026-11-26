@@ -1,67 +1,79 @@
 import CiceroCore
 import CoreText
 
-/// What a font page lists under its styles for one face: its characters and the glyphs its features draw, by group,
-/// and the ligatures it makes. A character whose glyph a ligature feature makes, like ﬁ, which fonts usually give
-/// U+FB01 (Alphabetic Presentation Forms) too, is listed once, as a ligature, which says the character.
 nonisolated struct PageContent: Sendable {
     let ligatures: [LigatureGroup]
-    /// The characters and feature glyphs by group, but characters listed as ligatures.
     let glyphs: [GlyphSection]
-    /// Every character the face draws, those listed as ligatures included.
-    let characterCount: Int
-    /// The character a ligature's glyph is too, by glyph.
+    let glyphCount: Int
+    let alternateCount: Int
     let ligatureCharacters: [CGGlyph: UInt32]
-    /// The glyphs features offer in place of characters', by character.
     let alternates: [UInt32: [FeatureAlternate]]
-    /// The version of the face's file it was read from (see `FontLoader.generation(of:)`). Its glyphs are by ID, which
-    /// a new version can give other glyphs, as one with letters added did: its alternates were drawn as the letters
-    /// that took their IDs.
+    // Glyphs are by ID, and a new version of the file can give those IDs to other glyphs.
     let generation: Int
 
     init(ligatures: [LigatureGroup], glyphs: [GlyphSection], alternates: [UInt32: [FeatureAlternate]], font: CTFont, generation: Int) {
         self.alternates = alternates
         self.generation = generation
-        characterCount = glyphs.reduce(0) { $0 + $1.scalars.count }
         let made = Set(ligatures.flatMap { $0.ligatures.map(\.glyph) })
         var characters: [CGGlyph: UInt32] = [:]
         var listed: Set<UInt32> = []
-        // The characters whose glyph a ligature is (the lowest, for its popover, where several share one); none to look
-        // for without ligatures.
-        for scalar in made.isEmpty ? [] : glyphs.flatMap(\.scalars).reversed() {
-            guard let character = Unicode.Scalar(scalar) else { continue }
-            var units = Array(String(Character(character)).utf16)
-            var glyph = [CGGlyph](repeating: 0, count: units.count)
-            if CTFontGetGlyphsForCharacters(font, &units, &glyph, units.count), made.contains(glyph[0]) {
-                characters[glyph[0]] = scalar
-                listed.insert(scalar)
+        var ownGlyphs: Set<CGGlyph> = []
+        for section in made.isEmpty ? [] : glyphs.reversed() {
+            for scalar in section.scalars.reversed() {
+                guard let character = Unicode.Scalar(scalar) else { continue }
+                var units = Array(String(Character(character)).utf16)
+                var glyph = [CGGlyph](repeating: 0, count: units.count)
+                guard CTFontGetGlyphsForCharacters(font, &units, &glyph, units.count), made.contains(glyph[0]) else { continue }
+                if section.group == .ligatures || character.properties.name?.contains("LIGATURE") == true || character.properties.generalCategory == .privateUse {
+                    characters[glyph[0]] = scalar
+                    listed.insert(scalar)
+                } else {
+                    ownGlyphs.insert(glyph[0])
+                }
             }
         }
-        self.ligatures = ligatures
+        let kept = ownGlyphs.subtracting(characters.keys)
+        self.ligatures = kept.isEmpty ? ligatures : ligatures.compactMap { group in
+            let left = group.ligatures.filter { !kept.contains($0.glyph) }
+            return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left, script: group.script)
+        }
         self.glyphs = listed.isEmpty ? glyphs : glyphs.compactMap { section in
             let left = section.scalars.filter { !listed.contains($0) }
             return left.isEmpty && section.glyphs.isEmpty ? nil : GlyphSection(group: section.group, scalars: left, glyphs: section.glyphs)
         }
         ligatureCharacters = characters
+        var cells = self.ligatures.reduce(0) { $0 + $1.ligatures.count }, choices = 0
+        for section in self.glyphs {
+            for run in section.runs(alternates: { alternates[$0] ?? [] }) {
+                cells += run.count
+                choices += run.count { cell in
+                    switch cell {
+                    case .character: false
+                    case .feature(let glyph): glyph.featureTags.contains(where: Self.isChoice)
+                    case .alternate(let alternate): alternate.allFeatures.contains(where: Self.isChoice)
+                    }
+                }
+            }
+        }
+        glyphCount = cells
+        alternateCount = choices
     }
 
-    /// Whether it was read from the file as it is now.
+    private static func isChoice(_ tag: String) -> Bool {
+        let number = Int(tag.dropFirst(2)) ?? 0
+        return tag == "salt" || tag == "swsh" || tag.hasPrefix("ss") && 1...20 ~= number || tag.hasPrefix("cv") && 1...99 ~= number
+    }
+
     func isCurrent(for face: FontFace) -> Bool {
         generation == FontLoader.shared.generation(of: face.path)
     }
 }
 
-/// Font pages' ligatures and characters, worked out off the main thread and kept for the faces shown last. The
-/// browser starts on a family as soon as it's selected, so the page a double-click or Return opens has them in its
-/// first frame instead of filling in a section at a time.
 final class PageContents {
     private let coverage: CoverageIndex
     private var ready: [FaceID: PageContent] = [:]
-    /// The faces in `ready`, least recently used first.
     private var recent: [FaceID] = []
-    /// With the version of the file each is reading.
     private var loading: [FaceID: (generation: Int, task: Task<PageContent, Never>)] = [:]
-    /// Bumped when files change, so what was read from an old version of one is never kept.
     private var generation = 0
     private static let kept = 24
 
@@ -69,12 +81,10 @@ final class PageContents {
         self.coverage = coverage
     }
 
-    /// nil until worked out, and for a file that changed since.
     func content(of face: FontFace) -> PageContent? {
         ready[face.id].flatMap { $0.isCurrent(for: face) ? $0 : nil }
     }
 
-    /// Starts on a face's content, unless it's ready or under way.
     func prepare(_ face: FontFace) {
         if content(of: face) == nil { _ = task(for: face) }
     }
@@ -87,16 +97,15 @@ final class PageContents {
         return await task(for: face).value
     }
 
-    /// Reads the file as it is now. A file the scanner read anew has a new version before `forget` drops what was read
-    /// from the old one.
     private func task(for face: FontFace) -> Task<PageContent, Never> {
         let version = FontLoader.shared.generation(of: face.path)
         if let under = loading[face.id], under.generation == version { return under.task }
+        loading[face.id]?.task.cancel()
         let coverage = coverage
         let started = generation
         let task = Task {
             let content = await Self.read(face, version: version, coverage: coverage)
-            guard started == generation, loading[face.id]?.generation == version else { return content }
+            guard !Task.isCancelled, started == generation, loading[face.id]?.generation == version else { return content }
             loading[face.id] = nil
             keep(content, for: face.id)
             return content
@@ -105,11 +114,12 @@ final class PageContents {
         return task
     }
 
-    /// Files a scan found changed: what was read from them goes, and so does anything still being read.
     func forget(paths: Set<String>) {
         guard !paths.isEmpty else { return }
-        generation += 1
-        loading = [:]
+        for (id, entry) in loading where paths.contains(id.path) {
+            entry.task.cancel()
+            loading[id] = nil
+        }
         for id in recent where paths.contains(id.path) { ready[id] = nil }
         recent.removeAll { paths.contains($0.path) }
     }
@@ -121,8 +131,6 @@ final class PageContents {
         if recent.count > Self.kept { ready[recent.removeFirst()] = nil }
     }
 
-    /// Both together, so the page never shows one without the other. Glyphs that draw nothing, like a trial font's
-    /// empty ones, are left out: a character's, a feature's, an alternate or a ligature.
     @concurrent
     private static func read(_ face: FontFace, version: Int, coverage: CoverageIndex) async -> PageContent {
         async let ligatures = LigatureGroup.read(face)
@@ -131,25 +139,56 @@ final class PageContents {
         let font = FontLoader.shared.font(face, size: 12)
         let empty = EmptyGlyphs(font: font)
         let scalars = await coverage.coverage(computing: face).scalars
-        let featureGlyphs = await features.filter { !empty.contains($0.glyph) }
+        let (featureGlyphs, listed) = await FeatureAlternates.listed(features: features, alternates: alternates, leavingOut: empty.contains)
         // Small capitals an older font keeps in private use too are listed as small capitals, not again as characters.
         let smallCaps = GlyphSection.privateUse(in: font, coverage: scalars,
                                                 drawing: Set(featureGlyphs.filter { $0.group == .smallCaps }.map(\.glyph)))
-        // Those in groups of their own, like tabular figures, aren't listed again after their characters.
-        let grouped = Set(featureGlyphs.map(\.glyph))
-        let listed = await alternates.compactMapValues { list in
-            let left = list.filter { !grouped.contains($0.glyph) && !empty.contains($0.glyph) }
-            return left.isEmpty ? nil : left
-        }
-        let drawn = await ligatures.compactMap { group in
+        let drawn = await LigatureGroup.byScript(ligatures).compactMap { group in
             let left = group.ligatures.filter { !empty.contains($0.glyph) }
-            return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left)
+            return left.isEmpty ? nil : LigatureGroup(tag: group.tag, ligatures: left, script: group.script)
         }
-        // The coverage has only the characters the font draws, and those with nothing to draw that it has; of those, the
-        // page shows the ones it draws something for anyway.
         let sections = GlyphSection.sections(for: scalars, features: featureGlyphs,
                                              privateUse: GlyphSection.privateUseNames(in: font, coverage: scalars),
                                              leavingOut: { smallCaps.contains($0) || EmptyGlyphs.isInvisible($0) && empty.drawsNothing(for: $0) })
         return PageContent(ligatures: drawn, glyphs: sections, alternates: listed, font: font, generation: version)
+    }
+}
+
+final class PageFeatures {
+    private var ready: [FileFace: [FontFeatureGroup]] = [:]
+    private var loading: [FileFace: Task<[FontFeatureGroup], Never>] = [:]
+
+    func features(of face: FontFace) -> [FontFeatureGroup]? {
+        ready[FileFace(face)]
+    }
+
+    func prepare(_ face: FontFace) {
+        if features(of: face) == nil { _ = task(for: face) }
+    }
+
+    func features(loading face: FontFace) async -> [FontFeatureGroup] {
+        if let features = features(of: face) { return features }
+        return await task(for: face).value
+    }
+
+    private func task(for face: FontFace) -> Task<[FontFeatureGroup], Never> {
+        let key = FileFace(face)
+        if let under = loading[key] { return under }
+        let task = Task {
+            let features = await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
+            if loading[key] != nil {
+                loading[key] = nil
+                ready[key] = features
+            }
+            return features
+        }
+        loading[key] = task
+        return task
+    }
+
+    func forget() {
+        for task in loading.values { task.cancel() }
+        ready = [:]
+        loading = [:]
     }
 }

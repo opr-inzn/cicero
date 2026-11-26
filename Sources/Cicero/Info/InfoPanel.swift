@@ -2,33 +2,21 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// The Info panel at the trailing edge of the window: a pane floating below the toolbar like the sidebar, its
-/// top level with the first fonts. Not SwiftUI's inspector, which runs the full window height under the search
-/// field. Over the split view rather than in its detail column, whose stack swaps the whole column for a pushed
-/// font page; each page makes room for it with `InfoPanelInset`. It slides in from the window's edge and out again as the
-/// sidebar does, and the room for it opens and closes along with it, so the page narrows as the panel comes: with the room
-/// made at once, the panel slid into an empty strip, and sliding out it uncovered fonts already in place.
 struct InfoPanelOverlay: ViewModifier {
     @Environment(AppModel.self) private var model
     static let width: CGFloat = 300
     static let gap: CGFloat = 8
-    /// Level with the first row of the grid and of specimens, which start this far below the toolbar.
     static let top: CGFloat = 16
-    /// As long as the sidebar takes to slide out or in, at its pace.
     static let slide = Animation.easeInOut(duration: 0.25)
 
-    /// The room a page makes for the panel `shown` of the way in, on whole pixels, so the grid can tell exactly how much
-    /// narrower its rows are (see `FontGrid.infoPanelNarrowing`).
     static func room(shown: CGFloat, scale: CGFloat) -> CGFloat {
         ((width + gap * 2) * shown * scale).rounded() / scale
     }
 
     func body(content: Content) -> some View {
-        // Only the panel's way in and out, not what changes inside it or under it.
-        content.animation(Self.slide) { $0.modifier(Panel(shown: model.isInfoPresented ? 1 : 0)) }
+        content.animation(Self.slide) { $0.modifier(Panel(shown: model.isInfoShown ? 1 : 0)) }
     }
 
-    /// The panel, `shown` of the way in from the window's edge: there while it slides out, too.
     private struct Panel: ViewModifier, Animatable {
         var shown: CGFloat
 
@@ -42,13 +30,11 @@ struct InfoPanelOverlay: ViewModifier {
                 if shown > 0 {
                     let shape = InfoPanelOverlay.shape
                     InfoPanel()
-                        // What changes in the panel shows at once. Under the slide, the rows filled in as it opened
-                        // faded in with it, and took as long.
+                        // Under the slide, the rows filled in as the panel opened faded in with it, and took as long.
                         .transaction { if $0.animation == InfoPanelOverlay.slide { $0.animation = nil } }
                         .frame(width: InfoPanelOverlay.width)
                         .frame(maxHeight: .infinity)
                         .background {
-                            // Opaque, over the page; the tint matches the sidebar.
                             shape.fill(Color.canvas)
                             shape.fill(.quaternary.opacity(0.5))
                         }
@@ -62,8 +48,6 @@ struct InfoPanelOverlay: ViewModifier {
         }
     }
 
-    /// Concentric with the window's corners on macOS 27, which tightens them; 20 pt on macOS 26, where
-    /// concentric comes out rounder than the panel has been.
     private static var shape: AnyShape {
         if #available(macOS 27, *) {
             AnyShape(ConcentricRectangle(corners: .concentric(minimum: 12), isUniform: true))
@@ -73,22 +57,27 @@ struct InfoPanelOverlay: ViewModifier {
     }
 }
 
-/// Makes room on a page of the detail column for the Info panel while it's open, opening and closing as the panel slides
-/// in and out (see `InfoPanelOverlay`), and tells the page how far it is in (`infoPanelShown`).
 struct InfoPanelInset: ViewModifier {
     @Environment(AppModel.self) private var model
+    var isCovered = false
+    @State private var coveredShown: CGFloat?
+    static let narrowestPage: CGFloat = 600
 
     func body(content: Content) -> some View {
+        let shown: CGFloat = model.isInfoShown ? 1 : 0
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(InfoPanelOverlay.slide) { $0.modifier(Room(shown: model.isInfoPresented ? 1 : 0)) }
-            // The toolbar and the gap around the panel show the page's colour from edge to edge.
+            .animation(InfoPanelOverlay.slide) { $0.modifier(Room(shown: isCovered ? coveredShown ?? shown : shown)) }
+            .onChange(of: isCovered, initial: true) { coveredShown = isCovered ? shown : nil }
+            .onGeometryChange(for: Bool.self) { proxy in
+                let page = proxy.size.width - proxy.safeAreaInsets.leading - proxy.safeAreaInsets.trailing
+                return page - InfoPanelOverlay.room(shown: 1, scale: 1) >= Self.narrowestPage
+            } action: { [isCovered] fits in
+                if !isCovered { model.infoFits = fits }
+            }
             .background(Color.canvas)
     }
 
-    /// The room, `shown` of the panel's width and gaps. An inset rather than padding, so the page still runs under the
-    /// toolbar from edge to edge and the search field keeps the look it has over the page instead of turning flat above
-    /// the panel.
     private struct Room: ViewModifier, Animatable {
         @Environment(\.displayScale) private var scale
         var shown: CGFloat
@@ -100,6 +89,7 @@ struct InfoPanelInset: ViewModifier {
 
         func body(content: Content) -> some View {
             content
+                // Safe area, not padding, so the page still runs under the toolbar from edge to edge and the search field keeps the look it has over the page.
                 .safeAreaPadding(.trailing, InfoPanelOverlay.room(shown: shown, scale: scale))
                 .environment(\.infoPanelShown, shown)
         }
@@ -107,48 +97,147 @@ struct InfoPanelInset: ViewModifier {
 }
 
 extension EnvironmentValues {
-    /// How far the Info panel is in: 0 while it's shut, 1 while it's open, and in between while it slides.
     @Entry var infoPanelShown: CGFloat = 0
 }
 
-/// Keeps the family at the top of a grid or list there when its width changes, as when the Info panel
-/// opens or closes; otherwise the same scroll offset lands on other families once rows hold fewer or more.
-/// Needs `.scrollTargetLayout()`.
 struct KeepsTopOnResize: ViewModifier {
-    // Applied by the scroll view as it lays out, so after the rows have reflowed (a proxy can jump too early).
-    @State private var position = ScrollPosition(idType: String.self)
+    @Environment(AppModel.self) private var model
+    // ScrollViewProxy, not .scrollPosition: in a sectioned LazyVGrid, SwiftUI's ScrollPosition jumps to the top when any view inside updates, such as on window resign-key or click.
+    let proxy: ScrollViewProxy
     @State private var topID: String?
     @State private var isAtTop = true
+    @State private var held: String?
+    @State private var settling: Task<Void, Never>?
+    @State private var hasAppeared = false
+    @State private var beforeSearch: (items: Set<SidebarItem>, id: String?)?
+    private static var closedAt: (items: Set<SidebarItem>, id: String)?
+    private static var isClosing = false
 
     func body(content: Content) -> some View {
         content
-            .scrollPosition($position, anchor: .top)
+            // Needs .scrollTargetLayout() on the content.
             .onScrollTargetVisibilityChange(idType: String.self) { if let first = $0.first { topID = first } }
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top < 1 } action: { isAtTop = $1 }
             // Reported before the visible families update, so `topID` is still the one from before.
-            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width } action: { _, _ in
-                if !isAtTop, let topID { position.scrollTo(id: topID, anchor: .top) }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width - $0.contentInsets.leading - $0.contentInsets.trailing } action: { old, new in
+                guard old > 0, new > 0, abs(new - old) >= 0.5 else { return }
+                keep()
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { old, new in
+                guard let held, abs(new - old) >= 0.5 else { return }
+                proxy.scrollTo(held, anchor: .top)
+            }
+            .onScrollPhaseChange { _, phase in
+                if phase == .interacting || phase == .decelerating { clearHeld() }
+            }
+            .onChange(of: model.selectedItems) { clearHeld() }
+            .onChange(of: model.shownSort) { clearHeld() }
+            .onChange(of: model.sortsAscending) { clearHeld() }
+            .onChange(of: model.scrollsToTop) { clearHeld() }
+            .onChange(of: model.jumpTargets) { clearHeld() }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
+                guard let window = note.object as? NSWindow, window === TextEditingKeys.mainWindow else { return }
+                Self.closedAt = isAtTop ? nil : topID.map { (model.selectedItems, $0) }
+                Self.isClosing = true
+            }
+            .onAppear {
+                Self.isClosing = false
+                guard !hasAppeared else { return }
+                hasAppeared = true
+                guard let place = Self.closedAt, place.items == model.selectedItems else { return }
+                restore(place.id)
+            }
+            .onChange(of: SearchState(model)) { old, new in
+                if !old.isActive, new.isActive {
+                    beforeSearch = (model.selectedItems, isAtTop ? nil : topID)
+                } else if old.isActive, !new.isActive {
+                    let before = beforeSearch
+                    beforeSearch = nil
+                    if let before, before.items == model.selectedItems {
+                        if let id = before.id { restore(id) } else { toTop() }
+                    }
+                    return
+                }
+                if new.isActive { toTop() }
+            }
+            // SwiftUI makes the browser twice as the window opens and removes the first only after the second has appeared.
+            .onDisappear {
+                clearHeld()
+                if !Self.isClosing { Self.closedAt = nil }
             }
     }
+
+    private func keep() {
+        if settling == nil { held = isAtTop ? nil : topID }
+        guard let id = held else { return }
+        hold(id)
+        // A turn later, after FontGrid's onGeometryChange updates its column count and rows reflow.
+        DispatchQueue.main.async {
+            guard held == id else { return }
+            proxy.scrollTo(id, anchor: .top)
+        }
+    }
+
+    private func restore(_ id: String) {
+        guard model.jumpTargets == nil else { return }
+        hold(id)
+        DispatchQueue.main.async {
+            guard held == id, !FamilyKeys.jumpedRecently else { return }
+            proxy.scrollTo(id, anchor: .top)
+        }
+    }
+
+    private func toTop() {
+        guard model.jumpTargets == nil, !FamilyKeys.jumpedRecently else { return }
+        clearHeld()
+        proxy.scrollTo(ScrollTop.id, anchor: .top)
+    }
+
+    private func hold(_ id: String) {
+        held = id
+        settling?.cancel()
+        settling = Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            held = nil
+            settling = nil
+        }
+    }
+
+    private func clearHeld() {
+        settling?.cancel()
+        settling = nil
+        held = nil
+    }
+}
+
+private struct SearchState: Equatable {
+    let text: String
+    let tokens: [SearchToken]
+
+    init(_ model: AppModel) {
+        text = model.appliedSearch
+        tokens = model.searchTokens
+    }
+
+    var isActive: Bool { !text.isEmpty || !tokens.isEmpty }
 }
 
 private struct InfoPanel: View {
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
 
     var body: some View {
         // The same view from one family to the next, so what its rows work out stays until the next family's is ready.
         if let family = model.inspectedFamily {
-            FamilyInfo(family: family, face: family.face(nearestWeight: preview.weight))
+            FamilyInfo(family: family, face: family.regular)
         } else {
-            let count = model.selectedIDs.count
-            EmptyState(count > 1 ? "\(count) Families Selected" : "No Selection", systemImage: "info.circle",
+            let count = model.shownSelection.count
+            EmptyState(count > 1 ? "\(count.plain) Families Selected" : "No Selection", systemImage: "info.circle",
                        description: Text("Select a single family to see its info."))
         }
     }
 }
 
-/// The family's name and the Info, Features and Axes tabs, for the style nearest the preview weight.
 private struct FamilyInfo: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -161,7 +250,7 @@ private struct FamilyInfo: View {
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding([.horizontal, .top], 16)
-            Picker("Tab", selection: tab) {
+            Picker("Info Section", selection: tab) {
                 ForEach(tabs, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .tabsPickerStyle()
@@ -176,12 +265,10 @@ private struct FamilyInfo: View {
         }
     }
 
-    /// Axes only for a variable family.
     private var tabs: [InfoTab] { family.isVariable ? InfoTab.allCases : InfoTab.allCases.filter { $0 != .axes } }
 
-    /// Info in the place of Axes for a family that isn't variable, and Axes again for the next that is.
     private var tab: Binding<InfoTab> {
-        Binding { model.infoTab == .axes && !family.isVariable ? .info : model.infoTab } set: { model.infoTab = $0 }
+        Binding { model.shownInfoTab } set: { model.infoTab = $0 }
     }
 }
 
@@ -193,7 +280,6 @@ private struct InfoRows: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // First: what the user wrote about the family.
             NoteRow(family: family)
             row("Status", face.state.label)
             TagsRow(family: family)
@@ -218,7 +304,7 @@ private struct InfoRows: View {
             }
             if !face.otherCopies.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    label("Other copies")
+                    label("Other Copies")
                     ForEach(face.otherCopies, id: \.self) { path in
                         Button(path) { model.reveal(path: path) }
                             .buttonStyle(.link)
@@ -230,8 +316,6 @@ private struct InfoRows: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Read now unless the file would keep the panel waiting, as samples are drawn: well under a millisecond, and the
-        // panel opens, or goes to another font, with the info in place rather than a moment of spinner.
         .loading($info, for: FileFace(face.face), cached: { [face = face.face] in
             CiceroCore.FontInfo.cached(face) ?? (FontLoader.shared.wouldWait(for: face.path) ? nil : CiceroCore.FontInfo.read(face))
         }) { [face = face.face] in
@@ -251,7 +335,6 @@ private struct InfoRows: View {
     }
 }
 
-/// The family's classification, with a menu to put it in another.
 private struct ClassificationRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -276,7 +359,6 @@ private struct ClassificationRow: View {
     }
 }
 
-/// The family's tags, with a menu to change them.
 private struct TagsRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -294,12 +376,12 @@ private struct TagsRow: View {
                     .fixedSize()
             }
             if tags.isEmpty {
-                Text("No Tags").font(.callout).foregroundStyle(.secondary)
+                Text("None").font(.callout).foregroundStyle(.secondary)
             } else {
                 FlowLayout(spacing: 10, lineSpacing: 4) {
                     ForEach(tags, id: \.self) { tag in
                         HStack(spacing: 4) {
-                            TagDots(colors: model.data.tagColors[tag].map { [$0] } ?? [])
+                            TagDots(dots: [TagDot(name: tag, color: model.data.tagColors[tag])]).accessibilityHidden(true)
                             Text(tag).font(.callout)
                         }
                     }
@@ -309,7 +391,6 @@ private struct TagsRow: View {
     }
 }
 
-/// The family's rating: five stars to click, the one it has again to take it away.
 private struct RatingRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -328,7 +409,7 @@ private struct RatingRow: View {
                             .contentShape(.rect)
                     }
                     .buttonStyle(.borderless)
-                    .help(stars == rating ? "Remove Rating" : Rating.description(stars))
+                    .help(stars == rating ? "Remove rating" : Rating.description(stars))
                 }
             }
             .font(.callout)
@@ -346,21 +427,18 @@ private struct RatingRow: View {
     }
 }
 
-/// The family's note, to write in place. Return starts a new line, as in a note anywhere else, rather than ending the
-/// editing. Saved a moment after the typing stops, and at once when the field loses focus or the panel goes to another
-/// family, so a list searched or a smart set by notes doesn't change with every key.
 private struct NoteRow: View {
     @Environment(AppModel.self) private var model
     let family: Family
     @State private var text = ""
-    /// The family `text` is the note of.
+    @State private var loaded = ""
     @State private var editing: String?
     @FocusState private var isFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Note").font(.caption).foregroundStyle(.secondary)
-            TextField("Note", text: $text, prompt: Text("Add a Note"), axis: .vertical)
+            TextField("Note", text: $text, prompt: Text("Add a note"), axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.callout)
                 .lineLimit(1...12)
@@ -373,8 +451,7 @@ private struct NoteRow: View {
             save()
             load()
         }
-        // A note changed elsewhere, as by restoring a backup, unless it's being written here.
-        .onChange(of: model.note(of: family)) { if !isFocused { load() } }
+        .onChange(of: model.note(of: family)) { if editing == family.id, !isFocused || text == loaded { load() } }
         .onChange(of: isFocused) { if !isFocused { save() } }
         .onDisappear(perform: save)
         .task(id: text) {
@@ -385,21 +462,20 @@ private struct NoteRow: View {
 
     private func load() {
         editing = family.id
-        text = model.note(of: family) ?? ""
+        loaded = model.note(of: family) ?? ""
+        text = loaded
     }
 
-    /// A line break where the text is selected, as Option-Return puts one in a text field, unless an input method is
-    /// still composing: its Return takes what's typed.
     private func newLine() -> KeyPress.Result {
         guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView, !editor.hasMarkedText() else { return .ignored }
         editor.insertNewlineIgnoringFieldEditor(nil)
         return .handled
     }
 
-    /// Saves the text as the note of the family it was written for, which may be the one before.
     private func save() {
-        guard let editing, let family = model.family(editing) else { return }
+        guard text != loaded, let editing, let family = model.family(editing) else { return }
         model.setNote(text, for: family)
+        loaded = model.note(of: family) ?? ""
     }
 }
 
@@ -416,9 +492,8 @@ private struct FeatureControls: View {
         Group {
             if let groups, groups.isEmpty {
                 EmptyState("No Features", systemImage: "textformat.abc",
-                           description: Text("This font has no optional OpenType features to switch on or off."))
+                           description: Text("This font has no optional OpenType features."))
             } else if let groups {
-                // A box of switches per feature, like the system Typography panel.
                 Form {
                     ForEach(groups) { group in
                         Section(group.name) {
@@ -436,8 +511,9 @@ private struct FeatureControls: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .loading($loaded, for: FileFace(face)) { [face] in
-            await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
+        .loading($loaded, for: FileFace(face), cached: { [model, face] in model.pageFeatures.features(of: face) }) { [model, face] in
+            if model.openFamilyID == family.id { return await model.pageFeatures.features(loading: face) }
+            return await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
         }
     }
 
@@ -458,7 +534,6 @@ private struct FeatureControls: View {
         )
     }
 
-    /// Exclusive features: switching an option on picks it; switching the picked one off goes back to the default.
     private func choice(_ group: FontFeatureGroup, _ option: FontFeatureGroup.Option) -> Binding<Bool> {
         let picked = exclusive(group)
         let fallback = group.options.first(where: \.isDefault)?.selector ?? group.options[0].selector
@@ -470,8 +545,8 @@ private struct FeatureControls: View {
         )
     }
 
-    /// Independent features: the option's selector turns it on, the next one (CoreText's convention) turns it off.
     private func toggle(_ group: FontFeatureGroup, _ option: FontFeatureGroup.Option) -> Binding<Bool> {
+        // The selector after an option's turns it off, as CoreText numbers them.
         let off = option.selector + 1
         return Binding(
             get: {
@@ -489,9 +564,6 @@ private struct FeatureControls: View {
     }
 }
 
-/// A face as its file is now, which an Info panel row works out what it shows for: a file that changed, as Replace puts a
-/// newer version in under the same path, counts as another (see `FontLoader.generation(of:)`). By the face's ID alone, the
-/// panel went on showing the old version's details until another font was selected.
 struct FileFace: Hashable {
     let id: FaceID
     let generation: Int
@@ -502,31 +574,26 @@ struct FileFace: Hashable {
     }
 }
 
-/// Something an Info panel row works out for one font, and which font.
 struct Loaded<Value> {
     let id: AnyHashable
     let value: Value
 }
 
 extension View {
-    /// Works out `state` for the font `id` without clearing it first: going to another font keeps the last
-    /// one's on screen until the new one is ready, a moment later, so the panel doesn't flash its spinners.
-    /// One that takes longer than that clears it, for the row's spinner. What `cached` has for the font is there
-    /// from the first frame, as the panel opens or goes to the font, while `work` makes sure of it: otherwise the
-    /// panel opened with spinners, and the work waited for its slide.
     func loading<ID: Hashable, Value>(_ state: Binding<Loaded<Value>?>, for id: ID, cached: @escaping @MainActor () -> Value? = { nil },
                                       _ work: @escaping @MainActor () async -> Value) -> some View {
-        // Both run before the frame they change is drawn.
         let useCached = {
             if state.wrappedValue?.id != AnyHashable(id), let value = cached() { state.wrappedValue = Loaded(id: id, value: value) }
         }
         return onAppear(perform: useCached)
             .onChange(of: id) { useCached() }
             .task(id: id) {
+                guard state.wrappedValue?.id != AnyHashable(id) else { return }
                 let value = await work()
                 if !Task.isCancelled { state.wrappedValue = Loaded(id: id, value: value) }
             }
             .task(id: id) {
+                guard state.wrappedValue?.id != AnyHashable(id) else { return }
                 try? await Task.sleep(for: .milliseconds(250))
                 if !Task.isCancelled, state.wrappedValue?.id != AnyHashable(id) { state.wrappedValue = nil }
             }
@@ -534,7 +601,6 @@ extension View {
 }
 
 private extension View {
-    /// Info, Features and Axes are tabs, not values to choose: macOS 27 draws a segmented picker apart for those.
     @ViewBuilder func tabsPickerStyle() -> some View {
         if #available(macOS 27, *) { pickerStyle(.tabs) } else { pickerStyle(.segmented) }
     }

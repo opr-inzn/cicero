@@ -1,17 +1,8 @@
 import AppKit
 
-/// The search field's tokens (`SearchToken`) tinted with the highlight colour, the one selected text has (Appearance
-/// in System Settings), rather than in SwiftUI's grey. `.searchable(text:tokens:)` puts SwiftUI's own cell in the
-/// field, a subclass of AppKit's `NSTokenAttachmentCell` whose `drawTokenWithFrame:inView:` fills the token with
-/// `quaternaryLabelColor`. AppKit's `drawWithFrame:inView:`, which draws every token and calls that method, gives
-/// SwiftUI's class AppKit's method back the first time it draws one of its tokens, so even the first token shows
-/// tinted, and a `tokenTintColor` from the highlight colour (`highlightTint`; with no tint, AppKit's tokens take the
-/// accent colour). SwiftUI's class still places the title. When either class or a method isn't there, or
-/// `tokenTintColor` is no longer a method returning an object, the tokens stay grey.
 enum SearchTokenTint {
     private typealias Draw = @convention(c) (NSCell, Selector, NSRect, NSView) -> Void
     private static var isInstalled = false
-    /// The token cell classes `drawWithFrame:inView:` has seen, tinted or not.
     private static var seen: Set<ObjectIdentifier> = []
 
     static func install() {
@@ -24,8 +15,7 @@ enum SearchTokenTint {
               let appKitDrawToken = class_getInstanceMethod(appKitCell, drawToken),
               let appKitTint = class_getInstanceMethod(appKitCell, tint),
               let appKitDraw = class_getInstanceMethod(appKitCell, draw),
-              // The private method still returns an object and takes nothing, as the block standing in for it does:
-              // called some other way, the block would crash.
+              // The private method still returns an object and takes nothing, as the block standing in for it does: called some other way, the block would crash.
               Self.returnsObjectOnly(appKitTint) else { return }
         let highlight: @convention(block) (NSCell) -> NSColor = { _ in highlightTint() }
         let tintImplementation = imp_implementationWithBlock(highlight)
@@ -39,24 +29,21 @@ enum SearchTokenTint {
             appKit(cell, draw, frame, view)
         }
         let implementation = imp_implementationWithBlock(tinted)
-        // Into NSTokenAttachmentCell itself, which has the method today; added there if it only inherits it.
+        // Into NSTokenAttachmentCell itself, which has the method today, or added there if it only inherits it.
         if !class_addMethod(appKitCell, draw, implementation, method_getTypeEncoding(appKitDraw)) {
             method_setImplementation(appKitDraw, implementation)
         }
     }
 
-    /// Whether a method returns an object and takes no arguments but `self` and `_cmd`, as `tokenTintColor` does.
     private static func returnsObjectOnly(_ method: Method) -> Bool {
         let returned = method_copyReturnType(method)
         defer { free(returned) }
         return String(cString: returned) == "@" && method_getNumberOfArguments(method) == 2
     }
 
-    /// The highlight colour as Light mode has it, 2.2 times as saturated: AppKit lays a token's tint over the field
-    /// lightly, and the highlight colour itself came out too pale. AppKit darkens it for Dark mode itself, where the
-    /// darker highlight colour Dark mode has came out grey.
     private static func highlightTint() -> NSColor {
         var highlight = NSColor.selectedTextBackgroundColor
+        // Light mode's colour in Dark mode too: AppKit darkens the tint for Dark mode itself, and Dark mode's own highlight colour came out grey.
         NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance {
             highlight = NSColor.selectedTextBackgroundColor.usingColorSpace(.sRGB) ?? highlight
         }

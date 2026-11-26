@@ -9,8 +9,8 @@ Hyperglot release is out, then commit the three files:
     scripts/update-languages.py --python /opt/homebrew/bin/python3.13
 
 Hyperglot needs Python 3.11 or newer (`brew install python@3.13`). The script makes its own venv
-in .build/update-languages-venv, installs hyperglot there and re-runs itself inside it. This is the
-only place Cicero ever touches the network; the app itself reads the bundled JSON and nothing else.
+in .build/update-languages-venv, installs hyperglot there and re-runs itself inside it. The app never downloads language data; it reads
+the bundled JSON and nothing else.
 
 What gets exported, using Hyperglot's own API so the resolution matches its checker exactly:
 - every language Hyperglot would consider by default (validity "draft" or better), with the
@@ -42,7 +42,6 @@ MIN_PYTHON = (3, 11)
 
 
 def native_name(name):
-    """A language's own name without the stray punctuation some Hyperglot entries end with ("ਪੰਜਾਬੀ,")."""
     return (name or "").strip().rstrip(",;").strip()
 
 
@@ -93,10 +92,10 @@ def export():
     from hyperglot import Languages, OrthographyStatus
     from hyperglot.parse import list_unique
 
-    # Hyperglot writes a pickle cache into the working directory; keep it out of the repo.
+    # Hyperglot writes a pickle cache into the working directory. Keep it out of the repo.
     os.chdir(tempfile.mkdtemp(prefix="update-languages-"))
 
-    languages = Languages()  # Hyperglot's defaults: validity >= draft, Rosetta macrolanguage model
+    languages = Languages()
     rows = []
     skipped_empty = 0
     for iso in sorted(languages.keys()):
@@ -141,7 +140,6 @@ def export():
     }
     os.makedirs(RESOURCES, exist_ok=True)
     with open(os.path.join(RESOURCES, "Languages.json"), "w", encoding="utf-8") as f:
-        # One language per line keeps diffs between versions readable.
         f.write("{\n")
         for key, value in header.items():
             f.write(f"{json.dumps(key)}: {json.dumps(value, ensure_ascii=False)},\n")

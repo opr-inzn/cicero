@@ -4,7 +4,6 @@ import SwiftUI
 struct FoldersSettings: View {
     @Environment(AppModel.self) private var model
     @State private var selection: Set<UUID> = []
-    /// The folder being marked as loaded by an app Cicero doesn't know.
     @State private var namingFolder: WatchedFolder?
     @State private var appName = ""
 
@@ -42,10 +41,11 @@ struct FoldersSettings: View {
             presenting: namingFolder
         ) { folder in
             TextField("App name", text: $appName, prompt: Text("App name"))
-            Button("OK") { model.setActivation(ofFolder: folder.id, active: false, app: appName) }
+            Button("Save") { model.setActivation(ofFolder: folder.id, active: false, app: appName) }
+                .disabled(appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button("Cancel", role: .cancel) {}
         } message: { folder in
-            Text("Cicero lists the fonts in “\(model.data.named(folder).displayName)” as active in that app, which loads them by itself.")
+            Text("Cicero lists the fonts in “\(model.data.named(folder).displayName)” as active in that app, which loads them automatically.")
         }
     }
 }
@@ -66,6 +66,7 @@ private struct FolderRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .truncationMode(.middle)
                 status
             }
             Spacer()
@@ -76,7 +77,6 @@ private struct FolderRow: View {
         .tag(folder.id)
     }
 
-    /// What's out of reach in the folder, if anything.
     @ViewBuilder
     private var status: some View {
         let onlineOnly = model.onlineOnlyCount(inFolder: folder.id)
@@ -91,22 +91,22 @@ private struct FolderRow: View {
                 Button("Allow") { model.openFilesAndFoldersSettings() }
                     .buttonStyle(.link)
                     .font(.caption)
-                    .help("Open Privacy & Security in System Settings, where Files and Folders lets Cicero in")
+                    .help("Open Privacy & Security → Files & Folders in System Settings to grant Cicero access")
             }
         case nil:
             if let progress = model.downloads[folder.id] {
-                Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
+                Text("Downloading \(progress.done.plain) of \(progress.total.plain)…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else if onlineOnly > 0 {
                 HStack(spacing: 6) {
-                    Label(onlineOnly == 1 ? "1 font file is online only" : "\(onlineOnly.formatted()) font files are online only", systemImage: "icloud.and.arrow.down")
+                    Label(onlineOnly == 1 ? "1 font file is online only" : "\(onlineOnly.plain) font files are online only", systemImage: "icloud.and.arrow.down")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folder.id) }
                         .buttonStyle(.link)
                         .font(.caption)
-                        .help("Download them from the cloud service so they’re listed")
+                        .help(onlineOnly == 1 ? "Download it from the cloud service so it’s listed" : "Download them from the cloud service so they’re listed")
                 }
             }
         }

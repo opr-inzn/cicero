@@ -2,9 +2,7 @@ import AppKit
 import CiceroCore
 import UniformTypeIdentifiers
 
-/// A font page's glyphs as vectors: Copy as Vector, and dragging a glyph's cell out of the page.
 enum GlyphVectors {
-    /// A glyph of a style, at its weight and with its axes as moved, at the size outlines are taken at.
     static func outline(_ glyph: CGGlyph?, face: FontFace, weight: Double, variations: [String: Double]) -> GlyphOutline? {
         glyph.flatMap { GlyphOutline(glyph: $0, font: font(face, weight: weight, variations: variations)) }
     }
@@ -13,7 +11,6 @@ enum GlyphVectors {
         FontLoader.shared.font(face, size: GlyphOutline.emSize, weight: weight, variations: variations)
     }
 
-    /// The glyph the font maps a character to, if it has one: the one its cell shows, without features.
     static func glyph(of scalar: UInt32, in font: CTFont) -> CGGlyph? {
         guard let character = Unicode.Scalar(scalar) else { return nil }
         var units = Array(String(Character(character)).utf16)
@@ -22,12 +19,6 @@ enum GlyphVectors {
         return glyphs[0]
     }
 
-    /// Puts the outline on the clipboard, first as an SVG file named after the style and the glyph, as the Finder copies
-    /// a file: Messages and WhatsApp take the first thing they can send, and named a PDF “FILE_3121.pdf”, and Figma,
-    /// which takes a file before SVG code, imports SVG but not PDF. Then as paths for design apps: InDesign's from
-    /// Illustrator's clipboard format, as it places a PDF as a graphic, and Illustrator's from the PDF, as it reads that
-    /// format in its own operators only. And as SVG, as an image and as text, as Illustrator's own copies have it. And
-    /// as `clip` for the font page's text, which pastes the glyph there rather than its SVG code.
     static func copy(_ outline: GlyphOutline, style: String, fallback: String, clip: SampleClip) {
         let item = NSPasteboardItem()
         let svg = outline.svg
@@ -43,19 +34,14 @@ enum GlyphVectors {
         NSPasteboard.general.writeObjects([item])
     }
 
-    /// A glyph to drag: the SVG file Copy as Vector puts on the clipboard, as the Finder drags a file, so the Finder
-    /// copies it and Messages sends it by its name, where its contents alone came as “SVG image.svg”. Nothing to drop
-    /// for a glyph without an outline.
     static func dragItem(_ outline: GlyphOutline?, style: String, fallback: String) -> NSItemProvider {
         dragFile(outline, style: style, fallback: fallback).map { NSItemProvider(object: $0 as NSURL) } ?? NSItemProvider()
     }
 
-    /// The SVG file itself, for a drag AppKit starts.
     static func dragFile(_ outline: GlyphOutline?, style: String, fallback: String) -> URL? {
         outline.flatMap { temporaryFile($0.fileName(style: style, fallback: fallback), Data($0.svg.utf8)) }
     }
 
-    /// Whether a file is one `temporaryFile` made, for a glyph copied or dragged.
     static func isDragFile(_ url: URL) -> Bool {
         url.isFileURL && url.standardizedFileURL.resolvingSymlinksInPath().path
             .hasPrefix(filesFolder.standardizedFileURL.resolvingSymlinksInPath().path + "/")
@@ -63,7 +49,6 @@ enum GlyphVectors {
 
     private static var filesFolder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("Glyphs", isDirectory: true) }
 
-    /// A file of its own in a new temporary folder, so it can have the name given: what's copied or dragged.
     private static func temporaryFile(_ name: String, _ data: Data) -> URL? {
         let folder = filesFolder.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let file = folder.appendingPathComponent(name)
@@ -78,6 +63,5 @@ enum GlyphVectors {
 }
 
 extension NSPasteboard.PasteboardType {
-    /// Adobe Illustrator's clipboard format (AICB), as Illustrator and InDesign declare it.
     static let illustratorClipboard = NSPasteboard.PasteboardType("com.adobe.illustrator.aicb")
 }

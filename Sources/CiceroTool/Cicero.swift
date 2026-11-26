@@ -17,9 +17,6 @@ struct Cicero: AsyncParsableCommand {
                       Rate.self, Note.self, MCPServer.self]
     )
 
-    /// ArgumentParser's own `main`, except when the command line is wrong (an unknown option, a missing name): that's
-    /// `invalidArgument`, exit 1, answered in JSON with `--json`, as for every other error. ArgumentParser would answer
-    /// in text and exit 64.
     static func main() async {
         let arguments = Array(CommandLine.arguments.dropFirst())
         var command: ParsableCommand
@@ -27,7 +24,6 @@ struct Cicero: AsyncParsableCommand {
             command = try parseAsRoot(arguments)
         } catch {
             guard exitCode(for: error) == .validationFailure else { Self.exit(withError: error) }
-            // `--json` before a `--`, after which every word is a name.
             if arguments.prefix(while: { $0 != "--" }).contains("--json") {
                 print(CommandError(.invalidArgument, message(for: error)).json.text())
             } else {
@@ -48,7 +44,6 @@ struct Cicero: AsyncParsableCommand {
 }
 
 enum Version {
-    /// The app's version, from the bundle the tool is in.
     static var text: String {
         let info = Bundle.main.executableURL?.resolvingSymlinksInPath()
             .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Info.plist")
@@ -57,7 +52,6 @@ enum Version {
     }
 }
 
-/// The options every command takes.
 struct CommonOptions: ParsableArguments {
     @Flag(help: "Answer in JSON, for scripts and agents.")
     var json = false
@@ -69,7 +63,6 @@ struct CommonOptions: ParsableArguments {
     var debug = false
 }
 
-/// Fonts Cicero's settings hide or show, which one command shows or hides instead. They never change the settings.
 struct ShownOptions: ParsableArguments {
     @Flag(inversion: .prefixedNo, help: "Show or hide the fonts that come with macOS. Without it, as in Cicero’s settings.")
     var systemFonts: Bool?
@@ -83,33 +76,22 @@ struct ShownOptions: ParsableArguments {
     var shown: ShownFonts { ShownFonts(systemFonts: systemFonts, adobeFonts: adobeFonts, proofingFonts: proofingFonts) }
 }
 
-/// A command that answers in JSON, as `--json` prints it, and that `cicero mcp` offers as a tool (see `MCPTools`).
 protocol Answering: AsyncParsableCommand {
     var common: CommonOptions { get }
-    /// What the command does to Cicero's library, for the agent apps.
     static var effect: Effect { get }
-    /// The answer. Never prints, and never asks: a change that asks first throws `needsConfirmation` without `--yes`.
     func result() async throws -> JSON
 }
 
-/// What a command does to Cicero's library.
 enum Effect {
-    /// It only reads. (`compare` writes its picture, nothing else.)
     case reads
-    /// It changes things, and adds or turns on; doing it again changes nothing more.
     case adds
-    /// It renames: doing it again finds no name.
     case renames
-    /// It puts something new in the place of what was there, like a rating or a note.
     case replaces
-    /// It takes away or turns off.
     case removes
 }
 
-/// A command that changes things, with `WriteDispatcher`.
 protocol Changing: Answering {
     var change: WriteCommand { get }
-    /// The fonts this one command shows or hides.
     var shown: ShownFonts { get }
 }
 
@@ -125,8 +107,6 @@ extension Changing {
     }
 }
 
-/// Runs a command's work and prints its answer, or its error, as text or JSON. Exits with the error's code, or with the
-/// answer's own `exitCode` (as `coverage` does when characters are missing).
 func answer(_ common: CommonOptions, text: (JSON) -> String, exitCode: (JSON) -> Int32 = { _ in 0 },
             _ work: () async throws -> JSON) async throws {
     let start = ContinuousClock.now
@@ -139,10 +119,10 @@ func answer(_ common: CommonOptions, text: (JSON) -> String, exitCode: (JSON) ->
         if common.json {
             print(error.json.text())
         } else {
-            var message = "cicero: \(error.message)"
+            var message = "cicero: \(Text.clean(error.message, lines: true))"
             if !error.suggestions.isEmpty {
                 message += "\n" + (error.code == .notFound ? "Did you mean:" : "It can be:") + "\n"
-                    + error.suggestions.map { "  \($0)" }.joined(separator: "\n")
+                    + error.suggestions.map { "  \(Text.clean($0))" }.joined(separator: "\n")
             }
             FileHandle.standardError.write(Data((message + "\n").utf8))
         }
@@ -152,8 +132,6 @@ func answer(_ common: CommonOptions, text: (JSON) -> String, exitCode: (JSON) ->
     if code != 0 { throw ExitCode(code) }
 }
 
-/// With `rescan`, Cicero scans first while it's open; while it's closed, the command does, holding the lock (see
-/// `WriteDispatcher`). When neither can (an old Cicero, or one not answering), the command scans and saves nothing.
 func load(_ common: CommonOptions, _ shown: ShownOptions, rescan: Bool = false) async throws -> LibraryContext {
     let start = ContinuousClock.now
     let environment = ToolEnvironment.current()
@@ -161,7 +139,9 @@ func load(_ common: CommonOptions, _ shown: ShownOptions, rescan: Bool = false) 
     if rescan {
         do {
             _ = try await WriteDispatcher.perform(WriteRequest(.rescan), environment: environment)
-        } catch let error as CommandError where error.code != .unreadableUserData {
+        } catch let error as CommandError where error.code == .unreadableUserData {
+            throw error
+        } catch {
             scansHere = true
         }
     }
@@ -214,7 +194,6 @@ struct Status: Answering {
     }
 }
 
-/// The options of `find` and `list families`.
 struct FindArguments: ParsableArguments {
     @Option(help: "Families of this foundry.", completion: .names(.foundries))
     var foundry: String?
@@ -350,7 +329,6 @@ struct CoverageCheck: Answering {
     }
 
     func run() async throws {
-        // 3 when characters are missing, as `diff` exits 1 when files differ: a script can ask without reading the JSON.
         try await answer(common, text: Text.coverageCheck, exitCode: { Text.bool($0["covered"]) == false ? 3 : 0 }, result)
     }
 }
@@ -441,17 +419,15 @@ struct List: Answering {
 
 // MARK: Changes
 
-/// Makes a change and prints what it did. A change that asks first asks in the terminal (y/N), unless --yes answers
-/// it; without a terminal, or with --json, it stops with `needsConfirmation` and the question.
-func write(_ command: WriteCommand, _ common: CommonOptions, _ shown: ShownFonts = ShownFonts()) async throws {
-    try await answer(common, text: { Text.changes(command, $0) }) {
+func write(_ command: WriteCommand, _ common: CommonOptions, _ shown: ShownFonts) async throws {
+    try await answer(common, text: { Text.changes(command, $0) }, exitCode: { Text.array($0["failed"]).isEmpty ? 0 : 6 }) {
         var request = WriteRequest(command, confirmed: common.yes, shown: shown)
         while true {
             do {
                 return try await WriteDispatcher.perform(request, environment: .current())
             } catch let error as CommandError where error.code == .needsConfirmation && !request.confirmed && !common.json
                 && isatty(STDIN_FILENO) == 1 && isatty(STDERR_FILENO) == 1 {
-                let question = error.question.map { "\($0.title)\n\($0.message)\n" } ?? error.message + "\n"
+                let question = Text.clean(error.question.map { "\($0.title)\n\($0.message)\n" } ?? error.message + "\n", lines: true)
                 FileHandle.standardError.write(Data((question + "Go on? [y/N] ").utf8))
                 guard let reply = readLine()?.trimmingCharacters(in: .whitespaces).lowercased(), ["y", "yes"].contains(reply) else {
                     throw CommandError(.needsConfirmation, "Nothing changed.")

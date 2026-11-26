@@ -2,24 +2,36 @@ import ArgumentParser
 import CiceroCommands
 import CiceroCore
 
-/// What Tab offers for an argument (see `CompletionNames`). The names come from the tool itself, run by the shell's
-/// completion script at each Tab, so they're always the library's names now.
 extension CompletionKind {
     static func names(_ kind: CompletionNames.Kind) -> CompletionKind {
         .custom { words, _, _ in
             let names = CompletionNames.names(kind, words: words, environment: .current())
-            // zsh reads each name as name:description, so a colon in a name is escaped there. fish and bash take the
-            // names as they are: fish would show the backslash.
-            guard CompletionShell.requesting == .zsh else { return names }
-            return names.map { $0.replacingOccurrences(of: ":", with: "\\:") }
+                .filter { !$0.unicodeScalars.contains { $0.properties.generalCategory == .control } }
+            switch CompletionShell.requesting {
+            // zsh reads each name as name:description, so a colon in a name is escaped there only: fish would show the backslash.
+            case .zsh: return names.map { $0.replacingOccurrences(of: ":", with: "\\:") }
+            // Security: bash expands each word of `compgen -W` ($(…), backticks, quotes) and then puts it on the command line as it is, so a font's name is escaped twice.
+            case .bash: return names.map { shellEscaped(shellEscaped($0)) }
+            default: return names
+            }
         }
+    }
+
+    static func shellEscaped(_ text: String) -> String {
+        var result = ""
+        for character in text {
+            if character.isASCII, !(character.isLetter || character.isNumber || "-_.,+@%/".contains(character)) {
+                result.append("\\")
+            }
+            result.append(character)
+        }
+        return result
     }
 
     static let families = names(.families)
     static let tags = names(.tags)
     static let folders = names(.folders)
 
-    /// The style words of `--filter`, one word each, as its help gives them: "extrabold", "tnum".
     static let styleWords = list(SearchToken.all.map { token in
         switch token {
         case .tabularFigures: "tnum"

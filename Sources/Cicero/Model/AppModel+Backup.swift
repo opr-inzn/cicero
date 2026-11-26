@@ -3,23 +3,13 @@ import CiceroCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The Back Up and Restore sheets of the main window, which the File menu opens.
-@Observable
-final class BackupPrompts {
-    var isBackingUp = false
-    /// A backup read from disk, waiting for the Restore sheet's go-ahead.
-    var restoring: BackupContents?
-}
-
 extension UTType {
-    /// Declared in Info.plist.
     nonisolated static let ciceroBackup = UTType(exportedAs: "com.maximilianinzinger.cicero.backup")
 }
 
 extension AppModel {
     // MARK: Export
 
-    /// The browser's selection, or with nothing selected every family in the list.
     func exportSelectionOrList() {
         let selected = selectedFamilies
         if !selected.isEmpty {
@@ -29,17 +19,14 @@ extension AppModel {
         }
     }
 
-    /// Sidebar rows whose fonts can be exported: sets, tags, folders, foundries, classifications and character sets.
     func canExport(_ item: SidebarItem) -> Bool {
         switch item {
-        // Creative Cloud's files never leave it.
         case .folder(WatchedFolder.adobeFontsID): false
         case .set, .smartSet, .tag, .folder, .foundry, .classification, .characterSet: true
         case .all, .active, .inactive, .temporary, .system, .recent, .problems: false
         }
     }
 
-    /// Exports the fonts sidebar rows have, named after the row when it's one: of a set, only the styles it has.
     func exportFonts(in rows: [SidebarRow]) {
         let items = rows.map(\.item)
         let faces = Set(faces(in: items).map(\.id))
@@ -48,9 +35,6 @@ extension AppModel {
         exportFonts(families, named: rows.count == 1 ? rows[0].title : nil) { faces.contains($1.id) }
     }
 
-    /// Asks where to put the files (and whether as a folder or a ZIP archive), copies them off the
-    /// main thread and reveals the result. Called `name`, else after the one family or "N Families". `including` picks
-    /// the styles of a family to export; all of them unless it says otherwise.
     func exportFonts(_ families: [Family], named name: String?, including: (Family, LibraryFace) -> Bool = { _, _ in true }) {
         let plan = FontExportPlan(families: families, including: including)
         guard !plan.isEmpty else {
@@ -77,8 +61,6 @@ extension AppModel {
 
     private var backup: LibraryBackup { LibraryBackup(locations: locations) }
 
-    /// Saves the current setup to the Backups folder before a restore or an import changes it. When that fails, says
-    /// nothing was `done` ("Couldn’t save the current setup first, so nothing was imported") and returns false.
     func saveSetupSnapshot(named name: String, nothingWas done: String) async -> Bool {
         let backup = backup
         let current = data
@@ -91,13 +73,13 @@ extension AppModel {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
     }
 
-    /// Every font file in the library with its size, for the Back Up sheet. Reads the disk off the main thread.
     func backupInventory() async -> [BackupFont] {
         await backup.inventory(of: library, records: data.records)
     }
 
-    /// Writes a backup; the caller shows the progress and may cancel the task.
     func backUp(to destination: URL, fonts: [BackupFont], includeFonts: Bool, progress: @escaping @Sendable (BackupProgress) -> Void) async throws {
+        guard startJob(.backingUp) else { throw CancellationError() }
+        defer { endJob(.backingUp) }
         // Replace in the save panel must never trash a font, even when the sheet hasn't counted them yet.
         let kept = FontExporter.keptPaths(in: library, data: data, locations: locations)
         try await backup.write(to: destination, userData: data, fonts: fonts, includeFonts: includeFonts, keeping: kept,
@@ -106,13 +88,17 @@ extension AppModel {
 
     // MARK: Restore
 
-    /// Asks for a backup file and reads it; nil when cancelled or it can't be read (a toast says why).
     func chooseBackupToRestore() async -> BackupContents? {
+        if let job {
+            showToast(job.waitMessage)
+            return nil
+        }
         let panel = NSOpenPanel()
         // By the declared type, and by extension in case the type isn't registered with macOS yet.
         panel.allowedContentTypes = [.ciceroBackup] + [UTType(filenameExtension: LibraryBackup.fileExtension)].compactMap { $0 }
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
         panel.message = "Choose a Cicero backup to restore."
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
         do {
@@ -125,41 +111,39 @@ extension AppModel {
         return nil
     }
 
-    /// Saves the current setup to the Backups folder, puts the fonts back (the long part, in the
-    /// caller's task so it can be cancelled), then replaces the setup and merges the records in one
-    /// queued operation, activates again what the backup had in place, rescans and reports.
     func restore(_ contents: BackupContents, settings: Bool, fonts: Bool, progress: @escaping @Sendable (Int, Int) -> Void) async {
+        guard startJob(.restoring) else { return }
+        defer { endJob(.restoring) }
         let backup = backup
         let current = data
         guard await saveSetupSnapshot(named: "Before Restore", nothingWas: "restored") else { return }
 
-        // Restoring the settings brings the backup's Font Library, if it has one; otherwise its fonts go into this one.
         let fontLibrary = settings && !contents.userData.fontLibraryPath.isEmpty ? nil : current.fontLibraryPath
         var fontResult: FontRestoreResult?
         if fonts { fontResult = await backup.restoreFonts(contents, fontLibrary: fontLibrary, progress: progress) }
-        let fallbackFolder = (fontResult?.fallback ?? 0) > 0 ? backup.fallbackFolder : nil
+        let fallbackFolder = (fontResult?.fallbackPaths.isEmpty ?? true) ? nil : backup.fallbackFolder
         if let fontResult, fontResult.cancelled {
             if let fallbackFolder { addFallbackFolder(fallbackFolder) }
             rescan()
-            return showToast("Stopped restoring")
+            return showToast("Restore canceled")
         }
 
-        let restored = backup.userData(from: contents, fontLibrary: fontLibrary)
-        await enqueued { model in
+        var restored = backup.userData(from: contents, fontLibrary: fontLibrary)
+        if let moved = fontResult?.fallbackPaths, !moved.isEmpty {
+            restored.fontFiles = restored.fontFiles.map { moved[$0] ?? $0 }
+            restored.records.inPlace = Set(restored.records.inPlace.map { moved[$0] ?? $0 })
+        }
+        let formerLibrary = current.fontLibraryPath
+        await enqueued { [restored] model in
             if settings {
                 var data = restored
-                // This Mac's activation state, merged below.
                 data.records = model.data.records
-                // A backup from before there were license tags gets them, and one from 0.9.1 or before loses the former
-                // ones it never used, as a library from then does as it loads.
                 data.updateLicenseTags()
-                // And one from before a Font Library that fonts aren't installed into became a location, as it does too.
                 data.keepFormerFontLibraryAsLocation(hasFonts: model.fontLibraryHasFonts)
                 model.data = data
                 model.selection = .all
             }
             if let fallbackFolder { model.addFallbackFolder(fallbackFolder) }
-            // Fonts that were off in the Fonts folder go back there, off.
             let off = await model.engine.moveIntoFontsFolderOff(fontResult?.turningOff ?? [:])
             let current = model.data.records
             let written = Set((fontResult?.restoredPaths ?? []).map { off.placed[$0] ?? $0 })
@@ -167,8 +151,8 @@ extension AppModel {
                 LibraryBackup.mergedRecords(current: current, backup: restored.records, written: written) { FileManager.default.fileExists(atPath: $0) }
             }.value
             model.data.records = merged.records
+            model.keepFontLibrariesAsLocations(former: formerLibrary)
             if !merged.reactivate.isEmpty {
-                // macOS doesn't know these registrations; a scan finds the faces of the files just put back.
                 let input = model.scanInput
                 if let library = try? await model.scanner.scan(input, progress: { _ in }) {
                     let wanted = Set(merged.reactivate)
@@ -184,51 +168,64 @@ extension AppModel {
         }
     }
 
-    /// Fonts that couldn't go back are in a folder of their own; it's watched so they stay in the library.
+    private func keepFontLibrariesAsLocations(former: String) {
+        var changed = data
+        if !changed.installsIntoFontLibrary, !changed.fontLibraryPath.isEmpty {
+            changed.keepFontLibraryAsLocation(hasFonts: fontLibraryHasFonts(URL(fileURLWithPath: changed.fontLibraryPath, isDirectory: true)))
+        }
+        func standard(_ path: String) -> String { URL(fileURLWithPath: path).standardizedFileURL.path }
+        if !former.isEmpty, standard(former) != standard(changed.fontLibraryPath),
+           !changed.folders.contains(where: { standard($0.path) == standard(former) }),
+           fontLibraryHasFonts(URL(fileURLWithPath: former, isDirectory: true)) {
+            changed.folders.append(WatchedFolder(path: former))
+        }
+        if changed != data { data = changed }
+    }
+
     private func addFallbackFolder(_ folder: URL) {
         guard !data.folders.contains(where: { $0.path == folder.path }) else { return }
         data.folders.append(WatchedFolder(path: folder.path))
         data.sidebar.hidden.remove(SidebarSection.folders.key)
     }
 
-    /// Runs an operation after the queued ones and waits for it.
     func enqueued(_ work: @escaping (AppModel) async -> Void) async {
         await withCheckedContinuation { continuation in
-            enqueue { model in
+            let queued = enqueue { model in
                 await work(model)
                 continuation.resume()
             }
+            if !queued { continuation.resume() }
         }
     }
 
-    /// "Restored 4 folders, 2 smart folders and 3,790 font files; 22 were already there"
     private static func restoreSummary(settings: Bool, data: UserData, fonts: FontRestoreResult?) -> String {
         var parts: [String] = []
         if settings {
             let folders = data.sets.count, smart = data.smartSets.count
-            if folders > 0 { parts.append(folders == 1 ? "1 folder" : "\(folders.formatted()) folders") }
-            if smart > 0 { parts.append(smart == 1 ? "1 smart folder" : "\(smart.formatted()) smart folders") }
+            if folders > 0 { parts.append(folders == 1 ? "1 folder" : "\(folders.plain) folders") }
+            if smart > 0 { parts.append(smart == 1 ? "1 smart folder" : "\(smart.plain) smart folders") }
             if parts.isEmpty { parts.append("your settings") }
         }
         if let fonts {
             let count = fonts.restored + fonts.fallback
-            parts.append(count == 1 ? "1 font file" : "\(count.formatted()) font files")
+            parts.append(count == 1 ? "1 font file" : "\(count.plain) font files")
         }
         var notes: [String] = []
         if let fonts, fonts.skipped > 0 {
-            notes.append(fonts.skipped == 1 ? "1 was already there" : "\(fonts.skipped.formatted()) were already there")
+            notes.append(fonts.skipped == 1 ? "1 was already there" : "\(fonts.skipped.plain) were already there")
         }
         if let fonts, fonts.fallback > 0 {
-            notes.append("\(fonts.fallback.formatted()) couldn’t go back and are in ~/\(LibraryBackup.fallbackFolderPath)")
+            notes.append(fonts.fallback == 1
+                ? "1 couldn’t be restored to its original location and is in ~/\(LibraryBackup.fallbackFolderPath)"
+                : "\(fonts.fallback.plain) couldn’t be restored to their original locations and are in ~/\(LibraryBackup.fallbackFolderPath)")
         }
         if let fonts, fonts.failed > 0 {
-            notes.append("\(fonts.failed.formatted()) couldn’t be written")
+            notes.append("\(fonts.failed.plain) couldn’t be written")
         }
         return (["Restored " + parts.listed()] + notes).joined(separator: "; ")
     }
 }
 
-/// The save panel for an export, with a Format picker (Folder or ZIP Archive) in it.
 private enum ExportPanel {
     static func run(name: String) -> (url: URL, format: FontExportFormat)? {
         let panel = NSSavePanel()
@@ -238,16 +235,17 @@ private enum ExportPanel {
         panel.nameFieldLabel = "Export As:"
         panel.nameFieldStringValue = name
         let choice = ExportChoice()
-        let picker = NSHostingView(rootView: FormatPicker(choice: choice) { apply($0, to: panel) })
+        let picker = NSHostingView(rootView: FormatPicker(choice: choice) { [weak panel] in
+            if let panel { apply($0, to: panel) }
+        })
         picker.setFrameSize(picker.fittingSize)
         panel.accessoryView = picker
         apply(choice.format, to: panel)
+        defer { panel.accessoryView = nil }
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        // A name typed with .zip means an archive, whatever the picker says.
         return (url, url.pathExtension.lowercased() == "zip" ? .zip : choice.format)
     }
 
-    /// A ZIP archive gets the .zip extension, a folder none.
     private static func apply(_ format: FontExportFormat, to panel: NSSavePanel) {
         let typed = panel.nameFieldStringValue as NSString
         let base = typed.pathExtension.lowercased() == "zip" ? typed.deletingPathExtension : typed as String

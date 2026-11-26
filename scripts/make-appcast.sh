@@ -2,43 +2,33 @@
 # Writes build/appcast.xml, the feed Sparkle reads for updates, for build/Cicero-<version>.dmg (made by
 # release.sh). The DMG is signed with the EdDSA key whose public half is SUPublicEDKey in Info.plist, and
 # that version's section of CHANGELOG.md becomes the release notes. publish.sh runs this and uploads the
-# feed to the latest stable release, so https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml
-# (SUFeedURL) always describes the latest version.
-#
-# A beta (0.12.0b1) goes in Sparkle's "beta" channel, which only the beta track is offered, next to the stable item of
-# the feed published now, so the stable track is still offered that; former betas go. A stable version (0.11.1) keeps
-# the published beta while that beta is of a newer version (0.12.0b2), so the beta track still has it; the stable
-# version the beta leads to (0.12.0) is the feed's only item.
+# feed with the DMG, so https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml (SUFeedURL)
+# always describes the latest version.
 #   ./scripts/make-appcast.sh             the DMG of the version in Resources/Info.plist
 #   ./scripts/make-appcast.sh <dmg>       another DMG of that version
-#   SPARKLE_KEY_FILE       sign with the private key in this file instead of the keychain's "cicero" account
-#   CICERO_FEED_URL        read the published feed from here instead of GitHub (for tests; a file:// URL works)
+#   SPARKLE_KEY_FILE  sign with the private key in this file instead of the keychain's "cicero" account
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 plist() { /usr/libexec/PlistBuddy -c "Print $1" Resources/Info.plist; }
 VERSION=$(plist CFBundleShortVersionString)
 BUILD=$(plist CFBundleVersion)
-# Sparkle wants major.minor.patch.
+# Appcast minimumSystemVersion needs major.minor.patch.
 MINIMUM_SYSTEM=$(plist LSMinimumSystemVersion)
 [[ "$MINIMUM_SYSTEM" == *.*.* ]] || MINIMUM_SYSTEM="$MINIMUM_SYSTEM.0"
 DMG="${1:-build/Cicero-$VERSION.dmg}"
 [[ -f "$DMG" ]] || { echo "Missing $DMG — run ./scripts/release.sh first." >&2; exit 1; }
-# The feed must name the build the DMG holds, or Sparkle offers the update again and again.
+# The feed must name the build the DMG holds, or updates repeat forever.
 BUILT=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" build/Cicero.app/Contents/Info.plist 2>/dev/null || true)
 [[ "$BUILT" == "$BUILD" ]] ||
     { echo "build/Cicero.app is build ${BUILT:-(missing)}, Info.plist says $BUILD — run ./scripts/release.sh again." >&2; exit 1; }
-# A feed naming a build that isn't above the published one would never offer it.
 ./scripts/check-version.sh
 
 NOTES=$(awk -v v="$VERSION" '$0 == "## " v { found = 1; next } found && /^## / { exit } found' CHANGELOG.md)
 [[ -n "${NOTES//[[:space:]]/}" ]] || { echo "Add a \"## $VERSION\" section to CHANGELOG.md first." >&2; exit 1; }
-# Sparkle shows the notes with no address to start from, so a link relative to CHANGELOG.md would go nowhere: it points
-# to the file in this version's tag on GitHub, as the release page's links do. Full addresses (with ":") stay.
+# Relative links in appcast notes have no base URL, so rewrite them to this version's tag on GitHub.
 NOTES=$(sed -E 's#\]\(([^):/\#][^):]*)\)#](https://github.com/opr-inzn/cicero/blob/v'"$VERSION"'/\1)#g' <<<"$NOTES")
 
-# Prints sparkle:edSignature="…" length="…" for the enclosure. The first time, macOS may ask to let
-# sign_update use the key; choose Always Allow.
 SIGN_UPDATE=.build/artifacts/sparkle/Sparkle/bin/sign_update
 [[ -x "$SIGN_UPDATE" ]] || swift package resolve
 if [[ -n "${SPARKLE_KEY_FILE:-}" ]]; then
@@ -49,33 +39,7 @@ fi
 [[ "$ENCLOSURE_SIGNATURE" =~ ^sparkle:edSignature=\"[^\"]+\"\ length=\"[0-9]+\"$ ]] ||
     { echo "Unexpected output from sign_update: $ENCLOSURE_SIGNATURE" >&2; exit 1; }
 
-# The items of the published feed to keep, as they are: their signatures sign the DMGs, not the feed.
-CHANNEL=
-KEPT_ITEMS=
-FEED_URL=${CICERO_FEED_URL:-https://github.com/opr-inzn/cicero/releases/latest/download/appcast.xml}
-items() { awk '/<item>/{b=""; i=1} i{b=b $0 "\n"} /<\/item>/{printf "%s%c", b, 0; i=0}' <<<"$1"; }
-if [[ "$VERSION" =~ b[0-9]+$ ]]; then
-    CHANNEL=$'\n            <sparkle:channel>beta</sparkle:channel>'
-    PUBLISHED=$(curl -fsSL --max-time 30 "$FEED_URL") ||
-        { echo "Couldn't read the published feed at $FEED_URL; a beta's feed must keep the stable version." >&2; exit 1; }
-    while IFS= read -r -d '' item; do
-        [[ "$item" == *"<sparkle:channel>"* ]] || KEPT_ITEMS+="$item"
-    done < <(items "$PUBLISHED")
-    [[ "$KEPT_ITEMS" == *"<sparkle:version>"* ]] ||
-        { echo "The published feed has no stable version to keep; publish a stable version first." >&2; exit 1; }
-elif PUBLISHED=$(curl -fsSL --max-time 30 "$FEED_URL" 2>/dev/null); then
-    # A beta of a newer version than this one stays: 0.12.0b2 after 0.11.1, not after 0.12.0.
-    while IFS= read -r -d '' item; do
-        [[ "$item" == *"<sparkle:channel>beta</sparkle:channel>"* ]] || continue
-        BASE=$(sed -n 's|.*<sparkle:shortVersionString>\(.*\)b[0-9]*</sparkle:shortVersionString>.*|\1|p' <<<"$item")
-        [[ -n "$BASE" && "$BASE" != "$VERSION" && "$(printf '%s\n%s\n' "$VERSION" "$BASE" | sort -V | tail -1)" == "$BASE" ]] &&
-            KEPT_ITEMS+="$item"
-    done < <(items "$PUBLISHED")
-else
-    echo "Couldn't read the published feed at $FEED_URL, so no beta is kept in it." >&2
-fi
-
-# Sparkle (2.9 and later) shows Markdown notes as they are; only "]]>" would end the CDATA section.
+# Only "]]>" ends an XML CDATA section.
 APPCAST=build/appcast.xml
 cat >"$APPCAST" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
@@ -89,15 +53,15 @@ cat >"$APPCAST" <<EOF
             <title>Cicero $VERSION</title>
             <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
             <sparkle:version>$BUILD</sparkle:version>
-            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>$CHANNEL
+            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>$MINIMUM_SYSTEM</sparkle:minimumSystemVersion>
             <description sparkle:format="markdown"><![CDATA[
 ${NOTES//]]>/]]]]><![CDATA[>}
 ]]></description>
-            <enclosure url="https://github.com/opr-inzn/cicero/releases/download/v$VERSION/Cicero.dmg" $ENCLOSURE_SIGNATURE type="application/octet-stream"/>
+            <enclosure url="https://github.com/opr-inzn/cicero/releases/download/v$VERSION/Cicero-$VERSION-$BUILD.dmg" $ENCLOSURE_SIGNATURE type="application/octet-stream"/>
         </item>
-$KEPT_ITEMS    </channel>
+    </channel>
 </rss>
 EOF
 xmllint --noout "$APPCAST"
-echo "Built $APPCAST$( [[ -n "$KEPT_ITEMS" ]] && echo ", keeping $(grep -c '<item>' <<<"$KEPT_ITEMS") published item(s)")"
+echo "Built $APPCAST"

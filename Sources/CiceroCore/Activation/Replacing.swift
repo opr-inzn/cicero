@@ -2,17 +2,6 @@ import CoreText
 import Foundation
 
 extension ActivationEngine {
-    /// Replace (see `AddedDuplicate.replacements`): each of the library's files goes to the Trash and a copy of the added
-    /// file takes its place, under its name, in its folder, on or off as it was. One that's on goes off for the moment
-    /// that takes and on again the way it was: in place, until Cicero quits, or from a Fonts folder. One that's off in a
-    /// Fonts folder has its copy go in off (see `moveIntoFontsFolderOff`), as macOS turns on whatever arrives there; see
-    /// `replaceOff`. With fonts installed into Cicero's Library, its copy goes there instead, off, as FontExplorer X
-    /// does it; see `replaceIntoLibrary`; and one Cicero installed from an original there that's replaced too just goes to
-    /// the Trash, as the original is the font. The copy is made in Cicero's staging folder first, so a file whose copy
-    /// can't be made or go in, or that can't go to the Trash, stays as it was. Its paths stay, so the records and
-    /// everything the user put it in do too, but for an off one that went in under another name or went for its original
-    /// (`placed` says where). `moving`, an added file that took every place it was meant for goes, as activating by
-    /// moving does.
     @concurrent
     public func replace(_ replacements: [FileReplacement], moving: Bool, records: ActivationRecords) async -> ActivationResult {
         let fm = FileManager.default
@@ -25,15 +14,15 @@ extension ActivationEngine {
         if !persistent.isEmpty { _ = await registrar.unregister(persistent.map(Self.url), scope: .persistent) }
         if !session.isEmpty { _ = await registrar.unregister(session.map(Self.url), scope: .session) }
 
-        let staging = locations.support.appendingPathComponent("Staging", isDirectory: true)
+        var stagedFiles: [URL] = []
+        defer { for staged in stagedFiles { Self.removeStaged(staged) } }
         var done: [FileReplacement] = []
         var failed: [String] = []
         var placed: [String: String] = [:]
         var renameLater: [String: String] = [:]
-        // Staged copy → the replacement it's for, of those that go in off, into a Fonts folder or Cicero's Library.
+        var keptAside = 0
         var goingInOff: [String: FileReplacement] = [:]
         var intoLibrary: [String: FileReplacement] = [:]
-        // Copies nothing goes in for (see `spareCopies`), with their originals.
         var spare: [(replacement: FileReplacement, original: String)] = []
         for replacement in replacements {
             if let original = spareCopies[replacement.old] {
@@ -41,32 +30,23 @@ extension ActivationEngine {
                 continue
             }
             let old = Self.url(replacement.old)
-            let staged = staging.appendingPathComponent(UUID().uuidString + "-" + old.lastPathComponent, isDirectory: false)
-            do {
-                try fm.createDirectory(at: staging, withIntermediateDirectories: true)
-                try fm.copyItem(at: Self.url(replacement.added), to: staged)
-            } catch {
-                try? fm.removeItem(at: staged)
-                failed.append(replacement.old)
-                continue
-            }
             if off.contains(replacement.old) {
+                let staged: URL
+                do {
+                    staged = try newStagedFile(named: Self.replacementName(of: old, by: Self.url(replacement.added)))
+                    stagedFiles.append(staged)
+                    try fm.copyItem(at: Self.realFile(Self.url(replacement.added)), to: staged)
+                } catch {
+                    failed.append(replacement.old)
+                    continue
+                }
                 if installsIntoFontLibrary, fontLibrary != nil { intoLibrary[staged.path] = replacement } else { goingInOff[staged.path] = replacement }
                 continue
             }
-            do {
-                _ = try trash(old)
-            } catch {
-                try? fm.removeItem(at: staged)
-                failed.append(replacement.old)
-                continue
-            }
-            do {
-                try fm.moveItem(at: staged, to: old)
+            if let new = replaceInPlace(old, with: Self.url(replacement.added)) {
                 done.append(replacement)
-            } catch {
-                // The old file is in the Trash, to put back from there.
-                try? fm.removeItem(at: staged)
+                if new != replacement.old { placed[replacement.old] = new }
+            } else {
                 failed.append(replacement.old)
             }
         }
@@ -77,16 +57,16 @@ extension ActivationEngine {
             failed += off.failed
             placed.merge(off.placed) { first, _ in first }
             renameLater = off.renameLater
-            for old in off.placed.keys { records.installedCopies[old] = nil }
+            keptAside = off.keptAside
+            for replacement in off.done { records.installedCopies[replacement.old] = nil }
         }
         if !intoLibrary.isEmpty {
             let library = replaceIntoLibrary(intoLibrary)
             done += library.done
             failed += library.failed
             placed.merge(library.placed) { first, _ in first }
-            for old in library.placed.keys { records.installedCopies[old] = nil }
+            for replacement in library.done { records.installedCopies[replacement.old] = nil }
         }
-        // Once its original has the added file, the copy goes; while it doesn't, the copy stays as it was.
         for (replacement, original) in spare {
             guard done.contains(where: { $0.old == original }), didTrash(Self.url(replacement.old)) else {
                 failed.append(replacement.old)
@@ -97,12 +77,25 @@ extension ActivationEngine {
             records.installedCopies[replacement.old] = nil
         }
 
-        // On again, as it was: the new file where it went in, the old one where it stayed.
-        let back = { (paths: [String]) in paths.filter { fm.fileExists(atPath: $0) } }
-        if !back(persistent).isEmpty { _ = await registerAndConfirm(back(persistent), scope: .persistent) }
-        if !back(session).isEmpty { _ = await registerAndConfirm(back(session), scope: .session) }
+        for (old, new) in placed {
+            if records.inPlace.remove(old) != nil { records.inPlace.insert(new) }
+            if let temp = records.temporary.removeValue(forKey: old) { records.temporary[new] = temp }
+            if let origin = records.installedCopies.removeValue(forKey: old) { records.installedCopies[new] = origin }
+            if let origin = records.appFolderOrigins.removeValue(forKey: old) { records.appFolderOrigins[new] = origin }
+        }
+        for (copy, origin) in records.installedCopies where placed[origin] != nil {
+            records.installedCopies[copy] = placed[origin]
+        }
 
-        // Where each new file is.
+        let back = { (paths: [String]) -> [String] in
+            var seen = Set<String>()
+            return paths.map { placed[$0] ?? $0 }.filter { fm.fileExists(atPath: $0) && seen.insert($0).inserted }
+        }
+        let persistentBack = back(persistent)
+        let sessionBack = back(session)
+        if !persistentBack.isEmpty { _ = await registerAndConfirm(persistentBack, scope: .persistent) }
+        if !sessionBack.isEmpty { _ = await registerAndConfirm(sessionBack, scope: .session) }
+
         func new(_ replacement: FileReplacement) -> String { placed[replacement.old] ?? replacement.old }
         if moving {
             for (added, copies) in Dictionary(grouping: done, by: \.added) where !Self.isProtected(added) {
@@ -112,18 +105,21 @@ extension ActivationEngine {
             }
         }
 
-        // "Replaced Inter. The old file is in the Trash", and what couldn't be, by name: ". Couldn’t replace Roboto".
         var message: String
         if done.isEmpty {
             message = Self.message("Replaced", "replace", succeeded: 0, failed: failed.count,
                                    undone: FontNames.describe(FontNames.fonts(inFiles: failed)))
         } else {
             let names = FontNames.describe(FontNames.fonts(inFiles: done.map(new))) ?? (done.count == 1 ? "1 file" : "\(done.count) files")
-            message = "Replaced \(names). " + (done.count == 1 ? "The old file is in the Trash" : "The old files are in the Trash")
+            let trashed = done.count - keptAside
+            message = "Replaced \(names). " + (keptAside == 0 ? (done.count == 1 ? "The old file is in the Trash" : "The old files are in the Trash")
+                : trashed == 0 ? (done.count == 1 ? "The old file is in Cicero’s Inactive folder" : "The old files are in Cicero’s Inactive folder")
+                : "\(trashed.plain) old \(trashed == 1 ? "file is" : "files are") in the Trash and \(keptAside.plain) \(keptAside == 1 ? "is" : "are") in Cicero’s Inactive folder")
             if !failed.isEmpty {
                 let undone = FontNames.describe(FontNames.fonts(inFiles: failed.filter { fm.fileExists(atPath: $0) }))
-                message += ". Couldn’t replace " + (undone ?? (failed.count == 1 ? "1 file" : "\(failed.count) files"))
+                message += ". Couldn’t replace " + (undone ?? (failed.count == 1 ? "1 file" : "\(failed.count.plain) files"))
             }
+            message += "."
         }
         var result = ActivationResult(records: records, succeeded: done.count, failed: failed, message: message)
         result.placed = placed
@@ -131,9 +127,6 @@ extension ActivationEngine {
         return result
     }
 
-    /// The copies Replace just sends to the Trash, each with its original: with fonts installed into Cicero's Library, ones
-    /// Cicero installed in a Fonts folder that are off, whose originals in Cicero's Library take the added file too.
-    /// Nothing goes in for them, or the library would have the font twice; the original is the font.
     public func spareCopies(among replacements: [FileReplacement], records: ActivationRecords) -> [String: String] {
         guard installsIntoFontLibrary else { return [:] }
         let olds = Set(replacements.map(\.old))
@@ -145,42 +138,105 @@ extension ActivationEngine {
         return spare
     }
 
-    /// Replaces files that are off in a Fonts folder with the staged copies (staged path → its replacement). macOS keeps a
-    /// font off by its file's path and PostScript name, and lets go of a gone file's entry a moment later: a new file at
-    /// that path with those font names would come on with it (tested in a macOS 26 VM). So the new file takes the old
-    /// one's path only once macOS has let go of the old one: the old file waits in Cicero's Inactive folder meanwhile, where
-    /// it stays in the library, off, should Cicero stop, then goes to the Trash. One macOS hasn't let go of within
-    /// `forgetWait` gets "Name 2.otf" instead (`renameLater` says what for), as does an added file of another name its
-    /// own. Any that can't go in leave the old one as it was.
+    static func replacementName(of old: URL, by added: URL) -> String {
+        let ext = added.pathExtension.isEmpty ? old.pathExtension : added.pathExtension
+        let base = old.deletingPathExtension().lastPathComponent
+        return ext.isEmpty ? base : base + "." + ext
+    }
+
+    private struct Replacing: Codable {
+        var staged: String
+        var old: String
+        var new: String?
+    }
+
+    private var replacingNotes: URL { locations.support.appendingPathComponent("Replacing", isDirectory: true) }
+
+    func replaceInPlace(_ old: URL, with added: URL) -> String? {
+        let fm = FileManager.default
+        let name = Self.replacementName(of: old, by: added)
+        let new = name.compare(old.lastPathComponent, options: .caseInsensitive) == .orderedSame
+            ? old : Self.uniqueURL(for: name, in: old.deletingLastPathComponent())
+        // The old file goes to the Trash only once its replacement is whole beside it, and comes back should the last step fail: a font must never be left gone from its place.
+        let staged = old.deletingLastPathComponent().appendingPathComponent(Self.movingPrefix + UUID().uuidString, isDirectory: false)
+        // Noted first, so a Cicero that stops partway finishes the replacement at its next launch, or takes the copy away.
+        let note = replacingNotes.appendingPathComponent(UUID().uuidString + ".json", isDirectory: false)
+        do {
+            try fm.createDirectory(at: replacingNotes, withIntermediateDirectories: true)
+            try JSONEncoder().encode(Replacing(staged: staged.path, old: old.path, new: new.path)).write(to: note, options: .atomic)
+            guard UserDataStore.syncToDisk(note) else { throw CocoaError(.fileWriteUnknown) }
+        } catch {
+            try? fm.removeItem(at: note)
+            return nil
+        }
+        defer { try? fm.removeItem(at: note) }
+        do {
+            try fm.copyItem(at: Self.realFile(added), to: staged)
+            Self.unlock(staged)
+        } catch {
+            try? fm.removeItem(at: staged)
+            return nil
+        }
+        let trashed: URL?
+        do {
+            trashed = try trash(old)
+        } catch {
+            try? fm.removeItem(at: staged)
+            return nil
+        }
+        if Self.renameExclusively(staged.path, to: new.path) { return new.path }
+        try? fm.removeItem(at: staged)
+        if let trashed, (try? move(trashed, to: old)) == nil { try? fm.moveItem(at: trashed, to: old) }
+        return nil
+    }
+
+    func finishReplacing() {
+        let fm = FileManager.default
+        for name in (try? fm.contentsOfDirectory(atPath: replacingNotes.path)) ?? [] where name.hasSuffix(".json") {
+            let note = replacingNotes.appendingPathComponent(name, isDirectory: false)
+            if let replacing = (try? Data(contentsOf: note)).flatMap({ try? JSONDecoder().decode(Replacing.self, from: $0) }),
+               (replacing.staged as NSString).lastPathComponent.hasPrefix(Self.movingPrefix), Self.exists(replacing.staged) {
+                if Self.exists(replacing.old) || !Self.renameExclusively(replacing.staged, to: replacing.new ?? replacing.old) {
+                    try? fm.removeItem(atPath: replacing.staged)
+                }
+            }
+            try? fm.removeItem(at: note)
+        }
+    }
+
     func replaceOff(_ staged: [String: FileReplacement]) async
-        -> (done: [FileReplacement], failed: [String], placed: [String: String], renameLater: [String: String]) {
+        -> (done: [FileReplacement], failed: [String], placed: [String: String], renameLater: [String: String], keptAside: Int) {
         let fm = FileManager.default
         var done: [FileReplacement] = []
         var failed: [String] = []
         var placed: [String: String] = [:]
         var renameLater: [String: String] = [:]
-        func sameName(_ replacement: FileReplacement) -> Bool {
-            Self.url(replacement.added).lastPathComponent.compare(Self.url(replacement.old).lastPathComponent, options: .caseInsensitive) == .orderedSame
+        var keptAside = 0
+        func name(_ replacement: FileReplacement) -> String {
+            Self.replacementName(of: Self.url(replacement.old), by: Self.url(replacement.added))
         }
-        // Old path → where the old file waits.
+        func sameName(_ replacement: FileReplacement) -> Bool {
+            name(replacement).compare(Self.url(replacement.old).lastPathComponent, options: .caseInsensitive) == .orderedSame
+        }
         var waiting: [String: String] = [:]
         var moves: [String: String] = [:]
         for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) {
             let old = Self.url(replacement.old)
             guard sameName(replacement) else {
-                // While the old file is still there, so never its path.
-                moves[path] = Self.uniqueURL(for: Self.url(replacement.added).lastPathComponent, in: old.deletingLastPathComponent()).path
+                moves[path] = Self.uniqueURL(for: name(replacement), in: old.deletingLastPathComponent()).path
                 continue
             }
             do {
+                // The old file waits in the Inactive folder, where it stays in the library, off, should Cicero stop.
                 let aside = Self.uniqueURL(for: old.lastPathComponent, in: try locations.inactiveFolderForNewFiles())
-                try Self.moveItem(old, to: aside)
+                try move(old, to: aside)
                 waiting[replacement.old] = aside.path
             } catch {
                 try? fm.removeItem(atPath: path)
                 failed.append(replacement.old)
             }
         }
+        // macOS keeps a font off by its file's path and PostScript name, and lets go of a gone file's entry a moment later: a new file at that path would come on as it does.
         let remembered = await registrar.waitUntilForgotten(waiting.keys.sorted(), timeout: forgetWait, every: .milliseconds(100))
         for (path, replacement) in staged where waiting[replacement.old] != nil {
             let old = Self.url(replacement.old)
@@ -195,33 +251,25 @@ extension ActivationEngine {
         for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) where moves[path] != nil {
             let aside = waiting[replacement.old]
             guard let new = moved.placed[path] else {
-                // Back in the staging folder; the old file goes back as it was.
                 try? fm.removeItem(atPath: path)
                 if let aside { await putBack(aside, at: replacement.old, remembered: remembered.contains(replacement.old)) }
                 failed.append(replacement.old)
                 continue
             }
-            if didTrash(Self.url(aside ?? replacement.old)) {
-                done.append(replacement)
-                if new != replacement.old { placed[replacement.old] = new }
-                if aside != nil, new != replacement.old { renameLater[new] = replacement.old }
-            } else if aside != nil {
-                // In the Inactive folder, the old one stays in the library, off, beside the new one.
-                done.append(replacement)
-            } else {
-                // The old one stays, off; the new one goes again, before macOS has it for long.
+            let trashed = didTrash(Self.url(aside ?? replacement.old))
+            guard trashed || aside != nil else {
                 try? fm.removeItem(atPath: new)
                 failed.append(replacement.old)
+                continue
             }
+            if !trashed { keptAside += 1 }
+            done.append(replacement)
+            if new != replacement.old { placed[replacement.old] = new }
+            if aside != nil, new != replacement.old { renameLater[new] = replacement.old }
         }
-        return (done, failed, placed, renameLater)
+        return (done, failed, placed, renameLater, keptAside)
     }
 
-    /// Replaces files that are off in a Fonts folder with the staged copies (staged path → its replacement) when Cicero
-    /// installs fonts into its library: each copy goes into its family's folder there, under the old file's name, where
-    /// macOS turns nothing on by itself, so it's off without being turned off, and the old file goes to the Trash. Nothing
-    /// goes into the Fonts folder, so nothing waits for macOS to let go of the old file, or goes in as "Name 2". One whose
-    /// copy can't go in, or whose old file can't go to the Trash, stays as it was.
     func replaceIntoLibrary(_ staged: [String: FileReplacement]) -> (done: [FileReplacement], failed: [String], placed: [String: String]) {
         let fm = FileManager.default
         var done: [FileReplacement] = []
@@ -230,7 +278,7 @@ extension ActivationEngine {
         for (path, replacement) in staged.sorted(by: { $0.key < $1.key }) {
             let old = Self.url(replacement.old)
             let folder = installFolder(for: replacement.added, family: nil)
-            let new = Self.uniqueURL(for: old.lastPathComponent, in: folder)
+            let new = Self.uniqueURL(for: Self.replacementName(of: old, by: Self.url(replacement.added)), in: folder)
             do {
                 try fm.createDirectory(at: folder, withIntermediateDirectories: true)
                 try fm.moveItem(at: Self.url(path), to: new)
@@ -253,49 +301,69 @@ extension ActivationEngine {
         return (done, failed, placed)
     }
 
-    /// Waits, off the operation queue, until macOS no longer names these paths as fonts it has off (see
-    /// `FontRegistrar.waitUntilForgotten`). Returns the paths it still names.
     @concurrent
     public func waitUntilForgotten(_ paths: [String], timeout: Duration, every: Duration) async -> Set<String> {
         await registrar.waitUntilForgotten(paths, timeout: timeout, every: every)
     }
 
-    /// Files Replace put in as "Name 2.otf" (`ActivationResult.renameLater`: their path → the one meant for them) take
-    /// their name, once macOS has let go of the old file there: renamed, they'd lose being off, so each leaves for the
-    /// Inactive folder and goes in again the way `moveIntoFontsFolderOff` does it, on for a few hundredths of a second.
-    /// Only while nothing changed: the name is free, macOS no longer names it, and the file is still there in the Fonts
-    /// folder, off, and not on for a while; otherwise it stays as it is. One that won't go in stays in the Inactive
-    /// folder, off: put back as "Name 2", macOS would turn it on. Returns the files renamed, from → to.
-    @concurrent
-    public func renameBack(_ pending: [String: String], records: ActivationRecords) async -> [String: String] {
-        let fm = FileManager.default
-        let ready = pending.filter { interim, original in
-            !fm.fileExists(atPath: original) && fm.fileExists(atPath: interim) && isInsideFontsFolder(interim)
-                && Self.url(interim).deletingLastPathComponent() == Self.url(original).deletingLastPathComponent()
-                && records.temporary[interim] == nil && !registrar.isActive(Self.url(interim))
-        }
-        guard !ready.isEmpty else { return [:] }
-        let remembered = await registrar.waitUntilForgotten(ready.values.sorted(), timeout: .zero, every: .zero)
-        // Where each waits → (its "Name 2" path, the path meant for it).
-        var waiting: [String: (interim: String, original: String)] = [:]
-        for (interim, original) in ready.sorted(by: { $0.key < $1.key }) where !remembered.contains(original) {
-            guard let folder = try? locations.inactiveFolderForNewFiles() else { continue }
-            let aside = Self.uniqueURL(for: Self.url(interim).lastPathComponent, in: folder)
-            guard (try? Self.moveItem(Self.url(interim), to: aside)) != nil else { continue }
-            waiting[aside.path] = (interim, original)
-        }
-        guard !waiting.isEmpty else { return [:] }
-        let moved = await moveIntoFontsFolderOff(waiting.mapValues(\.original), exactly: true)
-        var renamed: [String: String] = [:]
-        for (aside, file) in waiting {
-            if let path = moved.placed[aside] { renamed[file.interim] = path }
-        }
-        return renamed
+    private var renamesLaterList: URL { locations.support.appendingPathComponent("renaming-later.json", isDirectory: false) }
+
+    public var renamesLater: [String: String] {
+        (try? Data(contentsOf: renamesLaterList)).flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
     }
 
-    /// An old file that waited in the Inactive folder goes back where it was, off; one macOS still remembers there stays in
-    /// the Inactive folder, off, as putting it back would have it come on with the entry going.
+    public func noteRenamesLater(_ pending: [String: String]) {
+        writeRenamesLater(renamesLater.merging(pending) { _, new in new })
+    }
+
+    public func forgetRenamesLater(_ interims: some Sequence<String>) {
+        var list = renamesLater
+        for interim in interims { list[interim] = nil }
+        writeRenamesLater(list)
+    }
+
+    private func writeRenamesLater(_ list: [String: String]) {
+        guard !list.isEmpty else {
+            try? FileManager.default.removeItem(at: renamesLaterList)
+            return
+        }
+        try? FileManager.default.createDirectory(at: locations.support, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(list).write(to: renamesLaterList, options: .atomic)
+    }
+
+    @concurrent
+    public func renameBack(_ pending: [String: String], records: ActivationRecords) async -> (renamed: [String: String], settled: Set<String>) {
+        let fm = FileManager.default
+        let never = Set(pending.filter { interim, original in
+            fm.fileExists(atPath: original) || !fm.fileExists(atPath: interim) || !isInsideFontsFolder(interim)
+                || Self.url(interim).deletingLastPathComponent() != Self.url(original).deletingLastPathComponent()
+        }.keys)
+        let ready = pending.filter { interim, _ in
+            !never.contains(interim) && records.temporary[interim] == nil && !registrar.isActive(Self.url(interim))
+        }
+        guard !ready.isEmpty else { return ([:], never) }
+        let remembered = await registrar.waitUntilForgotten(ready.values.sorted(), timeout: .zero, every: .zero)
+        var waiting: [String: (interim: String, original: String)] = [:]
+        for (interim, original) in ready.sorted(by: { $0.key < $1.key }) where !remembered.contains(original) {
+            // Renamed where it is, a file would lose being off, so it leaves for the Inactive folder and goes in again.
+            guard let folder = try? locations.inactiveFolderForNewFiles() else { continue }
+            let aside = Self.uniqueURL(for: Self.url(interim).lastPathComponent, in: folder)
+            guard (try? move(Self.url(interim), to: aside)) != nil else { continue }
+            waiting[aside.path] = (interim, original)
+        }
+        guard !waiting.isEmpty else { return ([:], never) }
+        let moved = await moveIntoFontsFolderOff(waiting.mapValues(\.original), exactly: true)
+        var renamed: [String: String] = [:]
+        var back: [String: String] = [:]
+        for (aside, file) in waiting {
+            if let path = moved.placed[aside] { renamed[file.interim] = path } else { back[aside] = file.interim }
+        }
+        if !back.isEmpty { _ = await moveIntoFontsFolderOff(back, exactly: true) }
+        return (renamed, never.union(renamed.keys))
+    }
+
     private func putBack(_ aside: String, at old: String, remembered: Bool) async {
+        // One macOS still remembers stays in the Inactive folder: put back, it would come on as macOS lets go of the entry.
         guard !remembered else { return }
         _ = await moveIntoFontsFolderOff([aside: old])
     }

@@ -1,36 +1,35 @@
 # Changelog
 
-Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **What’s New** after an update. Only `## <version>` sections, their paragraphs and their `- ` items show there.
+Each version’s notes here become its release notes on the [releases page](https://github.com/opr-inzn/cicero/releases), and what Cicero shows in **Help → What’s New in Cicero**. Only `## <version>` sections, their paragraphs and their `- ` items show there.
 
-## 0.12.0b9
+## 0.13.0
 
-- **Glyphs** shows every glyph, with no limits, and the alternates that two or three features draw together, like `four.osf.ss01`. Figures are grouped by style, each alternate after its figure.
-- Compare’s first row starts at the letters’ ascenders, so there’s less empty space above it at large sizes.
-- Cicero uses much less memory on a first launch and in a long session with many fonts.
-- Your Mac and Cicero stay awake while an import copies fonts.
-- **Tab completion** for the Cicero CLI works in bash and fish too. Choose **Cicero → Install Cicero CLI** once more to add it.
+- **A new app icon:** Cicero’s icon is now a map of glyphs, with a gradient in Dark Mode.
+- **Find a look-alike for a font a PDF is missing:** when a PDF carries a font that isn’t in your library, click **Show Similar** next to it to see the families in your library that look most like it.
+- **Better classification:** Cicero guesses more fonts’ classifications correctly, from their letters, their names and the fonts like them.
+- **Rename in the sidebar:** double-click a folder, tag or location, or choose **Rename**, to change its name in place, as in the Finder.
+- **Duplicates is one table:** the extra copies are already selected. Change the selection with the checkboxes, then click **Move Files to Trash**. Each font always keeps at least one file. Duplicates now lists only files that are exactly the same.
+- Cicero no longer has a menu bar icon.
+- Performance improvements and bug fixes: Cicero is faster with large libraries, freezes and crashes less, and text fields no longer correct or complete what you type.
 
-## 0.12.0b8
+## 0.12.1
 
-- A beta is called **Cicero (Beta)** in the Dock and the Finder.
-- Links in **What’s New** and in the update window open their page.
+- **Sort in every view:** the new Sort button in the toolbar sorts the grid, the specimens and the list by name, date added, foundry, year, rating, status or number of styles. Sorted by date added, fonts are grouped into Today, Yesterday, Previous 7 Days and then months; sorted by year, into years and, before 2010, decades. Cicero keeps your sort when you change the view or quit.
+- **Go to a glyph by typing it:** on a font page, type a character to scroll to its glyph and mark it. Typing in the sample text still only types.
+- **Drag fonts out of Cicero:** drag families or styles to the Finder or another app to copy their font files. Several fonts move together as a pile of cards.
+- A character a font doesn’t have shows as that font’s own missing-glyph shape, not in another font.
+
+## 0.12.0
+
+- **Copy the characters a font is missing:** in the **Info** tab, **Show Missing** under **Coverage** lets you choose any character set, and in **Show All** under **Unicode Blocks** you can click a block to see what it is missing. **Copy Characters** puts them on the clipboard, to paste into your font editor.
+- **Languages:** every supported language now has a checkmark: green for full support, grey for support without some less common characters. Type a language the font doesn’t support in the search field to see the characters it is missing.
+- **The Cicero CLI** finds, checks and turns on your fonts, tags them, puts them in folders, and gives them ratings and notes, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Cicero CLI**, then type `cicero --help`. Tab completion works in zsh, bash and fish. See [The Cicero CLI](help/command-line.md).
 - **Cicero in Claude and Codex:** `cicero mcp` gives AI agents Cicero’s commands as tools, through MCP. Add it to Claude Code, Claude Desktop or Codex as [the CLI](help/command-line.md#use-it-in-claude-and-codex) says.
-- `cicero rate` and `cicero note` give families ratings and notes.
-- **What’s New** shows the changes after each update. To see them again, choose **Help → What’s New in Cicero**.
-- **Tab completion** for the Cicero CLI in Terminal: commands, options, and the names of your families, styles, tags and folders. If you installed the CLI before, choose **Cicero → Install Cicero CLI** once more.
 - `cicero compare` draws families or styles in one picture, so an AI agent can look at the fonts when it helps you choose.
-- `cicero find` also looks in the fonts’ licenses, descriptions and web addresses. `--any` finds families with any of the words, like `cicero find trial unlicensed test --any`.
-- `cicero tag` and `cicero folder` can rename and delete tags and folders.
-
-## 0.12.0b1
-
-This is Cicero’s first beta: new features come here first, before they’re finished. Thank you for trying it.
-
-- **The Cicero CLI** finds, checks and turns on your fonts, and tags them and puts them in folders, from Terminal, scripts and AI agents, also while Cicero is closed. Choose **Cicero → Install Cicero CLI**, then type `cicero --help`. See [The Cicero CLI](help/command-line.md).
-- **Undo** in the message after you turn fonts on or off, or move them to the Trash.
-- Choose betas or stable versions under **Update track** in **Preferences → General**, and go back to the stable version at any time.
-- Large libraries open faster, and lists scroll and update more smoothly.
-- Cicero asks about classifying fonts automatically in the sidebar’s **Organize** row, not in an alert at the first launch. **Not Similar** is gone, and **Rebuild Font List** is now **Rebuild Library**.
+- **Faster with large libraries:** Cicero opens, scans, searches and switches views faster, and uses much less memory.
+- **Importing is more reliable:** Cancel keeps the fonts copied so far, the fonts that were on come in on, fonts are found when FontBase or FontExplorer X spells their names otherwise, and the Mac stays awake while fonts are copied.
+- **Glyphs are grouped by script:** Latin first, then figures, symbols and forms, then each other script, like Greek or Cyrillic, with its own capitals, small letters and accents. The name of the group you’re in stays at the top while you scroll.
+- Performance improvements and bug fixes.
 
 ## 0.11.0
 

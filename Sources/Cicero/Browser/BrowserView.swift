@@ -1,10 +1,8 @@
 import CiceroCore
 import SwiftUI
 
-/// The families of the sidebar selection as a list, a grid or specimens, or the Problems view.
 struct BrowserView: View {
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
     @AppStorage("browser.mode") private var mode: BrowserMode = .grid
 
     var body: some View {
@@ -19,20 +17,18 @@ struct BrowserView: View {
         let families = model.visibleFamilies
         return Group {
             if families.isEmpty && model.hasScanned {
-                // Just the message on the plain background, in place of the empty list, grid or specimens.
                 EmptyBrowser()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.canvas)
             } else {
                 switch mode {
                 case .list: FontList()
-                case .grid: FontGrid(families: families)
-                case .specimens: SpecimenList(families: families)
+                case .grid: FontGrid(families: model.sortedFamilies)
+                case .specimens: SpecimenList(families: model.sortedFamilies)
                 }
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            // With nothing listed, the empty view says it instead.
             if case .folder(let id) = model.selection, !families.isEmpty, model.onlineOnlyCount(inFolder: id) > 0 {
                 OnlineOnlyBar(folderID: id)
             }
@@ -40,59 +36,85 @@ struct BrowserView: View {
         .topBar {
             if let id = model.similarFamilyID {
                 SimilarBar(familyID: id)
+            } else if let list = model.externalSimilar {
+                ListBar(symbol: "sparkle.magnifyingglass", message: "Families most similar to \(list.name), closest first.") {
+                    model.endExternalSimilar()
+                }
             } else if let list = model.documentList {
-                ListBar(symbol: "doc.text.magnifyingglass", message: "The fonts “\(list.name)” uses that are in your library.") {
+                ListBar(symbol: "doc.text.magnifyingglass", message: "Fonts used in “\(list.name)” that are in your library.") {
                     model.endDocumentList()
                 }
             }
         }
         .overlay(alignment: .bottomTrailing) { ScanCapsule() }
-        .onChange(of: model.selectedIDs, initial: true) { preparePage() }
+        .background { PagePreloader() }
+        .background { SampleWidthsAhead() }
         .navigationTitle(model.selectionTitle)
         .navigationSubtitle(subtitle(families))
     }
 
-    /// A family selected on its own is the one a double-click or Return opens: its page's ligatures and characters
-    /// are worked out now, so the page has them as it opens.
-    private func preparePage() {
-        guard model.selectedIDs.count == 1, let id = model.selectedIDs.first, let family = model.family(id) else { return }
-        model.pageContents.prepare(model.previewStyle(of: family, weight: preview.weight).face.face)
-    }
-
     private func subtitle(_ families: [Family]) -> String {
-        let count = families.count == 1 ? "1 family" : "\(families.count.formatted()) families"
+        let count = families.count == 1 ? "1 Family" : "\(families.count.plain) Families"
         if let progress = model.coverageProgress, dependsOnCoverage {
-            return "\(count) · checking characters, \(progress.done.formatted()) of \(progress.total.formatted())"
+            return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)…"
         }
+        if families.isEmpty { return count }
         let counts = model.visibleCounts
-        var parts = [count, "\(counts.active.formatted()) active"]
-        // On in one app only (like Adobe's fonts folder): neither active nor inactive, so counted apart.
+        var parts = [count, "\(counts.active.plain) active"]
         let apps = counts.appOnly
         if !apps.isEmpty {
-            let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "one app only"
-            parts.append("\(apps.count.formatted()) in \(place)")
+            let place = Set(apps).count == 1 ? FaceState.appDescription(apps[0]) : "specific apps only"
+            parts.append("\(apps.count.plain) in \(place)")
         }
         return parts.joined(separator: " · ")
     }
 
-    /// Whether the list can still grow while coverage is being worked out.
     private var dependsOnCoverage: Bool { model.listDependsOnCoverage }
 
 }
 
-/// The browser's toolbar items: its view picker, Preview Options and Info. Declared on the browser from outside it
-/// (`MainWindow`), not in its body: there, under the view a switch swaps, they made SwiftUI make the whole toolbar again
-/// with each switch (`ToolbarBridge.preferencesDidChange`), 40–65 ms of the switch's main-thread work, and the glass of
-/// the items settling for most of a second after. On the split view they'd stand 8 pt further from the search field.
-struct BrowserToolbar: ToolbarContent {
-    var body: some ToolbarContent {
-        ToolbarCapsule { BrowserModePicker() }
-        ToolbarCapsule { PreviewOptionsButton() }
-        ToolbarCapsule { InfoButton() }
+private struct PagePreloader: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Color.clear
+            .onChange(of: model.selectedIDs, initial: true) {
+                guard model.selectedIDs.count == 1, let id = model.selectedIDs.first, let family = model.family(id) else { return }
+                model.pageContents.prepare(model.previewStyle(of: family).face.face)
+            }
     }
 }
 
-/// The browser's List, Grid and Specimens picker, with the setting of its own, as the browser has.
+private struct SampleWidthsAhead: View {
+    @Environment(AppModel.self) private var model
+    @Environment(PreviewSettings.self) private var preview
+    @AppStorage("browser.mode") private var mode: BrowserMode = .grid
+
+    var body: some View {
+        let inputs = FontGrid.sampleInputs(model: model, preview: preview)
+        Color.clear
+            .task(id: mode == .grid ? nil : inputs, priority: .utility) {
+                guard mode != .grid, SampleWidths.shared.ratio(for: inputs) == nil else { return }
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                let text = FontGrid.sampleText(preview)
+                let samples = await FontGrid.samples(model: model, text: text, priority: .utility)
+                guard !Task.isCancelled else { return }
+                _ = await SampleWidths.shared.measure(inputs, text: text, samples: samples, scriptSamples: model.scriptSamples)
+            }
+    }
+}
+
+struct BrowserToolbar: ToolbarContent {
+    var body: some ToolbarContent {
+        ToolbarCapsule { BrowserModePicker() }
+        ToolbarCapsule(spaced: true) { SortButton() }
+        ToolbarCapsule(spaced: true) { PreviewOptionsButton() }
+        ToolbarCapsule(spaced: true) { InfoButton() }
+        ToolbarGap()
+    }
+}
+
 private struct BrowserModePicker: View {
     @AppStorage("browser.mode") private var mode: BrowserMode = .grid
 
@@ -102,7 +124,6 @@ private struct BrowserModePicker: View {
     }
 }
 
-/// The scanning capsule; its own view so progress messages don't re-render the list.
 private struct ScanCapsule: View {
     @Environment(AppModel.self) private var model
 
@@ -121,14 +142,13 @@ private struct ScanCapsule: View {
 
     private func text(for progress: ScanProgress) -> String {
         switch progress {
-        case .finding: "Finding fonts"
-        case .identifying(let done, let total): "Identifying fonts, \(done.formatted()) of \(total.formatted())"
-        case .updating(let done, let total): "Updating font details, \(done.formatted()) of \(total.formatted())"
+        case .finding: "Finding fonts…"
+        case .identifying(let done, let total): "Identifying fonts, \(done.plain) of \(total.plain)…"
+        case .updating(let done, let total): "Updating font details, \(done.plain) of \(total.plain)…"
         }
     }
 }
 
-/// Says that some of a folder's fonts are online only, so they aren't listed, with a button to download them.
 private struct OnlineOnlyBar: View {
     @Environment(AppModel.self) private var model
     let folderID: UUID
@@ -140,15 +160,17 @@ private struct OnlineOnlyBar: View {
                 Image(systemName: "icloud.and.arrow.down")
                     .foregroundStyle(.secondary)
                 if let progress = model.downloads[folderID] {
-                    Text("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
+                    Text("Downloading \(progress.done.plain) of \(progress.total.plain)…")
                     Spacer()
                     ProgressView().controlSize(.small)
                 } else {
-                    Text(count == 1 ? "1 font file here is online only, so it isn’t listed." : "\(count.formatted()) font files here are online only, so they aren’t listed.")
+                    Text(count == 1 ? "1 font file here is online only, so it isn’t listed." : "\(count.plain) font files here are online only, so they aren’t listed.")
                     Spacer()
                     Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folderID) }
                         .controlSize(.small)
-                        .help("Download them from the cloud service so they’re listed. To keep them on this Mac, make the folder available offline in the Finder.")
+                        .help(count == 1
+                            ? "Download it from the cloud service so it’s listed. To keep it on this Mac, make the folder available offline in the Finder."
+                            : "Download them from the cloud service so they’re listed. To keep them on this Mac, make the folder available offline in the Finder.")
                 }
             }
             .font(.callout)
@@ -160,7 +182,6 @@ private struct OnlineOnlyBar: View {
     }
 }
 
-/// Says whose similar fonts the browser shows, with a button to go back to what the sidebar showed.
 private struct SimilarBar: View {
     @Environment(AppModel.self) private var model
     let familyID: String
@@ -172,19 +193,17 @@ private struct SimilarBar: View {
     }
 
     private var message: String {
-        let name = model.family(familyID)?.name ?? familyID
-        if let family = model.family(familyID), model.canShowSimilar(family) {
-            return "The families that look most like \(name), the closest first."
+        let name = model.similarName ?? familyID
+        if let family = model.family(familyID), model.canShowSimilar(family, style: model.similarStyle) {
+            return "Families most similar to \(name), closest first."
         }
         if let progress = model.measurementProgress {
-            return "Measuring letters, \(progress.done.formatted()) of \(progress.total.formatted())"
+            return "Measuring letters, \(progress.done.plain) of \(progress.total.plain)…"
         }
-        return "Cicero can’t compare \(name) with other fonts: it hasn’t got the Latin letters Cicero measures."
+        return "Cicero can’t compare \(name) with other fonts because it doesn’t have the Latin letters Cicero measures."
     }
 }
 
-/// Above a list the browser shows instead of a sidebar item's (Show Similar Fonts, Show in Library): what it is, and
-/// Done, the way back.
 private struct ListBar: View {
     let symbol: String
     let message: String
@@ -202,11 +221,10 @@ private struct ListBar: View {
                 if isWorking {
                     ProgressView().controlSize(.small)
                 }
-                // Text in the accent colour, as the bar's way back.
                 Button("Done", action: done)
                     .buttonStyle(.plain)
                     .foregroundStyle(.tint)
-                    .help("Go back to what the sidebar showed")
+                    .help("Return to the selected sidebar view")
             }
             .font(.callout)
             .padding(.horizontal, 14)
@@ -217,24 +235,23 @@ private struct ListBar: View {
     }
 }
 
-/// A watched folder Cicero can't read now, or one whose fonts are all online only.
 private struct FolderOutOfReach: View {
     @Environment(AppModel.self) private var model
     let folderID: UUID
 
     var body: some View {
         let folder = model.folder(folderID)
-        let name = folder?.displayName ?? "This folder"
+        let name = folder?.displayName ?? "This location"
         switch model.availability(ofFolder: folderID) {
         case .noAccess:
             EmptyState("Cicero Can’t Read “\(name)”", systemImage: "lock",
-                       description: Text("macOS hasn’t let Cicero into this folder. Allow it in System Settings → Privacy & Security → Files and Folders, then try again.")) {
+                       description: Text("macOS hasn’t granted Cicero access to this folder. Allow access in System Settings → Privacy & Security → Files & Folders, then try again.")) {
                 Button("Open Privacy & Security") { model.openFilesAndFoldersSettings() }
                 Button("Try Again") { model.rescan() }
             }
         case .disconnected(let volume):
             EmptyState("“\(volume)” Isn’t Connected", systemImage: "externaldrive.badge.questionmark",
-                       description: Text("The fonts in “\(name)” are back as soon as you connect it. Their folders and tags stay as they are.")) {
+                       description: Text("The fonts in “\(name)” will reappear as soon as you connect it. Their folders and tags will stay as they are.")) {
                 Button("Try Again") { model.rescan() }
             }
         case .notFound:
@@ -248,9 +265,9 @@ private struct FolderOutOfReach: View {
             EmptyState("Online Only", systemImage: "icloud.and.arrow.down",
                        description: Text(count == 1
                            ? "The font file here is online only: the cloud service keeps it off this Mac. Download it to see it. To keep it on this Mac, make the folder available offline in the Finder."
-                           : "The \(count.formatted()) font files here are online only: the cloud service keeps them off this Mac. Download them to see them. To keep them on this Mac, make the folder available offline in the Finder.")) {
+                           : "The \(count.plain) font files here are online only: the cloud service keeps them off this Mac. Download them to see them. To keep them on this Mac, make the folder available offline in the Finder.")) {
                 if let progress = model.downloads[folderID] {
-                    ProgressView("Downloading \(progress.done.formatted()) of \(progress.total.formatted())")
+                    ProgressView("Downloading \(progress.done.plain) of \(progress.total.plain)…")
                         .controlSize(.small)
                 } else {
                     Button("Download") { model.downloadOnlineOnlyFonts(inFolder: folderID) }
@@ -262,6 +279,7 @@ private struct FolderOutOfReach: View {
 
 private struct EmptyBrowser: View {
     @Environment(AppModel.self) private var model
+    @FocusState private var focused: Bool
 
     var body: some View {
         let query = model.appliedSearch.trimmingCharacters(in: .whitespaces)
@@ -270,19 +288,27 @@ private struct EmptyBrowser: View {
         } else if !model.searchTokens.isEmpty {
             EmptyState.search()
         } else {
+            // Focusable, or SwiftUI hands the cursor of the list it replaces to the toolbar's search field.
             content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .focusable()
+                .focused($focused)
+                .focusEffectDisabled()
+                .modifier(TakesStartFocus(focused: $focused))
         }
     }
 
     @ViewBuilder
     private var content: some View {
         if model.similarFamilyID != nil {
-            // Only when the family is gone, or hidden: it comes first otherwise.
             EmptyState("Font Not Available", systemImage: "textformat",
                        description: Text("This font is no longer in your library."))
+        } else if let list = model.externalSimilar {
+            EmptyState("No Similar Fonts", systemImage: "sparkle.magnifyingglass",
+                       description: Text("None of the families similar to \(list.name) are in your library."))
         } else if let list = model.documentList {
             EmptyState("No Fonts in Your Library", systemImage: "doc.text.magnifyingglass",
-                       description: Text("None of the fonts “\(list.name)” uses are in your library."))
+                       description: Text("None of the fonts used in “\(list.name)” are in your library."))
         } else {
             sidebarItemContent
         }
@@ -294,37 +320,41 @@ private struct EmptyBrowser: View {
         case .folder(let id) where model.availability(ofFolder: id) != nil || model.onlineOnlyCount(inFolder: id) > 0:
             FolderOutOfReach(folderID: id)
         case .inactive:
-            // With no locations of their own too: what's here is what's on, and Proofing may well be under Locations.
-            // The same whatever "When you add font files" says: a location keeps its fonts off with every choice.
             EmptyState("Everything Is Active", systemImage: "checkmark.seal",
-                       description: Text("Every font in your library is turned on. Add a folder of fonts to keep more here without activating them.")) {
+                       description: Text("Every font in your library is active. Add a location\nto keep more fonts here without activating them.")) {
                 Button("Add Location") { model.presentAddFolderPanel() }
             }
         case .active:
             EmptyState("Nothing Active", systemImage: "xmark.seal",
-                       description: Text("Turn a font on and it shows up here."))
+                       description: Text("Activate a font to see it here."))
         case .temporary:
             EmptyState("No Temporary Fonts", systemImage: "clock",
-                       description: Text("Fonts you activate temporarily show up here until Cicero quits."))
+                       description: Text("Fonts you activate temporarily appear here until Cicero quits."))
         case .recent:
             EmptyState("No Recent Fonts", systemImage: "tray.and.arrow.down",
-                       description: Text("Fonts that arrive on your Mac show up here for a week."))
+                       description: Text("Fonts added to your Mac appear here for a week."))
         case .set:
             EmptyState("Empty Folder", systemImage: "folder",
-                       description: Text("Drag fonts onto the folder in the sidebar, or right-click a font and choose Add to Folder."))
+                       description: Text("Drag fonts onto the folder in the sidebar, or right-click\na font and choose Add to Folder."))
         case .smartSet(let id):
             EmptyState("No Matching Fonts", systemImage: "gearshape",
                        description: Text("No fonts in your library match this smart folder’s rules.")) {
                 if let smartSet = model.data.smartSets.first(where: { $0.id == id }) {
-                    Button("Edit Smart Folder") { model.editingSmartSet = smartSet }
+                    Button("Edit Smart Folder") { model.ask { $0.editingSmartSet = smartSet } }
                 }
             }
         case .characterSet(let id) where model.coverageProgress != nil:
-            EmptyState("Checking Characters", systemImage: "character.textbox",
-                       description: Text("Fonts that have every character of \(model.characterSet(id)?.name ?? "this set") will show up here."))
+            EmptyState("Checking Characters…", systemImage: "character.textbox",
+                       description: Text("Fonts that include every character in \(model.characterSet(id)?.name ?? "this coverage set") will appear here."))
         case .characterSet(let id):
             EmptyState("No Fonts with Every Character", systemImage: "character.textbox",
-                       description: Text("None of these fonts have all the characters in \(model.characterSet(id)?.name ?? "this set")."))
+                       description: Text("None of the fonts in your library include every character in \(model.characterSet(id)?.name ?? "this coverage set")."))
+        case .tag:
+            EmptyState("No Tagged Fonts", systemImage: "tag",
+                       description: Text("Drag fonts onto \(model.selectedItems.count > 1 ? "a" : "the") tag in the sidebar, or right-click\na font and choose Tags."))
+        case .classification:
+            EmptyState("No Fonts", systemImage: "textformat",
+                       description: Text("Drag fonts onto \(model.selectedItems.count > 1 ? "a" : "the") classification in the sidebar, or\nright-click a font and choose Classification."))
         default:
             EmptyState("No Fonts", systemImage: "textformat")
         }

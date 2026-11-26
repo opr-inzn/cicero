@@ -2,14 +2,11 @@ import CiceroCore
 import SwiftUI
 
 extension View {
-    /// Presents the Restore sheet for a backup read from disk.
     func restoreSheet(contents: Binding<BackupContents?>) -> some View {
         sheet(item: contents) { RestoreSheet(contents: $0) }
     }
 }
 
-/// Confirms restoring a backup: what's in it, whether to replace the setup and put the fonts
-/// back, and progress while the fonts are copied.
 struct RestoreSheet: View {
     let contents: BackupContents
     @Environment(AppModel.self) private var model
@@ -17,7 +14,6 @@ struct RestoreSheet: View {
     @State private var settings = true
     @State private var fonts = true
     @State private var isRestoring = false
-    /// Files put back so far, while the fonts are copied.
     @State private var progress: (done: Int, total: Int)?
     @State private var task: Task<Void, Never>?
 
@@ -42,10 +38,10 @@ struct RestoreSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if let progress {
                         ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
-                        Text("Putting fonts back, \(progress.done.formatted()) of \(progress.total.formatted())")
+                        Text("Restoring fonts, \(progress.done.plain) of \(progress.total.plain)…")
                     } else {
                         ProgressView()
-                        Text("Restoring")
+                        Text("Restoring…")
                     }
                 }
                 .progressViewStyle(.linear)
@@ -55,8 +51,7 @@ struct RestoreSheet: View {
             }
             HStack {
                 Spacer()
-                // While restoring, the task closes the sheet once it has stopped: closing it discards
-                // the unzipped folder, which a copy may still be reading.
+                // While restoring, the task closes the sheet once it has stopped: closing it discards the unzipped folder, which a copy may still be reading.
                 Button("Cancel", role: .cancel) {
                     if let task { task.cancel() } else { dismiss() }
                 }
@@ -67,10 +62,10 @@ struct RestoreSheet: View {
         }
         .padding(20)
         .frame(width: 520)
-        .onDisappear { contents.discard() }
+        .interactiveDismissDisabled(isRestoring)
+        .onDisappear { if !isRestoring { contents.discard() } }
     }
 
-    /// "4 folders, 2 smart folders, 7 tags, 3 locations, 12 added fonts and 1 character set." and what restoring them does.
     private var settingsDetail: String {
         let data = contents.userData
         let counts = [
@@ -78,13 +73,13 @@ struct RestoreSheet: View {
             (data.folders.count, "location", "locations"), (data.fontFiles.count, "added font", "added fonts"),
             (data.customCharacterSets.count, "coverage set", "coverage sets"),
         ]
-        let parts = counts.filter { $0.0 > 0 }.map { "\($0.0) \($0.0 == 1 ? $0.1 : $0.2)" }
+        let parts = counts.filter { $0.0 > 0 }.map { "\($0.0.plain) \($0.0 == 1 ? $0.1 : $0.2)" }
         let inside = parts.isEmpty ? "No folders or locations, just settings." : parts.listed() + "."
         return inside + " Replaces what’s set up now; the current setup is saved first, in ~/Library/Application Support/Cicero/Backups."
     }
 
     private var fontsDetail: String {
-        "\(contents.fontCount == 1 ? "1 file" : "\(contents.fontCount.formatted()) files"). Puts each file back where it was, unless one is already there."
+        "\(contents.fontCount == 1 ? "1 file" : "\(contents.fontCount.plain) files"). Restores each file to its original location unless a file is already there."
     }
 
     private func restore() {
@@ -95,6 +90,7 @@ struct RestoreSheet: View {
             await model.restore(contents, settings: settings, fonts: includeFonts) { done, total in
                 Task { @MainActor in progress = (done, total) }
             }
+            contents.discard()
             dismiss()
         }
     }

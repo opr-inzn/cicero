@@ -1,28 +1,18 @@
 import Foundation
 
-/// What to bring in from another font manager, as the Import sheet's checkboxes have it.
 public struct ImportChoices: Equatable, Sendable {
-    /// Copy in the fonts in FontExplorer X's Font Library or FontBase's folder.
     public var fontFolder = true
-    /// Copy in the font files it used from other places.
     public var otherFiles = true
-    /// The sets, application sets and collections to bring in, by `ImportedSet.id`.
     public var sets: Set<String> = []
-    /// The smart sets to bring in, by `ImportedSmartSet.id`.
     public var smartSets: Set<String> = []
     public var tags = true
     public var ratings = true
     public var classifications = true
-    /// Comments, as notes.
     public var comments = true
     public var history = true
-    /// Turn on again the fonts that were on in the other app, once they're copied in.
     public var activate = false
-    /// Move the other app's `leftoverCopies` to the Trash.
     public var removeCopies = true
 
-    /// Everything but the other app's own sets, which Font Book makes for everyone, and smart sets that can't come over;
-    /// the fonts that were on are turned on again, so they stay on once the other app is gone.
     public init(for library: ImportedLibrary) {
         sets = Set(library.sets.filter { !$0.isBuiltIn }.map(\.id))
         smartSets = Set(library.smartSets.filter(\.unsupported.isEmpty).map(\.id))
@@ -30,63 +20,41 @@ public struct ImportChoices: Equatable, Sendable {
     }
 }
 
-/// What an import did, for the message afterwards.
 public struct ImportSummary: Equatable, Sendable {
-    /// Font files copied in: the Font Library's and the others. Not those already there with the same name and contents.
     public var fonts = 0
-    /// Font files that didn't go in, as when macOS was too busy to take them: importing again tries them again.
     public var notCopied = 0
-    /// Sets made, or that had the name of one and got fonts or apps from it. What a set had already isn't counted, so
-    /// importing again counts nothing.
     public var sets = 0
     public var applicationSets = 0
     public var smartSets = 0
     public var tags = 0
     public var ratedFamilies = 0
-    /// Families put in a classification, and the user's own classifications made for them.
     public var classifiedFamilies = 0
     public var classifications = 0
-    /// Families that got a note from comments.
     public var notedFamilies = 0
-    /// Styles to turn on, as they were on in the other app.
     public var activated = 0
-    /// The other app's copies moved to the Trash.
     public var removedCopies = 0
-    /// Fonts the sets, tags or ratings name that aren't in the library.
     public var notFound = 0
-    /// Sets left out as none of their fonts are in the library: they would be empty.
     public var emptySets: [String] = []
-    /// Smart sets with rules Cicero can't take, or naming a set that wasn't brought in.
     public var skippedSmartSets: [String] = []
-    /// Apps of application sets that aren't on this Mac.
     public var missingApps: [String] = []
 
     public init() {}
 }
 
-/// Brings what another font manager has into Cicero: first its fonts, copied in off (`fontFiles`,
-/// `ActivationEngine.installOff`), then, once a scan has listed them, the rest (`apply`). Only ever adds: a set with the
-/// name of one that's there already gets its fonts, so importing again changes nothing.
 public enum LibraryImport {
-    /// The font files to copy in, each as the other app names it (`path`, what its sets and tags go by) and where to
-    /// copy it from (`source`): the Font Library's, from a backup when it has them, and those it used from elsewhere. Not
-    /// one Cicero reads already, in a Fonts folder, one of the user's locations or among the files they added, which stays
-    /// as it is; nor those in an Adobe app's folder, which comes with the Proofing switch instead, as when the user adds
-    /// one (`data`). A backup is a file anyone could have made: only font files are taken, and only from inside the
-    /// unzipped backup, never through a symbolic link or out of it.
     public static func fontFiles(_ imported: ImportedLibrary, choices: ImportChoices, data: inout UserData,
                                  locations: Locations) -> [(path: String, source: String)] {
         let folders = [locations.userFonts.path, locations.allUsersFonts.path] + locations.inactiveFolders.map(\.path) + data.scannedFolders().map(\.path)
         let listed = Set(data.fontFiles)
         func isRead(_ path: String) -> Bool { listed.contains(path) || folders.contains { path == $0 || path.hasPrefix($0 + "/") } }
-        func isFont(_ path: String) -> Bool { FontFormat.fileExtensions.contains((path as NSString).pathExtension.lowercased()) }
         var files: [(path: String, source: String)] = []
         if choices.fontFolder, let folder = imported.fontFolder {
             if WatchedFolder.detectAppName(forPath: folder) != nil {
                 data.showAdobeAppFolders = true
             } else if let bundled = imported.bundledFonts {
                 let source = URL(fileURLWithPath: bundled.folder.resolvingSymlinksInPath().path)
-                for file in bundled.files where isFont(file) {
+                // A backup is a file anyone could have made: take only font files, and only from inside the unzipped backup, never through a symbolic link or out of it.
+                for file in bundled.files where FontFormat.isFontFile(file) {
                     let parts = file.split(separator: "/", omittingEmptySubsequences: false)
                     guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { continue }
                     let from = source.appendingPathComponent(file)
@@ -97,30 +65,26 @@ public enum LibraryImport {
                     files.append((folder + "/" + file, from.path))
                 }
             } else {
-                files += imported.fontFolderFiles.filter { isFont($0) && !isRead($0) }.map { ($0, $0) }
+                files += imported.fontFolderFiles.filter { FontFormat.isFontFile($0) && !isRead($0) }.map { ($0, $0) }
             }
         }
         if choices.otherFiles {
-            files += imported.otherFiles.filter { isFont($0) && !isRead($0) }.map { ($0, $0) }
+            files += imported.otherFiles.filter { FontFormat.isFontFile($0) && !isRead($0) }.map { ($0, $0) }
         }
         return files
     }
 
-    /// Moves the other app's copies of its fonts out of the Fonts folder, to the Trash: only the ones it read, and
-    /// only font files. Returns how many were moved.
-    public static func removeCopies(_ imported: ImportedLibrary) -> Int {
+    public static func removeCopies(_ imported: ImportedLibrary, keeping isInLibrary: (_ origin: String) -> Bool) -> Int {
+        // Only the copies the reader found, only font files, and only of fonts Cicero has now, may go to the Trash.
         imported.leftoverCopies.count { path in
-            FontFormat.fileExtensions.contains((path as NSString).pathExtension.lowercased())
+            imported.leftoverCopyOrigins[path].map(isInLibrary) == true
+                && FontFormat.isFontFile(path)
                 && (try? FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)) != nil
         }
     }
 
-    /// Brings in the sets, smart sets, tags, ratings, classifications and activation history, matched against the
-    /// library, which has the other app's fonts by now, at the paths their copies have (`paths`, the other app's → the
-    /// copy's); and gives the styles to turn on, when chosen. Apps of application sets are looked for where they were,
-    /// then by name in `appFolders`.
     public static func apply(_ imported: ImportedLibrary, choices: ImportChoices, to data: inout UserData, library: Library,
-                             paths: [String: String] = [:], appFolders: [URL] = AppFinder.defaultFolders)
+                             paths: [String: String] = [:], appFolders: [URL] = AppFinder.defaultFolders, copiedInOn: Set<String> = [])
         -> (summary: ImportSummary, activate: [LibraryFace]) {
         let matcher = FontMatcher(library)
         var summary = ImportSummary()
@@ -139,8 +103,6 @@ public enum LibraryImport {
             return faces(fonts).map(\.family).filter { seen.insert($0.id).inserted }
         }
 
-        // Sets: whole families where every style the library has is in it, else the styles. FontExplorer X's sets have
-        // files, so every style the library has in one.
         var setIDs: [String: UUID] = [:]
         let apps = AppFinder(folders: appFolders)
         for set in imported.sets where choices.sets.contains(set.id) {
@@ -190,7 +152,6 @@ public enum LibraryImport {
                 setIDs[set.id] = data.sets[index].id
                 changed = data.sets[index] != before
             } else if whole.isEmpty, styles.isEmpty, set.count > 0 {
-                // None of its fonts are here: it would come over empty.
                 summary.emptySets.append(set.name)
                 continue
             } else {
@@ -203,7 +164,6 @@ public enum LibraryImport {
             if set.isApplicationSet { summary.applicationSets += 1 } else { summary.sets += 1 }
         }
 
-        // Tags before smart sets, whose rules may name them.
         if choices.tags {
             for tag in imported.tags {
                 var changed = false
@@ -223,8 +183,6 @@ public enum LibraryImport {
             }
         }
 
-        // Smart sets, only whole: one without a rule would pick other fonts. One with the name of one that's there was
-        // brought in before.
         let setNames = Dictionary(imported.sets.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         for smart in imported.smartSets where choices.smartSets.contains(smart.id) {
             guard !data.smartSets.contains(where: { $0.name == smart.name }) else { continue }
@@ -250,7 +208,6 @@ public enum LibraryImport {
             summary.smartSets += 1
         }
 
-        // A family's rating is its highest-rated style's, unless it has one already.
         if choices.ratings {
             var stars: [String: Int] = [:]
             for rating in imported.ratings {
@@ -262,8 +219,6 @@ public enum LibraryImport {
             }
         }
 
-        // A family goes in the classification most of its styles have, as the user's choice, unless the user chose one
-        // already or its fonts say as much; the user's own ones from the other app come along.
         if choices.classifications {
             var votes: [String: [String: Int]] = [:]
             var families: [String: Family] = [:]
@@ -291,7 +246,6 @@ public enum LibraryImport {
             }
         }
 
-        // A family's note is its comments, each once, unless it has a note already.
         if choices.comments {
             var notes: [String: [String]] = [:]
             for comment in imported.comments {
@@ -305,7 +259,6 @@ public enum LibraryImport {
             }
         }
 
-        // How often a family was turned on: the most any of its files was, and when last; Cicero's counts if higher.
         if choices.history {
             var histories: [String: ActivationHistory] = [:]
             for entry in imported.history {
@@ -327,23 +280,20 @@ public enum LibraryImport {
         var activate: [LibraryFace] = []
         if choices.activate {
             var seen = Set<FaceID>()
-            activate = faces(imported.active).map(\.face).filter { $0.canActivate && seen.insert($0.face.id).inserted }
+            activate = faces(imported.active).map(\.face)
+                .filter { ($0.canActivate || copiedInOn.contains($0.face.path)) && seen.insert($0.face.id).inserted }
         }
         summary.notFound = notFound.count
         return (summary, activate)
     }
 }
 
-/// Finds the apps of application sets from another Mac: where they were, else one with the same name in the
-/// Applications folders, else the newest one whose name only has another year ("Adobe InDesign 2024" finds
-/// "Adobe InDesign 2026").
 public struct AppFinder: Sendable {
     public static var defaultFolders: [URL] {
         [URL(fileURLWithPath: "/Applications"), URL(fileURLWithPath: "/System/Applications"),
          FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")]
     }
 
-    /// The apps in the folders and the folders in them (Adobe's apps are in folders of their own), by name.
     private let installed: [(name: String, url: URL)]
 
     public init(folders: [URL]) {
@@ -381,7 +331,6 @@ public struct AppFinder: Sendable {
         return LinkedApp(bundleID: bundleID, name: name, path: url.path)
     }
 
-    /// "Adobe InDesign 2024" → "Adobe InDesign".
     private static func withoutYear(_ name: String) -> String {
         name.replacing(/\s(19|20)\d\d$/, with: "")
     }

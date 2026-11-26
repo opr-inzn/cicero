@@ -1,59 +1,55 @@
 import CiceroCore
 import SwiftUI
 
-/// Sidebar, the browser with font pages pushed over it, prompts and toasts.
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
-    @Environment(BackupPrompts.self) private var backup
-    @Environment(\.openWindow) private var openWindow
     @State private var promptText = ""
+    @FocusState private var isSearchFocused: Bool
+    @State private var startFocus = StartFocus()
+    @State private var autoHide = SidebarAutoHide()
 
     var body: some View {
         @Bindable var model = model
-        @Bindable var backup = backup
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: SidebarWidth.minimum, ideal: SidebarWidth.ideal, max: SidebarWidth.maximum)
-                // When it slides out and in, and where it is, for how much room hiding it gives the grid (see `SidebarRoom`).
                 .background { SidebarItemReader() }
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { SidebarRoom.shared.sidebar = $0 }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    SidebarRoom.shared.sidebar = $0
+                    if !SidebarRoom.shared.isCollapsed, $0.maxX >= SidebarWidth.minimum { autoHide.sidebarEdge = $0.maxX }
+                }
         } detail: {
-            // A stack in a split view's detail column swaps the whole column for a page pushed onto it, dropping
-            // whatever is around the stack: each page makes room for the Info panel and takes dropped files.
+            // A stack in a split view's detail column swaps the whole column for a page pushed onto it, dropping whatever is around the stack: each page makes room for the Info panel and takes dropped files.
             NavigationStack(path: Binding(
                 get: { model.openFamilyID.map { [$0] } ?? [] },
                 set: { model.openFamilyID = $0.last }
             )) {
                 BrowserView()
-                    // Here rather than in BrowserView, so switching its view doesn't make the toolbar again (see
-                    // `BrowserToolbar`).
+                    // Here rather than in BrowserView, so switching its view doesn't make the toolbar again.
                     .toolbar { BrowserToolbar() }
-                    .modifier(DetailPage())
-                    // A page of its own for each family, so one opened from another's, as from Similar, starts at the
-                    // top, as from the browser, rather than scrolled where the other was.
+                    .modifier(DetailPage(isCovered: model.openFamilyID != nil))
+                    // A page of its own for each family, so one opened from another's starts at the top rather than scrolled where the other was.
                     .navigationDestination(for: String.self) { FontPage(familyID: $0).id($0).modifier(DetailPage()) }
             }
-            // A font page appears and goes at once, never sliding in, whatever else is animating.
             .transaction(value: model.openFamilyID) { transaction in
                 transaction.animation = nil
                 transaction.disablesAnimations = true
             }
-            // At the sidebar's edge, also while it slides in and out, which the grid follows (see `SidebarRoom`).
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { SidebarRoom.shared.detailStart = $0 }
         }
-        // On the split view, so font pages keep the field too (on the stack it doesn't show at all); typing in
-        // it, or changing its tokens, on one goes back to the matches.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { fitSidebar(width: $0) }
+        .onChange(of: model.isInfoPresented) { fitSidebar(width: autoHide.windowWidth) }
+        .onChange(of: SidebarRoom.shared.isCollapsed) { growWindow(sidebarCollapsed: $1) }
+        // On the split view: on the stack, the search field doesn't show at all.
         .searchable(text: searchText, tokens: searchTokens, placement: .toolbar, prompt: "Search", token: tokenLabel)
         .searchSuggestions { SearchSuggestions() }
-        // On the split view, so the browser and font pages both have it.
+        .searchFocused($isSearchFocused)
+        .environment(\.startFocus, startFocus)
+        .focusedSceneValue(\.focusSearch, FocusSearchAction(id: ObjectIdentifier(startFocus)) { isSearchFocused = true })
         .toolbarGlassFollowsAppearance()
-        // Over the split view, so the panel stays put when a font page opens or closes.
         .modifier(InfoPanelOverlay())
         .background { QuickLookHost() }
         .background { WindowReader { TextEditingKeys.mainWindow = $0 } }
-        // After an update, what's new, over the window once it's there (see `WhatsNew`).
-        .task { if WhatsNew.shared.takePending() { openWindow(id: WindowID.whatsNew) } }
-        // While the Fonts in Document sheet is up, it asks how to install itself: a window shows one sheet.
         .sheet(item: Binding(get: { model.documentFonts == nil ? model.installPrompt : nil }, set: { model.installPrompt = $0 })) {
             InstallSheet(prompt: $0)
         }
@@ -72,20 +68,20 @@ struct MainWindow: View {
         .sheet(isPresented: Binding(get: { model.editingAppsForSet != nil }, set: { if !$0 { model.editingAppsForSet = nil } })) {
             if let id = model.editingAppsForSet { AppSetEditor(setID: id) }
         }
-        .backupSheet(isPresented: $backup.isBackingUp)
-        .restoreSheet(contents: $backup.restoring)
+        .backupSheet(isPresented: $model.showsBackupSheet)
+        .restoreSheet(contents: $model.restorePrompt)
         .alert(
-            "Turn Off Other Styles Too?",
+            "Deactivate Other Styles Too?",
             isPresented: Binding(get: { model.copySwitchPrompt != nil }, set: { if !$0 { model.copySwitchPrompt = nil } }),
             presenting: model.copySwitchPrompt
         ) { request in
-            Button("Use \(request.source)’s Copies") { model.confirmCopySwitch(request) }
+            Button("Use Copies from \(request.source)") { model.confirmCopySwitch(request) }
             Button("Cancel", role: .cancel) {}
         } message: { request in
             let styles = request.plan.alsoTurnsOff
             let shown = styles.count > 6 ? Array(styles.prefix(5)) + ["\(styles.count - 5) more"] : styles
             let named = shown.listed()
-            Text("The file that turns off also holds \(named). \(styles.count == 1 ? "It turns" : "They turn") off too.")
+            Text("The file being deactivated also contains \(named). \(styles.count == 1 ? "It will be deactivated" : "They will be deactivated") too.")
         }
         .alert(
             model.trashPlan.map { "Move \($0.title) to the Trash?" } ?? "",
@@ -97,15 +93,13 @@ struct MainWindow: View {
         } message: { plan in
             Text(Self.trashMessage(plan))
         }
-        // From the sidebar's Organize row, until it's answered.
         .alert("Classify Your Fonts Automatically?", isPresented: Binding(get: { model.showsGuessingQuestion }, set: { _ in })) {
-            // Side by side, Not Now in grey and Classify in the accent colour, the one Return chooses: a longer title, like
-            // Don't Classify, and the alert stacks them.
+            // Side by side only with short titles: a longer one, like Don't Classify, makes the alert stack the buttons.
             Button("Classify") { model.answerGuessing(true) }
                 .keyboardShortcut(.defaultAction)
             Button("Not Now", role: .cancel) { model.answerGuessing(false) }
         } message: {
-            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters" + (ClassificationGuesser.readsNames ? " and, with Apple Intelligence, from their names" : "") + ", on this Mac. Otherwise they stay Unclassified until you choose one. You can change this in Preferences → General.")
+            Text("Many fonts don’t say whether they’re serif, sans serif, script or ornamental. Cicero can tell from the shapes of their letters" + (ClassificationGuesser.readsNames ? " and, with Apple Intelligence, from their names" : "") + ", on this Mac. Otherwise they stay Unclassified until you choose a classification. You can change this in Preferences → General.")
         }
         .alert(
             model.textPrompt?.title ?? "",
@@ -114,12 +108,12 @@ struct MainWindow: View {
         ) { prompt in
             TextField("Name", text: $promptText)
             Button(prompt.confirmTitle) { prompt.action(promptText) }
+                .disabled(prompt.requiresText && promptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button("Cancel", role: .cancel) {}
         }
         .onChange(of: model.textPrompt?.id) { promptText = model.textPrompt?.initialText ?? "" }
         .overlay(alignment: .bottom) {
-            // Animated in here only: on the window, everything that changed with a toast (fonts trashed, the
-            // Info panel showing another) would slide into place too.
+            // Animated in here only: on the window, everything that changed with a toast would slide into place too.
             ZStack {
                 if let toast = model.toast {
                     HStack(spacing: 12) {
@@ -169,17 +163,16 @@ struct MainWindow: View {
 
     static func trashMessage(_ plan: TrashPlan) -> String {
         var parts = [plan.paths.count == 1
-            ? "1 font file will be removed from your Mac and turned off in every app."
-            : "\(plan.paths.count) font files\(plan.includesCopies ? ", including copies in other folders," : "") will be removed from your Mac and turned off in every app."]
+            ? "1 font file will be moved to the Trash and deactivated in every app."
+            : "\(plan.paths.count.plain) font files\(plan.includesCopies ? ", including copies in other folders," : "") will be moved to the Trash and deactivated in every app."]
         if !plan.otherFamilies.isEmpty {
             let names = plan.otherFamilies.count > 3 ? plan.otherFamilies.prefix(3).joined(separator: ", ") + " and others" : plan.otherFamilies.listed()
+            let files = plan.paths.count == 1 ? "The file also contains" : "Some files also contain"
             if plan.spareCopiesOf != nil {
-                // Conflicts only removes files whose every font has a copy elsewhere.
-                let files = plan.paths.count == 1 ? "The file also contains" : "Some files also contain"
                 let keep = plan.otherFamilies.count == 1 ? "which keeps its other copies" : "which keep their other copies"
                 parts.append("\(files) \(names), \(keep).")
             } else {
-                parts.append("Some files also contain \(names), which will be removed too.")
+                parts.append("\(files) \(names), which will be removed too.")
             }
         }
         if plan.protectedCount > 0 { parts.append("Files that come with macOS or an app stay where they are.") }
@@ -188,8 +181,71 @@ struct MainWindow: View {
     }
 }
 
-/// The questions before fonts are replaced: in more than one place or in the user's own folders (`replacePrompt`), and
-/// while apps that keep a font's old version are open (`openAppsReplacePrompt`).
+struct FocusSearchAction: Equatable {
+    let id: ObjectIdentifier
+    private let run: () -> Void
+
+    init(id: ObjectIdentifier, run: @escaping () -> Void) {
+        self.id = id
+        self.run = run
+    }
+
+    func callAsFunction() { run() }
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
+}
+
+extension FocusedValues {
+    @Entry var focusSearch: FocusSearchAction?
+}
+
+@Observable
+final class StartFocus {
+    var isPending = true
+    var owner: UUID?
+    @ObservationIgnored var shown: Set<UUID> = []
+}
+
+extension EnvironmentValues {
+    @Entry var startFocus: StartFocus?
+}
+
+struct TakesStartFocus: ViewModifier {
+    let focused: FocusState<Bool>.Binding
+    @Environment(\.startFocus) private var startFocus
+    @State private var id = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: LibraryFocus.shared.isKey, initial: true) { take() }
+            .onChange(of: startFocus?.isPending) { take() }
+            .onChange(of: focused.wrappedValue) { _, isFocused in
+                guard !isFocused else { return }
+                DispatchQueue.main.async { if startFocus?.owner == id { startFocus?.owner = nil } }
+            }
+            .onAppear { startFocus?.shown.insert(id) }
+            // SwiftUI makes the browser twice as the window opens and removes the first, which hands the cursor to the sidebar.
+            .onDisappear {
+                guard let startFocus else { return }
+                startFocus.shown.remove(id)
+                guard startFocus.owner == id else { return }
+                startFocus.owner = nil
+                startFocus.isPending = true
+            }
+    }
+
+    private func take() {
+        guard LibraryFocus.shared.isKey, let startFocus, startFocus.isPending else { return }
+        // A turn later: as the window becomes key, the sidebar's outline takes the cursor.
+        DispatchQueue.main.async {
+            guard startFocus.isPending, startFocus.shown.contains(id) else { return }
+            startFocus.isPending = false
+            startFocus.owner = id
+            focused.wrappedValue = true
+        }
+    }
+}
+
 private struct ReplaceAlerts: ViewModifier {
     @Environment(AppModel.self) private var model
 
@@ -202,8 +258,7 @@ private struct ReplaceAlerts: ViewModifier {
             ) { prompt in
                 Button("Replace") { model.replaceEverywhere(prompt) }
                     .keyboardShortcut(.defaultAction)
-                // Once the alert has gone, so the sheet isn't lost on its way out.
-                Button("Choose for Each") { Task { model.duplicatePrompt = prompt } }
+                Button("Choose for Each") { model.ask { $0.duplicatePrompt = prompt } }
                 Button("Cancel", role: .cancel) {}
             } message: { prompt in
                 Text(replaceMessage(prompt))
@@ -221,19 +276,16 @@ private struct ReplaceAlerts: ViewModifier {
             }
     }
 
-    /// "Replace Fonts While InDesign Is Open?", "…While InDesign and Photoshop Are Open?".
     static func openAppsTitle(_ prompt: OpenAppsReplacePrompt) -> String {
         "Replace Fonts While \(prompt.apps.listed()) \(prompt.apps.count == 1 ? "Is" : "Are") Open?"
     }
 
     static func openAppsMessage(_ prompt: OpenAppsReplacePrompt) -> String {
         prompt.apps.count == 1
-            ? "\(prompt.apps[0]) keeps the old version until it restarts, and documents open in it can show wrong letters. Quit it first, or restart it afterwards."
-            : "\(prompt.apps.listed()) keep the old version until they restart, and documents open in them can show wrong letters. Quit them first, or restart them afterwards."
+            ? "\(prompt.apps[0]) will keep using the old version until it restarts, and open documents may show the wrong characters. Quit it first, or restart it afterward."
+            : "\(prompt.apps.listed()) will keep using the old version until they restart, and open documents may show the wrong characters. Quit them first, or restart them afterward."
     }
 
-    /// "Replace Helvetica in 2 Places?", "Replace Helvetica in Clients?", or for several families "Replace Fonts in More
-    /// Than One Place?" or "Replace These Fonts?".
     private func replaceTitle(_ prompt: DuplicatePrompt) -> String {
         let warned = prompt.duplicates.filter(model.warnsBeforeReplacing)
         guard warned.count == 1 else {
@@ -244,10 +296,6 @@ private struct ReplaceAlerts: ViewModifier {
             : "Replace \(one.family) \(model.replacedPlaces(one))?"
     }
 
-    /// "Helvetica is in your Fonts folder and in Clients. Each of these files goes to the Trash, and the added one takes its place."
-    /// For one file: "Helvetica is in Clients. The file goes to the Trash, and the added one takes its place."
-    /// Cicero's copies that just go (see `AppModel.spareCopies`) are named: "…takes its place. Cicero’s copy of Helvetica in
-    /// your Fonts folder only goes to the Trash, as the added one in Cicero’s Library takes over."
     private func replaceMessage(_ prompt: DuplicatePrompt) -> String {
         let several = prompt.duplicates.filter(model.warnsBeforeReplacing)
         var lines = several.prefix(3).map { "\($0.family) is \(model.replacedPlaces($0))." }
@@ -259,40 +307,103 @@ private struct ReplaceAlerts: ViewModifier {
         }
         let families = spare.map(\.0)
         let spares = spare.reduce(0) { $0 + $1.1 } == 1
-            ? "Cicero’s copy of \(families[0]) in your Fonts folder only goes to the Trash, as the added one in Cicero’s Library takes over."
-            : "Cicero’s copies of \(families.listed()) in your Fonts folder only go to the Trash, as the added ones in Cicero’s Library take over."
+            ? "Cicero’s copy of \(families[0]) in your Fonts folder will be moved to the Trash, since the new copy in Cicero’s library takes over."
+            : "Cicero’s copies of \(families.listed()) in your Fonts folder will be moved to the Trash, since the new copies in Cicero’s library take over."
         return (lines + ["Each of these files goes to the Trash, and the added one takes its place.", spares]).joined(separator: " ")
     }
 }
 
-/// A page of the detail column: room for the Info panel, and files dropped on it.
+private struct SidebarAutoHide {
+    static let narrowestPage: CGFloat = 800
+    static let gap: CGFloat = 8
+    var sidebarEdge = SidebarWidth.ideal
+    var windowWidth: CGFloat = 0
+    var fits: Bool?
+    var hidSidebar = false
+    var grownFrom: NSRect?
+    var grownTo: NSRect?
+}
+
+private extension MainWindow {
+    func fitSidebar(width measured: CGFloat) {
+        let width = min(measured, TextEditingKeys.mainWindow?.contentView?.bounds.width ?? measured)
+        autoHide.windowWidth = width
+        let info = model.isInfoPresented ? InfoPanelOverlay.room(shown: 1, scale: 1) : 0
+        let fits = width - autoHide.sidebarEdge - SidebarAutoHide.gap - info >= SidebarAutoHide.narrowestPage
+        guard width > 0, fits != autoHide.fits else { return }
+        autoHide.fits = fits
+        if !fits, !SidebarRoom.shared.isCollapsed {
+            DispatchQueue.main.async { SidebarRoom.shared.setCollapsed(true) }
+            autoHide.hidSidebar = true
+        } else if fits, autoHide.hidSidebar {
+            DispatchQueue.main.async { SidebarRoom.shared.setCollapsed(false) }
+            autoHide.hidSidebar = false
+        }
+    }
+
+    func growWindow(sidebarCollapsed collapsed: Bool) {
+        guard let window = TextEditingKeys.mainWindow, !window.styleMask.contains(.fullScreen) else { return }
+        if collapsed {
+            if let from = autoHide.grownFrom, window.frame == autoHide.grownTo { window.animator().setFrame(from, display: true) }
+            autoHide.grownFrom = nil
+            autoHide.grownTo = nil
+            return
+        }
+        guard let screen = window.screen?.visibleFrame, let width = window.contentView?.bounds.width else { return }
+        let info = model.isInfoPresented ? InfoPanelOverlay.room(shown: 1, scale: 1) : 0
+        guard width - autoHide.sidebarEdge - SidebarAutoHide.gap - info < SidebarAutoHide.narrowestPage else { return }
+        var frame = window.frame
+        frame.size.width = min(frame.width + autoHide.sidebarEdge, screen.width)
+        frame.origin.x = max(screen.minX, min(frame.minX, screen.maxX - frame.width))
+        guard frame != window.frame else { return }
+        autoHide.grownFrom = window.frame
+        autoHide.grownTo = frame
+        window.animator().setFrame(frame, display: true)
+    }
+}
+
 private struct DetailPage: ViewModifier {
+    var isCovered = false
+
     func body(content: Content) -> some View {
         content
-            .modifier(InfoPanelInset())
+            .modifier(CoveredSize(isCovered: isCovered))
+            .environment(\.isCovered, isCovered)
+            .modifier(InfoPanelInset(isCovered: isCovered))
             .modifier(FileDrop())
     }
 }
 
-/// Font files and folders dropped from the Finder onto the browser or a font page, or copied there and pasted with ⌘V,
-/// join the library, and the folder or tag the browser shows, or go into the location it shows (see
-/// `AppModel.targetForAddedFiles`). The page is outlined while files are over it.
+private struct CoveredSize: ViewModifier {
+    let isCovered: Bool
+    @State private var size: CGSize?
+
+    func body(content: Content) -> some View {
+        content
+            .frame(width: isCovered ? size?.width : nil, height: isCovered ? size?.height : nil, alignment: .topLeading)
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { [isCovered] in if !isCovered { size = $0 } }
+            // Not clipped: the browser scrolls under the toolbar's glass, and while it's covered nothing of it shows.
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var isCovered = false
+}
+
 private struct FileDrop: ViewModifier {
     @Environment(AppModel.self) private var model
     @State private var isTargeted = false
 
     func body(content: Content) -> some View {
         content
-            // From outside Cicero: families dragged within the window are names, not files.
-            .drops(of: URL.self, fromOutsideOnly: true, isOver: { isTargeted = $0 }) { urls in
+            .overlay(FontDropTarget(files: .init(isOver: { isTargeted = $0 }) { urls in
                 isTargeted = false
-                // A glyph dragged off a font page and let go over it again, as when the user changes their mind: no
-                // toast saying it isn't a font. macOS 15 doesn't say the drag is Cicero's own, so its file is left out.
+                // A glyph dragged off a font page and let go over it again: macOS 15 doesn't say the drag is Cicero's own, so its file is left out.
                 let urls = urls.filter { !GlyphVectors.isDragFile($0) }
                 guard !urls.isEmpty else { return }
                 model.open(urls, into: model.targetForAddedFiles)
-            }
-            // While the grid, the list or the page has the focus; elsewhere `AppDelegate` takes ⌘V.
+            }))
             .onPasteCommand(of: [.fileURL]) { _ in model.pasteFiles() }
             .overlay {
                 if isTargeted {

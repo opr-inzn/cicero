@@ -3,7 +3,7 @@
 
 Run by hand when a source changes: ./scripts/update-character-sets.py (Python 3.13 or later, whose
 Unicode data matches the block list it downloads). It downloads the sources at the commits and
-versions pinned below (Cicero itself never goes online), resolves sets that build on each other into
+versions pinned below (the app never downloads them), resolves sets that build on each other into
 complete lists, and drops whitespace and invisible characters, which aren't what people mean by
 character set support.
 
@@ -27,8 +27,6 @@ ADOBE = "https://raw.githubusercontent.com/adobe-type-tools/adobe-latin-charsets
 GOOGLE = "https://raw.githubusercontent.com/googlefonts/glyphsets/432104e3ecb119c44b3cc29d7209d7b54bf41017"
 UNICODE = f"https://www.unicode.org/Public/{unicodedata.unidata_version}/ucd/Blocks.txt"
 
-# Blocks type designers check coverage of. Ideograph blocks, private use and the like aren't useful
-# as "has every character" filters.
 BLOCKS = [
     "Basic Latin", "Latin-1 Supplement", "Latin Extended-A", "Latin Extended-B", "Latin Extended Additional",
     "Latin Extended-C", "Latin Extended-D", "Latin Extended-E", "IPA Extensions", "Spacing Modifier Letters",

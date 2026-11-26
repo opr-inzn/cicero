@@ -1,25 +1,8 @@
 import Foundation
 
-/// What's typed in the search field. A family matches when the query's words can be split into runs that each begin
-/// one of its terms, the words for what kind of family it is (variable, monospaced, its classification, display or
-/// text, condensed, its tags), or begin a word in one of its texts (its names and its styles', its foundry, a style's
-/// PostScript name, designer or vendor ID, its note). So the whole query at the start of a word in a name finds a
-/// family, but "mono" also finds every monospaced one, "variable sans" variable sans serifs, and "inter variable" Inter
-/// if it's variable. A term only begins with a run, so "serif" doesn't find sans serifs by their classification, and
-/// a run only begins a word, so "am" finds American Typewriter but not every family from a foundry with "am" inside
-/// its name. Typing more of a word only ever narrows what's found, unless it stops being a keyword ("mono", then
-/// "monot"). Where nothing has a word that begins with it, `anywhereInNames` looks inside words of names too.
-///
-/// A run that's a keyword, one of the words for a kind of family, is looked for in the family's and its styles' names
-/// and its note only, not in the rest of its texts: "mono" finds monospaced families and families with Mono in a name,
-/// but not every font from Monotype.
 public struct SearchQuery: Sendable {
-    /// Lowercased, with one space between its words.
     public let text: String
-    /// Whether a run is found inside a word of a name too, not only where one begins.
     public private(set) var isAnywhereInNames = false
-    /// Every run of consecutive words, by first word and length less one: runs[1][0] is the second word, runs[0][1]
-    /// the first two.
     private let runs: [[Run]]
 
     private struct Run: Sendable {
@@ -40,24 +23,19 @@ public struct SearchQuery: Sendable {
 
     public var isEmpty: Bool { text.isEmpty }
 
-    /// The same query, finding its runs inside words of names too, like "vetica" in Helvetica: for when nothing has a
-    /// word that begins with them.
     public var anywhereInNames: SearchQuery {
         var query = self
         query.isAnywhereInNames = true
         return query
     }
 
-    /// Whether the query matches a family with these names (its own and its styles', and its note), other texts and
-    /// terms, lowercased.
     public func matches(names: [String], texts: [String], terms: [String]) -> Bool {
         guard !isEmpty else { return true }
         func found(_ run: Run) -> Bool {
             terms.contains { $0.hasPrefix(run.text) }
-                || names.contains { isAnywhereInNames ? $0.contains(run.text) : Self.beginsWord(run.text, in: $0) }
+                || names.contains { isAnywhereInNames ? Self.contains(run.text, in: $0) : Self.beginsWord(run.text, in: $0) }
                 || !run.isKeyword && texts.contains { Self.beginsWord(run.text, in: $0) }
         }
-        // covered[i]: the words before the i-th split into runs that are found.
         var covered = [true] + Array(repeating: false, count: runs.count)
         for start in runs.indices where covered[start] {
             for (length, run) in runs[start].enumerated() where !covered[start + length + 1] && found(run) {
@@ -68,17 +46,14 @@ public struct SearchQuery: Sendable {
         return false
     }
 
-    /// How well a family's name, lowercased, suits the query as a suggestion in the search field: 0 when the name
-    /// begins with the whole query, 1 when a later word in it does, nil when none does.
     public func suggestionRank(of name: String) -> Int? {
         guard !isEmpty else { return nil }
         if name.hasPrefix(text) { return 0 }
         return Self.beginsWord(text, in: name) ? 1 : nil
     }
 
-    /// Whether `run` is in `text` where a word begins: at its start, or after a character that's neither a letter nor
-    /// a digit. A run that doesn't begin with a letter or digit itself, like "-bold", can be anywhere.
     static func beginsWord(_ run: String, in text: String) -> Bool {
+        if let found = asciiFind(run, in: text, wordStart: true) { return found }
         guard let first = run.first, first.isLetter || first.isNumber else { return text.contains(run) }
         var rest = text[...]
         while let range = rest.range(of: run) {
@@ -90,6 +65,32 @@ public struct SearchQuery: Sendable {
         return false
     }
 
+    static func contains(_ run: String, in text: String) -> Bool {
+        asciiFind(run, in: text, wordStart: false) ?? text.contains(run)
+    }
+
+    private static func asciiFind(_ run: String, in text: String, wordStart: Bool) -> Bool? {
+        var run = run, text = text
+        return run.withUTF8 { run in
+            text.withUTF8 { text -> Bool? in
+                // ASCII only: a byte over 127 could be part of a character the run's last letter only begins, like an e with a combining accent.
+                guard let first = run.first, !run.contains(where: { $0 > 127 }), !text.contains(where: { $0 > 127 }) else { return nil }
+                guard run.count <= text.count else { return false }
+                let atWordStart = wordStart && isASCIILetterOrDigit(first)
+                for start in 0...(text.count - run.count) where text[start] == first {
+                    if atWordStart, start > 0, isASCIILetterOrDigit(text[start - 1]) { continue }
+                    if memcmp(run.baseAddress! + 1, text.baseAddress! + start + 1, run.count - 1) == 0 { return true }
+                }
+                return false
+            }
+        }
+    }
+
+    private static func isASCIILetterOrDigit(_ byte: UInt8) -> Bool {
+        let lower = byte | 0x20
+        return (0x30...0x39).contains(byte) || (0x61...0x7A).contains(lower)
+    }
+
     // MARK: Words for kinds of family
 
     static let narrow = ["condensed", "compressed", "narrow"]
@@ -97,32 +98,30 @@ public struct SearchQuery: Sendable {
     static let slab = ["slab serif", "slab"]
     static let opticalSize = ["optical size", "opsz"]
 
-    /// Every word for a kind of family, in any family's terms.
     static let keywords: Set<String> = Set(
-        Classification.allCases.flatMap(\.searchTerms) + narrow + wide + slab + opticalSize + FontFileReader.fontExtensions
+        Classification.allCases.flatMap(\.searchTerms) + narrow + wide + slab + opticalSize + FontFormat.fileExtensions
             + ["variable", "italics", "italic", "text", "display"]
     )
 
     // MARK: Styles a search names
 
-    /// A style the query names by words for a slope, a width or a weight, for previews to show that style of the families
-    /// it finds rather than their regular: "italic" their italics, "condensed" their condensed styles, "bold italic" their
-    /// bold italics (see `Family.previewStyle(for:weight:)`).
-    public struct Style: Equatable, Sendable {
+    public struct Style: Hashable, Sendable {
         public var isItalic = false
-        /// On the OS/2 scale, 1 (ultra-condensed) … 5 (normal) … 9 (ultra-expanded).
         public var width: Int?
-        /// On the OS/2 scale, as a style's name spells it out (see `StyleName`).
         public var weight: Int?
+
+        public init(isItalic: Bool = false, width: Int? = nil, weight: Int? = nil) {
+            self.isItalic = isItalic
+            self.width = width
+            self.weight = weight
+        }
+
+        var side: Int { ((width ?? 5) - 5).signum() }
     }
 
-    /// The style the query names for a family's previews; nil when it names none. Only words spelled out count ("italic",
-    /// not "it"), and not those that begin a word in one of the family's names, lowercased: those name the family, as
-    /// "condensed" does Avenir Next Condensed, which then shows as usual.
     public func style(forFamilyNamed names: [String]) -> Style? {
         let words = text.split(separator: " ").filter { word in !names.contains { Self.beginsWord(String(word), in: $0) } }
         var style = Style()
-        // Joined as in style names, so "semi bold" is semibold.
         for word in StyleName.words(words.joined(separator: " ")) {
             if Self.slopeWords.contains(word) {
                 style.isItalic = true
@@ -136,14 +135,12 @@ public struct SearchQuery: Sendable {
     }
 
     static let slopeWords: Set<String> = ["italic", "italics", "oblique"]
-    /// Of `StyleName`'s widths, those spelled out.
     static let widthWords: Set<String> = [
         "ultracondensed", "ultracompressed", "extracondensed", "extracompressed", "compressed", "condensed", "narrow",
         "semicondensed", "semicompressed", "semiextended", "semiexpanded", "semiwide", "extended", "expanded", "wide",
         "extraextended", "extraexpanded", "extrawide", "ultraextended", "ultraexpanded", "ultrawide",
     ]
-    /// Of `StyleName`'s weights, those spelled out, but for words more often in a name than for a weight ("roman",
-    /// "super", "ultra").
+    // Not "roman", "super" or "ultra", more often in a name than for a weight.
     static let weightWords: Set<String> = [
         "hairline", "thin", "extrathin", "ultrathin", "extralight", "ultralight", "light", "semilight", "book", "regular",
         "medium", "semibold", "demibold", "bold", "extrabold", "ultrabold", "heavy", "black", "extrablack", "ultrablack",
@@ -151,8 +148,6 @@ public struct SearchQuery: Sendable {
 }
 
 extension Classification {
-    /// The words a search finds families of the classification by, besides the name the user gave it: its own and the
-    /// usual ones for it, like Google Fonts' and CSS's ("sans-serif", "handwriting", "display").
     public var searchTerms: [String] {
         switch self {
         case .serif: ["serif"]
@@ -167,11 +162,6 @@ extension Classification {
 }
 
 extension Family {
-    /// The words a search finds the family by for what kind of family its fonts say it is (see `SearchQuery`), but for
-    /// its classification, which the app can put it in another of: variable, monospaced, with italics, with an optical
-    /// size axis, for text or display sizes as that axis or its name says (see `SimilarFonts.OpticalSize`), with styles
-    /// narrower or wider than normal, a slab serif as its OS/2 family class says, the kinds of file it comes in; and
-    /// for a monospaced family, what that class says its letters are, so "sans mono" finds a monospaced sans serif.
     var searchTerms: [String] {
         let faces = faces.map(\.face)
         var terms: [String] = []
@@ -183,8 +173,7 @@ extension Family {
         let size = SimilarFonts.OpticalSize(name: id)
         if hasOpticalSize || size == .text { terms.append("text") }
         if hasOpticalSize || size == .display { terms.append("display") }
-        // On a width axis, against the regular's place on it, as not every font's is in percent (Skia's goes from 0.62
-        // to 1.3); else by the OS/2 width class.
+        // Against the regular's place on the width axis, as not every font's is in percent (Skia's goes from 0.62 to 1.3).
         let normal = regular.face.axes.first { $0.tag == "wdth" }?.value ?? 100
         let widths = faces.map { face in
             face.axes.first { $0.tag == "wdth" }.map { $0.value < normal ? -1 : $0.value > normal ? 1 : 0 } ?? (face.width - 5).signum()
@@ -198,11 +187,12 @@ extension Family {
         return terms
     }
 
-    /// The style to preview the family in for a search, and the weight to draw it at: the one its tokens and typed words
-    /// name (see `SearchToken.style(of:over:)` and `SearchQuery.Style`), else the one for `weight`, at that weight; a
-    /// variable one for the Variable token. A weight they name is where a variable style of that weight sits on the
-    /// weight axis, as not every font's axis is on the OS/2 scale (one has its Light at 450), else that weight.
-    public func previewStyle(for query: SearchQuery, tokens: [SearchToken] = [], weight: Double) -> (face: LibraryFace, weight: Double) {
+    public func namesStyle(_ query: SearchQuery, tokens: [SearchToken]) -> Bool {
+        let typed = query.isEmpty ? nil : query.style(forFamilyNamed: [id.lowercased(), name.lowercased()])
+        return SearchToken.style(of: tokens, over: typed) != nil
+    }
+
+    public func previewStyle(for query: SearchQuery, tokens: [SearchToken] = [], weight: Double = 400) -> (face: LibraryFace, weight: Double) {
         let typed = query.isEmpty ? nil : query.style(forFamilyNamed: [id.lowercased(), name.lowercased()])
         let variable = tokens.contains(.variable)
         guard let style = SearchToken.style(of: tokens, over: typed) else {
@@ -211,18 +201,41 @@ extension Family {
         }
         guard let named = style.weight else { return (face(for: style, weight: weight, variable: variable), weight) }
         let face = face(for: style, weight: Double(named), variable: variable)
+        // Where a variable style of the named weight sits on its axis, as not every font's weight axis is on the OS/2 scale (one has its Light at 450).
         let isNamed = face.face.weightAxis != nil && FontFace.hundreds(face.face.namedWeight) == FontFace.hundreds(Double(named))
         return (face, isNamed ? face.face.styleWeight : Double(named))
     }
 
-    /// The style nearest one a search names: of the variable styles when `variable`; of those, the italics when it's
-    /// italic, else the uprights; of those, the ones nearest its width, on the narrower or wider side when there are any;
-    /// then the one nearest the weight, by its name when that says one (a Bold the file classes at 400 is still Bold),
-    /// the normal width first among the same weight. A variable style with a weight axis comes first, as it draws every
-    /// weight, and of the variable styles, with a weight axis or not, the ones where the regular is on the axes the
-    /// search says nothing about. Not one of ornaments, unless that's all there is. When the family has none of a kind,
-    /// the next step chooses among them all, so a family without italics shows its upright.
-    func face(for style: SearchQuery.Style, weight: Double, variable: Bool = false) -> LibraryFace {
+    public func kind(of face: LibraryFace) -> SearchQuery.Style {
+        let width = widthClass(of: face.face)
+        return SearchQuery.Style(isItalic: face.face.isItalic, width: width == 5 ? nil : width)
+    }
+
+    public var kinds: [SearchQuery.Style] {
+        let letters = faces.filter { !$0.face.isOrnaments }
+        var kinds: [SearchQuery.Style] = []
+        for face in letters.isEmpty ? faces : letters {
+            let kind = kind(of: face)
+            if !kinds.contains(kind) { kinds.append(kind) }
+        }
+        return kinds
+    }
+
+    public var weightNeighbors: [LibraryFace] {
+        let kind = kind(of: regular), weight = regular.face.namedWeight
+        let others = faces.filter { $0.id != regular.id && $0.face.weightAxis == nil && !$0.face.isOrnaments && self.kind(of: $0) == kind }
+        let lighter = others.filter { $0.face.namedWeight < weight }.max { $0.face.namedWeight < $1.face.namedWeight }
+        let heavier = others.filter { $0.face.namedWeight > weight }.min { $0.face.namedWeight < $1.face.namedWeight }
+        return [lighter, heavier].compactMap { $0 }
+    }
+
+    public func representative(of kind: SearchQuery.Style) -> LibraryFace? {
+        let face = face(for: SearchQuery.Style(isItalic: kind.isItalic, width: kind.width), weight: 400)
+        let found = self.kind(of: face)
+        return found.isItalic == kind.isItalic && found.side == kind.side ? face : nil
+    }
+
+    public func face(for style: SearchQuery.Style, weight: Double, variable: Bool = false) -> LibraryFace {
         let letters = faces.filter { !$0.face.isOrnaments }
         var candidates = letters.isEmpty ? faces : letters
         func keep(_ test: (LibraryFace) -> Bool) {
@@ -237,7 +250,6 @@ extension Family {
             keep { abs(widthClass(of: $0.face) - wanted) == nearest }
         }
         keep { $0.face.weightAxis != nil }
-        // A static style has no axes to be moved on, so it stays beside them.
         let named = ["wght"] + (style.isItalic ? ["ital", "slnt"] : []) + (style.width == nil ? [] : ["wdth"])
         let origin = Dictionary(regular.face.axes.map { ($0.tag, $0.value) }) { first, _ in first }
         func moved(_ face: FontFace) -> Int {
@@ -251,12 +263,10 @@ extension Family {
         }!
     }
 
-    /// How wide a style is on the OS/2 scale, 1 (ultra-condensed) … 5 (normal) … 9 (ultra-expanded): as its name spells
-    /// it out, else on a width axis against the regular's place on it, as not every font's is in percent (narrower is 3,
-    /// wider 7), else by its OS/2 width class.
     func widthClass(of face: FontFace) -> Int {
         if let named = StyleName(face.styleName).width { return named }
         if let value = face.axes.first(where: { $0.tag == "wdth" })?.value {
+            // Against the regular's place on the axis, as not every font's width axis is in percent.
             let normal = regular.face.axes.first { $0.tag == "wdth" }?.value ?? 100
             return value < normal ? 3 : value > normal ? 7 : 5
         }
@@ -265,14 +275,12 @@ extension Family {
 }
 
 extension FontFace {
-    /// Its weight as its name spells it out, as a Bold the file classes at 400 is still Bold; the regular weight for a
-    /// name of only widths and slopes ("Italic", "Condensed"); else its place on the weight axis or its OS/2 class.
     var namedWeight: Double {
+        // By its name first: a Bold its file classes at 400 is still Bold.
         let name = StyleName(styleName)
         return name.weight.map(Double.init) ?? (name.isRegular ? 400 : styleWeight)
     }
 
-    /// A weight to the nearest hundred, from 100 to 900: Book (350) is a Regular, Heavy (850) a Black.
     static func hundreds(_ weight: Double) -> Int {
         min(max(Int((weight / 100).rounded()) * 100, 100), 900)
     }

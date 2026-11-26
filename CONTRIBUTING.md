@@ -8,16 +8,12 @@ Please [open an issue](https://github.com/opr-inzn/cicero/issues/new) before you
 
 ## Branches
 
-- **`main`** holds the latest stable release.
-- **`beta`** holds the next version and the beta releases. **Open pull requests against `beta`.**
-
-When a beta is ready, `beta` is merged into `main` and released as the stable version.
+- **`main`** holds the latest release and the work on the next one. **Open pull requests against `main`.**
 
 ## Versions
 
-- A stable release is `<major>.<minor>.<patch>`, for example `0.12.0`.
-- A beta release is that version followed by `b` and the beta's number: `0.12.0b1`, `0.12.0b2`, and so on, up to the stable `0.12.0`.
-- The build number (`CFBundleVersion`) of a stable release counts on in whole numbers: 62, 63, 64. A beta's build is the latest stable build, a dot and the beta's number: `0.12.0b1` after build 62 is `62.1`. Updates go by the build number, so betas fit between two stable builds and never take the next stable one.
+- A release is `<major>.<minor>.<patch>`, for example `0.13.0`.
+- The build number (`CFBundleVersion`) counts on in whole numbers: 80, 81, 82. Updates go by the build number.
 
 ## Building
 

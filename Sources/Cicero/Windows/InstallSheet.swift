@@ -1,9 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// Asks how to bring in font files the user adds while the install method is Ask: copy them into the Fonts folder and
-/// turn them on, move the ones that can move there, or list them where they are, off. Dropped on a location, copying or
-/// moving puts them into it instead (see `DropLocation`).
 struct InstallSheet: View {
     let prompt: InstallPrompt
     @Environment(AppModel.self) private var model
@@ -30,19 +27,18 @@ struct InstallSheet: View {
                     }
                 } else {
                     option(model.data.installsIntoFontLibrary ? "Copy Into Cicero’s Library" : "Copy Into Fonts Folder", icon: "doc.on.doc",
-                           detail: one ? "Copies the file into \(model.installPlace) and turns it on. The original stays where it is."
-                               : "Copies the files into \(model.installPlace) and turns them on. The originals stay where they are.") { choose(.copy) }
+                           detail: one ? "Copies the file into \(model.installPlace) and activates it. The original stays where it is."
+                               : "Copies the files into \(model.installPlace) and activates them. The originals stay where they are.") { choose(.copy) }
                     if prompt.offersMove {
                         option(model.data.installsIntoFontLibrary ? "Move Into Cicero’s Library" : "Move Into Fonts Folder", icon: "folder",
-                               detail: one ? "Moves the file into \(model.installPlace) and turns it on. The folder it was in stays."
-                                   : "Moves the files into \(model.installPlace) and turns them on. The folders they were in stay.") { choose(.move) }
+                               detail: one ? "Moves the file into \(model.installPlace) and activates it. The folder it was in stays."
+                                   : "Moves the files into \(model.installPlace) and activates them. The folders they were in stay.") { choose(.move) }
                     }
                 }
-                option("Leave Files Where They Are", icon: "link",
-                       detail: one ? "Lists the file under Added Fonts, where it is, without turning it on."
-                           : "Lists the files under Added Fonts, where they are, without turning them on.") { choose(.inPlace) }
+                option(one ? "Leave File Where It Is" : "Leave Files Where They Are", icon: "link",
+                       detail: one ? "Lists the file under Added Fonts, where it is, without activating it."
+                           : "Lists the files under Added Fonts, where they are, without activating them.") { choose(.inPlace) }
             }
-            // Every option as tall as the tallest.
             .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline) {
                 Toggle("Remember this choice (you can change it later)", isOn: $remember)
@@ -54,31 +50,26 @@ struct InstallSheet: View {
         .frame(width: prompt.offersMove ? 720 : 560)
     }
 
-    /// "How should Cicero install this font file?", or add it to the location it was dropped on.
     private var question: String {
         let files = prompt.files.count == 1 ? "this font file" : "these font files"
         guard let location = prompt.location else { return "How should Cicero install \(files)?" }
         return "How should Cicero add \(files) to “\(location.name)”?"
     }
 
-    /// How the files are once in the location: " and turns it on" for an Active one, ", where Adobe apps use it" for one an
-    /// app loads by itself, else " without turning it on".
     private static func effect(of location: DropLocation, one: Bool) -> String {
         let it = one ? "it" : "them"
-        if location.isActive { return " and turns \(it) on" }
-        guard let app = location.app else { return " without turning \(it) on" }
+        if location.isActive { return " and activates \(it)" }
+        guard let app = location.app else { return " without activating \(it)" }
         return app == "Adobe" ? ", where Adobe apps use \(it)" : ", where \(app) uses \(it)"
     }
 
-    /// "Add “Name-Regular.otf”", or "Add 12 Font Files".
     private var title: String {
-        prompt.files.count == 1 ? "Add “\(URL(fileURLWithPath: prompt.files[0]).lastPathComponent)”" : "Add \(prompt.files.count) Font Files"
+        prompt.files.count == 1 ? "Add “\(URL(fileURLWithPath: prompt.files[0]).lastPathComponent)”" : "Add \(prompt.files.count.plain) Font Files"
     }
 
     private func option(_ title: String, icon: String, detail: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                // As tall for every symbol, so the titles line up.
                 Image(systemName: icon)
                     .font(.system(size: 28))
                     .foregroundStyle(.tint)
@@ -104,8 +95,6 @@ struct InstallSheet: View {
     }
 }
 
-/// A card that's as tall as its label. A bordered button sized it on its own, cutting the last line of a long detail
-/// off at the bottom on some Macs.
 private struct OptionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -115,21 +104,17 @@ private struct OptionButtonStyle: ButtonStyle {
 }
 
 extension View {
-    /// Asks whether to turn on as many families as `AppModel.manyActivationPrompt` holds, when `isActive`: the main window
-    /// asks unless a sheet of its own is up, which asks from there.
     func confirmsManyActivations(when isActive: Bool = true) -> some View {
         modifier(ManyActivationConfirmation(isActive: isActive))
             .modifier(MovingOutConfirmation(isActive: isActive))
     }
 }
 
-/// Asks whether to turn off fonts whose files would move out of a folder others share (`AppModel.movingOutPrompt`).
 private struct MovingOutConfirmation: ViewModifier {
     let isActive: Bool
     @Environment(AppModel.self) private var model
 
     func body(content: Content) -> some View {
-        // On a view of its own, as the question about turning on many fonts.
         content.background {
             Color.clear
                 .alert(
@@ -162,14 +147,14 @@ private struct ManyActivationConfirmation: ViewModifier {
         content.background {
             Color.clear
                 .alert(
-                    model.manyActivationPrompt.map { "Activate \($0.families.formatted()) Families?" } ?? "",
+                    model.manyActivationPrompt.map { "Activate \($0.families.plain) Families?" } ?? "",
                     isPresented: Binding(get: { isActive && model.manyActivationPrompt != nil }, set: { if !$0 { model.manyActivationPrompt = nil } }),
                     presenting: model.manyActivationPrompt
                 ) { prompt in
                     Button(prompt.temporarily ? "Activate Temporarily" : "Activate") { model.confirm(prompt) }
                     Button("Cancel", role: .cancel) {}
                 } message: { _ in
-                    Text("Apps load every font that’s on as they open, so this many at once can slow them down.")
+                    Text("Apps load every active font as they open, so activating this many at once can slow them down.")
                 }
                 .dialogSuppressionToggle("Don’t ask again", isSuppressed: Binding(
                     get: { !model.data.asksBeforeActivatingMany },

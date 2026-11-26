@@ -7,44 +7,44 @@ struct CiceroApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var model: AppModel
     @State private var preview = PreviewSettings()
-    @State private var backup = BackupPrompts()
     @State private var updates: Updates
-    @State private var menuBarItem: MenuBarItem
+    @State private var promptWatcher: PromptWatcher
 
     init() {
-        // Before the model reads the library, while its saved data still tells an update from the first launch.
-        WhatsNew.shared.noteLaunch()
+        UserDefaults.standard.register(defaults: ["NSUseAnimatedFocusRing": false])
         let model = AppModel()
         let updates = Updates()
-        let menuBarItem = MenuBarItem(model: model)
+        let promptWatcher = PromptWatcher(model: model)
         _model = State(initialValue: model)
         _updates = State(initialValue: updates)
-        _menuBarItem = State(initialValue: menuBarItem)
-        // At launch rather than as the main window appears: Cicero can open without it, at login or in the menu bar.
+        _promptWatcher = State(initialValue: promptWatcher)
+        AppDelegate.launchModel = model
         NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
                 Appearance.applySaved()
+                model.start()
+                LibraryFocus.shared.start()
                 model.appSets.start(model)
                 model.openDocumentFonts.start(model)
-                menuBarItem.start()
+                promptWatcher.start()
+                // After the lock's message, SwiftUI doesn't open the Library window at launch by itself.
                 if LaunchWait.showedMessage {
-                    DispatchQueue.main.async { menuBarItem.openWindow?(id: WindowID.main) }
+                    DispatchQueue.main.async { promptWatcher.openWindow?(id: WindowID.main) }
                 }
             }
         }
     }
 
     var body: some Scene {
-        // Library in the Window menu, as in the window list and the Dock (see `WindowList`).
         Window("Library", id: WindowID.main) {
             MainWindow()
                 .environment(model)
                 .environment(preview)
-                .environment(backup)
                 .frame(minWidth: 960, minHeight: 600)
                 .onAppear {
                     TextEditingKeys.install()
                     SearchTokenTint.install()
+                    SearchFolding.install()
                     model.start()
                     ApplicationsFolder.checkAtLaunch(model: model)
                     delegate.model = model
@@ -52,13 +52,12 @@ struct CiceroApp: App {
                     MeasureRun.startIfAsked(model: model, preview: preview)
                     #endif
                 }
-                // Fonts opened from the Finder (Open With, or a double-click when Cicero opens fonts): SwiftUI
-                // hands the first of them here and the others to the delegate.
+                // SwiftUI hands the first of the fonts opened from the Finder here and the others to the delegate.
                 .onOpenURL { model.open([$0]) }
         }
         .defaultSize(width: 1440, height: 900)
         .handlesExternalEvents(matching: ["*"])
-        .commands { CiceroCommands(model: model, backup: backup, updates: updates, menuBarItem: menuBarItem) }
+        .commands { CiceroCommands(model: model, updates: updates, promptWatcher: promptWatcher) }
 
         Window("Character Toolbox", id: WindowID.toolbox) {
             ToolboxWindow()
@@ -78,7 +77,6 @@ struct CiceroApp: App {
         .restorationBehavior(.disabled)
         .handlesExternalEvents(matching: [])
 
-        // After an update, and from the Help menu (see `WhatsNew`). Not in the Window menu: it shows what it's given.
         Window("What’s New in Cicero", id: WindowID.whatsNew) {
             WhatsNewWindow()
         }
@@ -100,32 +98,28 @@ struct CiceroApp: App {
 
 struct CiceroCommands: Commands {
     let model: AppModel
-    let backup: BackupPrompts
     let updates: Updates
-    let menuBarItem: MenuBarItem
+    let promptWatcher: PromptWatcher
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
     @FocusedBinding(\.compareSize) private var compareSize
+    @FocusedValue(\.focusSearch) private var focusSearch
 
-    /// ⌘O opens the family selected in the browser, as in the Finder, and adds fonts while none is. ⌘↓ opens it
-    /// too, from the browser (see `FamilyKeys`).
-    private var opensSelection: Bool { model.openFamilyID == nil && !model.selectedIDs.isEmpty }
+    private var opensSelection: Bool { LibraryFocus.shared.isKey && model.openFamilyID == nil && !model.shownSelection.isEmpty }
 
     var body: some Commands {
         // The menu bar's commands are made at launch and have these even while no window is open.
-        let _ = menuBarItem.connect(openWindow: openWindow, openSettings: openSettings)
+        let _ = promptWatcher.connect(openWindow: openWindow)
         CommandGroup(replacing: .appInfo) {
-            // "About Cicero (Beta)" in a beta, as the bundle's name is (see build-app.sh).
-            Button("About \(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Cicero")", systemImage: "info.circle") {
+            Button("About Cicero", systemImage: "info.circle") {
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
             Button("Check for Updates", systemImage: "arrow.triangle.2.circlepath") { updates.checkForUpdates() }
-                .disabled(!updates.canCheckForUpdates)
-            // Says when it's done, as installing shows nothing else to see (see CommandLineTool).
+                .disabled(!updates.isAvailable)
             if CommandLineTool.State.shared.installed {
-                Button("Cicero CLI installed", systemImage: "checkmark") { CommandLineTool.install(model: model) }
+                Button("Cicero CLI Installed", systemImage: "checkmark") { CommandLineTool.install(model: model) }
             } else {
                 Button("Install Cicero CLI", systemImage: "terminal") { CommandLineTool.install(model: model) }
+                    .disabled(CommandLineTool.State.shared.isInstalling)
             }
         }
         CommandGroup(after: .newItem) {
@@ -134,35 +128,48 @@ struct CiceroCommands: Commands {
             Button("Add Location", systemImage: "folder.badge.plus") { model.presentAddFolderPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Find Fonts in Document", systemImage: "doc.text.magnifyingglass") { model.presentFindFontsPanel() }
-            // The selected families go in, so the name says so, as the context menu's does.
             Button(model.selectedFamilies.isEmpty ? "New Folder" : "New Folder from Selection", systemImage: "folder") {
                 model.prompt("New Folder", confirm: "Create") { model.addSet(named: $0, with: model.selectedFamilies) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            Button("New Smart Folder", systemImage: "gearshape") { model.editingSmartSet = SmartSet(name: "") }
+            Button("New Smart Folder", systemImage: "gearshape") { model.ask { $0.editingSmartSet = SmartSet(name: "") } }
                 .keyboardShortcut("n", modifiers: [.command, .option])
             Button(model.selectedFamilies.isEmpty ? "New App Folder" : "New App Folder from Selection", systemImage: "app.badge.checkmark") {
                 model.newApplicationSet(with: model.selectedFamilies)
             }
             Divider()
-            Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
-            Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
-            Button("Import from FontBase", systemImage: "square.and.arrow.down") { model.importFromFontBase() }
+            Group {
+                Button("Import from FontExplorer X", systemImage: "square.and.arrow.down") { model.importFromFontExplorer() }
+                Button("Import from Font Book", systemImage: "square.and.arrow.down") { model.importFromFontBook() }
+                Button("Import from FontBase", systemImage: "square.and.arrow.down") { model.importFromFontBase() }
+            }
+            .disabled(model.job != nil || model.isShowingPrompt)
             Divider()
             Button("Export Fonts", systemImage: "square.and.arrow.up") { model.exportSelectionOrList() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             Divider()
-            Button("Back Up Library", systemImage: "externaldrive") { backup.isBackingUp = true }
-            Button("Restore Library", systemImage: "clock.arrow.circlepath") { Task { backup.restoring = await model.chooseBackupToRestore() } }
+            Button("Back Up Library", systemImage: "externaldrive") { model.ask { $0.showsBackupSheet = true } }
+                .disabled(model.job != nil || model.isShowingPrompt)
+            Button("Restore Library", systemImage: "clock.arrow.circlepath") {
+                Task {
+                    guard let contents = await model.chooseBackupToRestore() else { return }
+                    model.ask { $0.restorePrompt = contents }
+                }
+            }
+            .disabled(model.job != nil || model.isShowingPrompt)
         }
-        // Show Sidebar and Hide Sidebar, ⌃⌘S. Editing the sidebar is in its own menu and its Edit button.
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("Find", systemImage: "magnifyingglass") { focusSearch?() }
+                .keyboardShortcut("f")
+                .disabled(focusSearch == nil)
+        }
         SidebarCommands()
-        // Compare's size, while its window is in front, the one in its Preview Options. The menu bar matches ⌘+ to the
-        // keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
+        // The menu bar matches ⌘+ to the keyboard's own keys: ⌘= (or ⇧⌘=) on a US keyboard, the + key on a German one.
         CommandGroup(after: .sidebar) {
             Divider()
-            // From a font page to the browser, as Esc and the toolbar's back button go. While the page's text is being
-            // typed in, ⌘← goes to the start of the line instead (see `TextEditingKeys`).
+            Menu("Sort By", systemImage: "arrow.up.arrow.down") { SortMenuItems(model: model) }
+            Divider()
             Button("Back", systemImage: "chevron.backward") { model.openFamilyID = nil }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
                 .disabled(model.openFamilyID == nil)
@@ -179,7 +186,7 @@ struct CiceroCommands: Commands {
             .disabled(compareSize.map { $0 <= CompareWindow.sizes.lowerBound } ?? true)
         }
         CommandMenu("Fonts") {
-            let selection = model.selectedFamilies
+            let selection = LibraryFocus.shared.isKey ? model.selectedFamilies : []
             Button("Activate", systemImage: "checkmark.seal") { model.activate(selection) }
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!selection.contains(where: \.hasActivatable))
@@ -187,45 +194,44 @@ struct CiceroCommands: Commands {
                 .keyboardShortcut(.return, modifiers: [.command, .option])
                 .disabled(!selection.contains(where: \.hasTemporarilyActivatable))
             Button("Deactivate", systemImage: "xmark.seal") { model.deactivate(selection) }
-                .keyboardShortcut(.delete, modifiers: [])
+                .keyboardShortcut(DevBuild.deleteKeyShortcut(modifiers: []))
                 .disabled(!selection.contains(where: \.hasDeactivatable))
             Divider()
             Button("Open", systemImage: "macwindow") { model.openFamilyID = selection.first?.id }
                 .keyboardShortcut(opensSelection ? KeyboardShortcut("o") : KeyboardShortcut(.downArrow))
                 .disabled(selection.count != 1 || model.openFamilyID != nil)
-            // What ⌘I does: it closes the panel only from the Info tab, else it shows that tab.
-            let hidesInfo = model.isInfoPresented && model.infoTab == .info
+            let hidesInfo = model.isInfoShown && model.shownInfoTab == .info
             Button(hidesInfo ? "Hide Info" : "Show Info", systemImage: "info.circle") { model.toggleInfo() }
                 .keyboardShortcut("i", modifiers: .command)
+                .disabled(!LibraryFocus.shared.isKey)
             Button(model.quickLook.isOpen ? "Close Quick Look" : "Quick Look", systemImage: "eye") { model.quickLook.toggle() }
                 .keyboardShortcut("y", modifiers: .command)
-                .disabled(!model.quickLook.isOpen && (selection.isEmpty || model.openFamilyID != nil))
+                .disabled(!LibraryFocus.shared.isKey || !model.quickLook.isOpen && (selection.isEmpty || model.openFamilyID != nil))
             Button("Reveal in Finder", systemImage: "finder") { model.reveal(selection) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(selection.isEmpty)
             Button("Move to Trash", systemImage: "trash") { model.requestTrash(selection) }
-                .keyboardShortcut(.delete, modifiers: .command)
+                .keyboardShortcut(DevBuild.deleteKeyShortcut(modifiers: .command))
                 .disabled(selection.isEmpty)
             Divider()
-            // Several families start over; one joins those there, so families far apart in the library can be put
-            // together one by one; none just opens the window.
             Button("Compare", systemImage: "rectangle.split.1x2") {
                 if selection.count > 1 { model.compare(selection) } else { _ = model.addToCompare(selection.map(\.id)) }
                 openWindow(id: WindowID.compare)
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
-            Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") { model.showSimilar(to: selection[0]) }
-                .disabled(selection.count != 1 || !model.canShowSimilar(selection[0]))
+            .disabled(!LibraryFocus.shared.isKey)
+            Button("Show Similar Fonts", systemImage: "sparkle.magnifyingglass") {
+                model.showSimilar(to: selection[0], style: model.shownStyle(of: selection[0]))
+            }
+            .disabled(selection.count != 1 || !model.canShowSimilar(selection[0], style: model.shownStyle(of: selection[0])))
             Button("Character Toolbox", systemImage: "character.textbox") { openWindow(id: WindowID.toolbox) }
                 .keyboardShortcut("t", modifiers: [.command, .option])
             Divider()
             Button("Rescan Library", systemImage: "arrow.clockwise") { model.rescan() }
                 .keyboardShortcut("r", modifiers: .command)
             Button("Rebuild Library", systemImage: "list.bullet.rectangle") { model.rebuildFontList() }
-            Button("Clear Font Caches", systemImage: "eraser") { model.isClearingCaches = true }
+            Button("Clear Font Caches", systemImage: "eraser") { model.ask { $0.isClearingCaches = true } }
         }
-        // What's new in this version, in its window; the user guide, the project's pages on GitHub and the privacy policy
-        // on the website, opened in the default browser.
         CommandGroup(replacing: .help) {
             Button("Cicero Help", systemImage: "questionmark.circle") {
                 NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/README.md")!)
@@ -234,15 +240,15 @@ struct CiceroCommands: Commands {
             Button("What’s New in Cicero", systemImage: "newspaper") {
                 if WhatsNew.shared.showLatest() { openWindow(id: WindowID.whatsNew) }
             }
-            Button("Release Notes", systemImage: "doc.text") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/releases")!) }
+            Button("Version History", systemImage: "doc.text") {
+                NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/blob/main/help/version-history.md")!)
+            }
             Button("Privacy Policy", systemImage: "hand.raised") { NSWorkspace.shared.open(URL(string: "https://cicero.maximilianinzinger.com/privacy")!) }
             Divider()
             Button("Report an Issue", systemImage: "exclamationmark.bubble") { NSWorkspace.shared.open(URL(string: "https://github.com/opr-inzn/cicero/issues/new")!) }
         }
     }
 
-    /// A link to Cicero's website under the version in the About panel. The panel puts the copyright
-    /// (NSHumanReadableCopyright, "© 2026 Maximilian Inzinger") below it, so the name isn't repeated here.
     private static var credits: NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
@@ -255,13 +261,8 @@ struct CiceroCommands: Commands {
     }
 }
 
-/// Takes the files opened from the Finder that SwiftUI doesn't give the main window's `onOpenURL`: with several,
-/// that gets the first and this the rest, at about the same time, and `AppModel.open` adds them together.
-/// Makes the Dock icon's menu, with Add Fonts, and counts the launch for the usage statistics.
-/// Last in the responder chain, it takes Edit → Paste (⌘V) in the main window where nothing else does, as while the
-/// sidebar has the focus: font files and folders copied in the Finder are added as if dropped on it (see `FileDrop`).
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
-    /// Set when the main window appears; files that come before wait for it, and so does Add Fonts in the Dock icon's menu.
+    @MainActor static var launchModel: AppModel?
     var model: AppModel? {
         didSet { flush() }
     }
@@ -269,9 +270,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var addsFonts = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if model == nil { model = Self.launchModel }
+        PlainTyping.install()
         UsageStatistics.sendLaunch()
         PreferencesItem.keepNamed()
         WindowList.start()
+    }
+
+    // A change half made when Cicero quits would leave fonts on or off that its records don't know about.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let model else { return .terminateNow }
+        if let job = model.job {
+            NSApp.bringForward()
+            model.showToast(job.waitMessage)
+            return .terminateCancel
+        }
+        guard model.isWorking else { return .terminateNow }
+        Task {
+            await model.finishWork(within: .seconds(30))
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -279,7 +298,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         flush()
     }
 
-    /// Above the system's items, and the windows the Dock lists itself (see `WindowList`): Add Fonts, as in the File menu.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
         let addFonts = NSMenuItem(title: "Add Fonts", action: #selector(addFonts), keyEquivalent: "")
@@ -288,8 +306,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return menu
     }
 
-    /// Brings Cicero forward, which opens the main window when none shows, so the fonts added show there, and asks
-    /// for them.
     @objc private func addFonts() {
         NSApp.bringForward()
         addsFonts = true
@@ -304,7 +320,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         menuItem.action == #selector(paste(_:)) ? canPaste : true
     }
 
-    /// Files are on the pasteboard and the main window is in front, without a sheet over it.
     private var canPaste: Bool {
         model != nil && NSApp.keyWindow != nil && NSApp.keyWindow === TextEditingKeys.mainWindow && !AppModel.pastedFiles.isEmpty
     }
@@ -323,10 +338,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 }
 
-/// The Cicero menu's settings item, called Preferences. SwiftUI makes it, as for any app with a Settings scene, and
-/// calls it Settings… again whenever it updates the menu. It gives that title to whatever holds ⌘, (a command group of
-/// Cicero's own too, which leaves two), so its own item is named again whenever any menu changes (SwiftUI can put
-/// the Cicero menu in the menu bar whole, which only the menu bar hears of) and as one opens: a dozen items to look at.
+@Observable
+final class LibraryFocus {
+    static let shared = LibraryFocus()
+    private(set) var isKey = false
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
+
+    func start() {
+        guard observers.isEmpty else { return }
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                DispatchQueue.main.async { LibraryFocus.shared.update() }
+            })
+        }
+        update()
+    }
+
+    private func update() {
+        let isKey = NSApp.keyWindow.map { $0 === TextEditingKeys.mainWindow } ?? false
+        if isKey != self.isKey { self.isKey = isKey }
+    }
+}
+
 enum PreferencesItem {
     static let title = "Preferences"
     private static var observers: [NSObjectProtocol] = []
@@ -334,6 +367,7 @@ enum PreferencesItem {
 
     static func keepNamed() {
         guard observers.isEmpty else { return }
+        // SwiftUI names the item Settings… again whenever it updates a menu, and gives that title to whatever holds ⌘, (a command group of Cicero's own too).
         for name in [NSMenu.didChangeItemNotification, NSMenu.didAddItemNotification, NSMenu.didBeginTrackingNotification] {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
                 MainActor.assumeIsolated { rename() }
@@ -355,11 +389,6 @@ enum PreferencesItem {
     }
 }
 
-/// Cicero's windows in the Window menu's list of open windows, where the Dock finds the windows it lists in an app's
-/// menu, with their symbol and the frontmost checked. SwiftUI leaves its windows out of that list (it has a command for
-/// each scene above it instead), so each is added as it shows, under a name of its own: the main window as Library,
-/// rather than what its sidebar shows, and Settings as Preferences, rather than its tab. A window that closes leaves the
-/// list by itself.
 enum WindowList {
     private static var observers: [NSObjectProtocol] = []
 
@@ -385,7 +414,6 @@ enum WindowList {
         }
     }
 
-    /// nil for panels, sheets and the menu bar's own windows.
     private static func title(of window: NSWindow) -> String? {
         guard window.styleMask.contains(.titled), !(window is NSPanel), window.sheetParent == nil else { return nil }
         switch window.identifier?.rawValue {
@@ -395,5 +423,16 @@ enum WindowList {
         case let id? where id.contains("Settings"): return PreferencesItem.title
         default: return window.title.isEmpty ? nil : window.title
         }
+    }
+}
+
+enum DevBuild {
+    static func deleteKeyShortcut(modifiers: EventModifiers) -> KeyboardShortcut? {
+        #if CICERO_DEV
+        // A dev build runs on the developer's real library, where one stray Delete deactivates or trashes every selected font.
+        nil
+        #else
+        KeyboardShortcut(.delete, modifiers: modifiers)
+        #endif
     }
 }

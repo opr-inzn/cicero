@@ -1,39 +1,21 @@
 import Foundation
 
-/// Reads FontBase's library. FontBase keeps one folder of fonts (`~/FontBase` unless moved, its `rootFolder`) and
-/// names each font by its PostScript name. It turns a font on by copying it to `~/Library/Fonts/FontBase/<PostScript
-/// name>.<ext>`, and, as it's set to at first, deletes the copies when it quits and makes them again when it opens: so
-/// what's on is what it remembers, not what's in that folder.
-///
-/// It remembers everything in IndexedDB (an Electron app's, in `~/Library/Application Support/FontBase`): the database
-/// "fontbase", object store "fontbase_db", one value per part of its state. `fontbase_settings.rootFolder`;
-/// `fontbase_pathsAll`, each file by its path under the folder (`id` its PostScript name, `url` where a provider's font
-/// is downloaded from); `fontbase_fontsAll`, each font's names; `fontbase_fontsStatus`, the path of each font that's on;
-/// `fontbase_collectionsAll`, its collections (`query.ids` their fonts; All, Recent, Active and Inactive are filters, of
-/// type "default"; Favorites is type "favorites"); `fontbase_fontsTagsUser`, the user's tags of each font.
-///
-/// FontBase writes these while it runs, a moment after each change, and last when it quits: read once it has quit.
 public enum FontBaseImport {
     public enum Failure: Error, Equatable {
-        /// No FontBase library there.
         case notALibrary
     }
 
     public static let bundleIdentifier = "com.dominiklevitsky.fontbase"
 
-    /// FontBase's folder on this Mac, when it has a library there.
     public static func folder(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL? {
         let url = home.appendingPathComponent("Library/Application Support/FontBase", isDirectory: true)
         return leveldb(in: url) != nil ? url : nil
     }
 
-    /// The folder FontBase copies the fonts that are on into.
     public static func copiesFolder(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
         home.appendingPathComponent("Library/Fonts/FontBase", isDirectory: true)
     }
 
-    /// The LevelDB folder of FontBase's folder, of its IndexedDB folder, or that folder itself, as a user may choose
-    /// any of them.
     static func leveldb(in url: URL) -> URL? {
         let name = "file__0.indexeddb.leveldb"
         let candidates = [url, url.appendingPathComponent(name), url.appendingPathComponent("IndexedDB").appendingPathComponent(name)]
@@ -43,8 +25,6 @@ public enum FontBaseImport {
         }
     }
 
-    /// Reads the library at `url`: FontBase's folder, or its IndexedDB. A folder in another account's home is taken as
-    /// being in `home`. FontBase's copies in the Fonts folder are only looked at for this Mac's own library.
     public static func read(_ url: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) throws -> ImportedLibrary {
         guard let leveldb = leveldb(in: url) else { throw Failure.notALibrary }
         let values: [String: JSValue]
@@ -54,8 +34,12 @@ public enum FontBaseImport {
             throw Failure.notALibrary
         }
         guard values["fontbase_pathsAll"] != nil || values["fontbase_settings"] != nil else { throw Failure.notALibrary }
-        let isThisMacs = folder(home: home).map { leveldb.standardizedFileURL.path.hasPrefix($0.standardizedFileURL.path + "/") } ?? false
-        return Reader(values: values, home: home.path).library(copies: isThisMacs ? copiesFolder(home: home) : nil)
+        return Reader(values: values, home: home.path).library(copies: isThisMacs(url, home: home) ? copiesFolder(home: home) : nil)
+    }
+
+    public static func isThisMacs(_ url: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+        guard let leveldb = leveldb(in: url), let folder = folder(home: home) else { return false }
+        return leveldb.standardizedFileURL.path.hasPrefix(folder.standardizedFileURL.path + "/")
     }
 
     struct Reader {
@@ -68,8 +52,6 @@ public enum FontBaseImport {
             let root = rootFolder()
             let realRoot = LibraryScanner.realPath(root)
 
-            // Each file by its path under the folder, and where it is on this Mac: under the folder, or, through a
-            // symbolic link, elsewhere.
             var pathOf: [String: String] = [:]
             var located: [String: String] = [:]
             var missing = 0
@@ -83,7 +65,6 @@ public enum FontBaseImport {
                 if let id = entry["id"]?.string, pathOf[id] == nil { pathOf[id] = relative }
                 let path = root + relative
                 guard fm.fileExists(atPath: path) else {
-                    // A provider's font FontBase lists without having downloaded it, or a file that's gone.
                     let parts = relative.split(separator: "/")
                     if entry["url"]?.string != nil, parts.count > 2, parts[0] == "Providers" {
                         notDownloaded[String(parts[1]), default: 0] += 1
@@ -112,7 +93,7 @@ public enum FontBaseImport {
                 library.fontFolderCount = count
                 library.fontFolderFiles = inFolder.sorted()
             } else if !(values["fontbase_pathsAll"]?.properties ?? []).isEmpty {
-                library.notes.append("its folder, \((root as NSString).abbreviatingWithTildeInPath), which isn’t on this Mac")
+                library.notes.append("FontBase’s folder, \((root as NSString).abbreviatingWithTildeInPath), which isn’t on this Mac")
             }
             library.otherFiles = other.sorted()
 
@@ -123,7 +104,6 @@ public enum FontBaseImport {
                                     style: names[id]?["fontSubFamily"]?.string)
             }
 
-            // Collections: the user's, and Favorites when it has any; not the filters.
             var otherCollections: [String] = []
             for (id, collection) in values["fontbase_collectionsAll"]?.properties ?? [] {
                 let type = collection["type"]?.string ?? ""
@@ -141,7 +121,6 @@ public enum FontBaseImport {
                 }
             }
 
-            // The user's tags, each given to the fonts that have it.
             var tagged: [String: [ImportedFont]] = [:]
             var tagOrder: [String] = []
             for (id, tags) in values["fontbase_fontsTagsUser"]?.properties ?? [] {
@@ -154,29 +133,25 @@ public enum FontBaseImport {
             }
             library.tags = tagOrder.map { ImportedTag(name: $0, color: nil, fonts: tagged[$0] ?? []) }
 
-            // The fonts that are on, at the paths FontBase copied them from.
-            var active = Set<String>()
+            var active: [String: String] = [:]
             for (id, relative) in values["fontbase_fontsStatus"]?.properties ?? [] {
                 guard let relative = relative.string, relative.hasPrefix("/") else { continue }
                 library.active.append(font(id, at: relative))
-                if located[relative] != nil { active.insert(id) }
+                if let path = located[relative] { active[id] = path }
             }
 
-            // FontBase's copies of those, left in the Fonts folder: FontBase was set to keep them on once it quit, or
-            // didn't get to delete them. Only those named after a font that's on and still in its folder.
             if let copies, let files = try? fm.contentsOfDirectory(at: copies, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
-                library.leftoverCopies = files.filter { file in
-                    FontFormat.fileExtensions.contains(file.pathExtension.lowercased())
-                        && active.contains(file.deletingPathExtension().lastPathComponent)
+                for file in files where FontFormat.fileExtensions.contains(file.pathExtension.lowercased()) {
+                    guard let origin = active[file.deletingPathExtension().lastPathComponent] else { continue }
+                    library.leftoverCopyOrigins[file.path] = origin
                 }
-                .map(\.path).sorted()
+                library.leftoverCopies = library.leftoverCopyOrigins.keys.sorted()
             }
 
             notes(&library, otherCollections: otherCollections, missing: missing, notDownloaded: notDownloaded, unreadable: unreadable)
             return library
         }
 
-        /// What doesn't come over, for the sheet.
         private func notes(_ library: inout ImportedLibrary, otherCollections: [String], missing: Int, notDownloaded: [String: Int],
                            unreadable: [FontExplorerImport.UnreadableKind: Int]) {
             if !otherCollections.isEmpty {
@@ -184,14 +159,14 @@ public enum FontBaseImport {
                     + otherCollections.map { "“\($0)”" }.listed())
             }
             let automatic = ["fontbase_fontsTagsSystem", "fontbase_fontsTagsCrowd"].contains { !(values[$0]?.properties ?? []).isEmpty }
-            if automatic { library.notes.append("the tags FontBase gives fonts itself, like Sans and Script") }
+            if automatic { library.notes.append("automatic FontBase tags, like Sans and Script") }
             let edited = values["fontbase_fontsOverrides"]?.properties?.count ?? 0
-            if edited > 0 { library.notes.append(edited == 1 ? "your changes to 1 font’s details" : "your changes to \(edited.formatted()) fonts’ details") }
+            if edited > 0 { library.notes.append(edited == 1 ? "your changes to 1 font’s details" : "your changes to \(edited.plain) fonts’ details") }
             let licenses = values["fontbase_licensesAll"]?.properties?.count ?? 0
-            if licenses > 0 { library.notes.append(licenses == 1 ? "1 license you added" : "\(licenses.formatted()) licenses you added") }
+            if licenses > 0 { library.notes.append(licenses == 1 ? "1 license you added" : "\(licenses.plain) licenses you added") }
             let activeFolders = (values["fontbase_foldersAll"]?.properties ?? []).filter { $0.value["status"]?.string == "active" && $0.value["virtual"]?.bool != true }
             if !activeFolders.isEmpty {
-                library.notes.append("turning on new fonts in \(activeFolders.count == 1 ? "the active folder" : "active folders") by themselves")
+                library.notes.append("automatically activating new fonts in \(activeFolders.count == 1 ? "the active folder" : "active folders")")
             }
             library.notes.append("sample texts and preview settings")
             for kind in FontExplorerImport.UnreadableKind.allCases {
@@ -200,14 +175,13 @@ public enum FontBaseImport {
             let total = notDownloaded.values.reduce(0, +)
             if total > 0 {
                 let providers = notDownloaded.keys.sorted().listed()
-                library.notes.append("\(total.formatted()) \(providers) \(total == 1 ? "font" : "fonts") you haven’t downloaded")
+                library.notes.append("\(total.plain) \(providers) \(total == 1 ? "font" : "fonts") you haven’t downloaded")
             }
             if missing > 0 {
-                library.notes.append(missing == 1 ? "1 font file that isn’t on this Mac" : "\(missing.formatted()) font files that aren’t on this Mac")
+                library.notes.append(missing == 1 ? "1 font file that isn’t on this Mac" : "\(missing.plain) font files that aren’t on this Mac")
             }
         }
 
-        /// FontBase's folder, as it's set, or where it is at first; in another account's home, in this one's.
         private func rootFolder() -> String {
             var root = values["fontbase_settings"]?["rootFolder"]?.string ?? home + "/FontBase"
             while root.count > 1, root.hasSuffix("/") { root.removeLast() }

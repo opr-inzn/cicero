@@ -1,14 +1,18 @@
 import CiceroCore
 import SwiftUI
 
-/// The sheet for a new or existing smart set: name, match all or any, and a row per rule.
 struct SmartSetEditor: View {
     let original: SmartSet
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SmartSet
-    /// Whether the set was new when the sheet opened: saving or deleting it changes that while the sheet is still closing.
     @State private var openedAsNew: Bool?
+    @State private var summaryCache = MatchSummaryCache()
+
+    private final class MatchSummaryCache {
+        var key: (matchAll: Bool, rules: [SmartRule], fingerprint: Int, revision: Int, coverageRevision: Int, guessRevision: Int)?
+        var summary = ""
+    }
 
     init(original: SmartSet) {
         self.original = original
@@ -27,8 +31,8 @@ struct SmartSetEditor: View {
                     Text("Any of the rules").tag(false)
                 }
                 Section("Rules") {
-                    ForEach($draft.rules) { $rule in
-                        RuleRow(rule: $rule, canRemove: draft.rules.count > 1) {
+                    ForEach(draft.rules) { rule in
+                        RuleRow(rule: binding(to: rule), canRemove: draft.rules.count > 1) {
                             draft.rules.removeAll { $0.id == rule.id }
                         } add: {
                             let position = draft.rules.firstIndex { $0.id == rule.id } ?? draft.rules.count - 1
@@ -58,15 +62,33 @@ struct SmartSetEditor: View {
         .onAppear { openedAsNew = isNew }
     }
 
+    // By id, not index: a number field commits its edit after a click on another row's − has removed its own row.
+    private func binding(to rule: SmartRule) -> Binding<SmartRule> {
+        Binding {
+            draft.rules.first { $0.id == rule.id } ?? rule
+        } set: { new in
+            guard let index = draft.rules.firstIndex(where: { $0.id == rule.id }) else { return }
+            draft.rules[index] = new
+        }
+    }
+
     private var matchSummary: String {
+        let key = (draft.matchAll, draft.rules, model.library.fingerprint, model.dataRevision, model.coverageRevision, model.guessRevision)
+        if let cached = summaryCache.key, cached.matchAll == key.0, cached.rules == key.1,
+           cached.fingerprint == key.2, cached.revision == key.3,
+           cached.coverageRevision == key.4, cached.guessRevision == key.5 {
+            return summaryCache.summary
+        }
         let test = model.matcher(for: draft)
         let data = model.data
         let count = model.library.families.count { data.lists($0) && test($0) }
-        return count == 1 ? "1 family matches" : "\(count.formatted()) families match"
+        let summary = count == 1 ? "1 family matches" : "\(count.plain) families match"
+        summaryCache.key = key
+        summaryCache.summary = summary
+        return summary
     }
 }
 
-/// Field · comparison · value, with the value control the field needs.
 private struct RuleRow: View {
     @Environment(AppModel.self) private var model
     @Binding var rule: SmartRule
@@ -80,15 +102,17 @@ private struct RuleRow: View {
                 ForEach(fields, id: \.self) { Text($0.title).tag($0) }
             }
             .fixedSize()
-            Picker("Comparison", selection: $rule.comparison) {
+            Picker("Comparison", selection: comparison) {
                 ForEach(rule.field.comparisons, id: \.self) { Text($0.title(for: rule.field)).tag($0) }
             }
             .fixedSize()
             value
             Spacer(minLength: 0)
             rowButton("Remove Rule", icon: "minus.circle", action: remove)
+                .fixedSize()
                 .disabled(!canRemove)
             rowButton("Add Rule", icon: "plus.circle", action: add)
+                .fixedSize()
         }
         .labelsHidden()
     }
@@ -99,8 +123,6 @@ private struct RuleRow: View {
             .buttonStyle(.borderless)
     }
 
-    /// The user's folders, then Proofing when its fonts are shown, Adobe Fonts when there are some and they're shown, and
-    /// Added Fonts when there are some. The Font Library, no longer a location, only for a rule that has it.
     private var folderOptions: [(id: String, title: String)] {
         let own = (model.data.showAdobeAppFolders ? [WatchedFolder.adobeAppsID] : [])
             + (model.ownFoldersWithFonts.contains(WatchedFolder.adobeFontsID) ? [WatchedFolder.adobeFontsID] : [])
@@ -109,12 +131,20 @@ private struct RuleRow: View {
         return model.data.namedFolders.map { ($0.id.uuidString, $0.displayName) } + own.map { ($0.uuidString, model.folderName($0)) }
     }
 
-    /// The fields a new rule offers, and the rule's own when it's one no longer offered.
     private var fields: [SmartRule.Field] {
         SmartRule.Field.offered.contains(rule.field) ? SmartRule.Field.offered : SmartRule.Field.offered + [rule.field]
     }
 
-    /// Changing the field resets the comparison and value to ones that make sense for it.
+    private var comparison: Binding<SmartRule.Comparison> {
+        Binding(get: { rule.comparison }, set: { new in
+            guard new != rule.comparison else { return }
+            rule.comparison = new
+            if rule.field == .foundry, new != .contains, !model.foundryNames.contains(rule.value) {
+                rule.value = model.foundryNames.first ?? ""
+            }
+        })
+    }
+
     private var field: Binding<SmartRule.Field> {
         Binding(get: { rule.field }, set: { new in
             guard new != rule.field else { return }
@@ -166,22 +196,19 @@ private struct RuleRow: View {
         case .classification:
             options(model.classificationNames.map { ($0, $0) })
         case .tag:
-            options(model.data.tags.map { ($0, $0) }, empty: "No tags yet", colors: model.data.tagColors)
+            options(model.data.orderedTags.map { ($0, $0) }, empty: "No tags yet", colors: model.data.tagColors)
         case .rating:
-            // The most stars first, as in the family's Rating menu.
             options([("0", "No Rating")] + (1...5).reversed().map { (String($0), Rating.stars($0)) })
         case .set:
             options(model.data.sets.map { ($0.id.uuidString, $0.name) }, empty: "No folders yet")
         case .folder:
             options(folderOptions, empty: "No locations yet")
         case .status:
-            // Active in Adobe Apps Only also while Proofing is hidden: Adobe Fonts that Adobe apps turned on for
-            // themselves are still listed.
             options(SmartRuleValue.statuses.map { ($0, Self.statusTitle($0)) })
         case .kind:
             options(SmartRuleValue.kinds.map { ($0, Self.kindTitle($0)) })
         case .format:
-            options(FontFormat.allCases.map { ($0.rawValue, $0.rawValue) })
+            options(FontFormat.allCases.filter { $0 != .other }.map { ($0.rawValue, Self.formatTitle($0)) })
         case .styles:
             number(in: 0...999)
         case .feature:
@@ -189,7 +216,7 @@ private struct RuleRow: View {
         case .embedding:
             options(Embedding.allCases.map { ($0.rawValue, $0.title) })
         case .added, .lastActivated:
-            number(unit: "days", in: 1...3650)
+            number(unit: Int(rule.value) == 1 ? "day" : "days", in: 1...3650)
         case .timesActivated:
             number(in: 0...99_999)
         case .language:
@@ -205,7 +232,11 @@ private struct RuleRow: View {
             .frame(minWidth: 140, maxWidth: 260)
     }
 
-    /// A pop-up of the options, each with the dot of its colour, if it has one, like a tag's.
+    private static func formatTitle(_ format: FontFormat) -> String {
+        let extensions = FontFormat.fileExtensions.filter { FontFormat.of(path: "x.\($0)") == format }.sorted()
+        return "\(format.rawValue) (\(extensions.map { "." + $0 }.joined(separator: ", ")))"
+    }
+
     @ViewBuilder
     private func options(_ options: [(id: String, title: String)], empty: String = "", colors: [String: TagColor] = [:]) -> some View {
         if options.isEmpty {
@@ -222,11 +253,10 @@ private struct RuleRow: View {
                     }
                 }
             }
-            .fixedSize()
+            .frame(maxWidth: 260, alignment: .leading)
         }
     }
 
-    /// A field for the number, with its unit after it where the field's name doesn't say it, like days.
     private func number(unit: String? = nil, in range: ClosedRange<Int>) -> some View {
         let number = Binding<Int>(
             get: { Int(rule.value) ?? range.lowerBound },
@@ -256,7 +286,7 @@ private struct RuleRow: View {
                 }
             }
         }
-        .fixedSize()
+        .frame(maxWidth: 260, alignment: .leading)
     }
 
     private static func statusTitle(_ value: String) -> String {
@@ -278,7 +308,6 @@ private struct RuleRow: View {
     }
 }
 
-/// A pop-up of Hyperglot's languages: searchable, sorted by speakers.
 private struct LanguagePicker: View {
     @Binding var selection: String
     let catalog: LanguageCatalog
@@ -297,6 +326,7 @@ private struct LanguagePicker: View {
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             VStack(spacing: 8) {
                 TextField("Search", text: $search, prompt: Text("Search"))
+                    .noAutoFill()
                     .textFieldStyle(.roundedBorder)
                 List(languages, selection: Binding<String?>(
                     get: { selection },
@@ -364,23 +394,19 @@ private extension SmartRule.Field {
 }
 
 private extension SmartRule.Comparison {
-    /// The wording depends on the field: a set "is in", a language or an OpenType feature "is supported", coverage
-    /// "includes", Has Note is Yes or No. A tag "is" any of the family's.
     func title(for field: SmartRule.Field) -> String {
         switch (field, self) {
         case (.set, .is), (.folder, .is): "is in"
         case (.set, .isNot), (.folder, .isNot): "isn’t in"
-        case (.language, .is), (.feature, .is): "is supported"
-        case (.language, .isNot), (.feature, .isNot): "isn’t supported"
-        case (.characterSet, .is): "includes"
-        case (.characterSet, .isNot): "doesn’t include"
+        case (.language, .is), (.feature, .is), (.characterSet, .is): "includes"
+        case (.language, .isNot), (.feature, .isNot), (.characterSet, .isNot): "doesn’t include"
         case (.hasNote, .is): "Yes"
         case (.hasNote, .isNot): "No"
         case (_, .contains): "contains"
         case (_, .doesNotContain): "doesn’t contain"
         case (_, .beginsWith): "begins with"
         case (_, .is): "is"
-        case (_, .isNot): "is not"
+        case (_, .isNot): "isn’t"
         case (_, .greaterThan): "is more than"
         case (_, .lessThan): "is less than"
         case (_, .inLast): "is in the last"

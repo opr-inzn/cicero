@@ -2,7 +2,7 @@
 
 ![Cicero’s window: All Fonts as a grid of tiles, each family previewed in itself, with the sidebar on the left](docs/screenshot.png)
 
-**[Download the latest version](https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg)** · [Help](help/README.md) · [All versions and release notes](https://github.com/opr-inzn/cicero/releases) · [Roadmap](docs/ROADMAP.md) · Requires macOS 15 or later on Apple silicon.
+**[Download the latest version](https://github.com/opr-inzn/cicero/releases/latest/download/Cicero.dmg)** · [Help](help/README.md) · [Version history](help/version-history.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · Requires macOS 15 or later on Apple silicon.
 
 A font manager for macOS. Browse every font on your Mac and in your font folders, try them out, and turn them on only when you need them.
 
@@ -12,7 +12,7 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 - **Info and Features.** The info panel shows a font’s details (its designer, vendor ID and embedding permission among them), its tags and rating, your note on it, the languages it supports, its coverage and the Unicode blocks it covers; the Features tab turns OpenType features on in the text on the family’s font page.
 - **Search** by family or style name, foundry, PostScript name, designer, vendor ID or your note, or by what a family is: variable, mono, italic, serif, sans, script, display or text, condensed or extended, a tag. Words combine, so “variable sans” finds the variable sans serifs.
 - **Names in your language.** A family whose fonts name it in your Mac’s language, as many Japanese, Chinese and Korean fonts do, shows and sorts by that name: Hiragino Sans is ヒラギノ角ゴシック on a Mac in Japanese.
-- **Similar fonts.** Right-click a family and choose Show Similar Fonts to see the 12 in your library that look most like it, the closest first, measured from the shapes of their letters on your Mac (x-height, weight, contrast and stress, width and spacing, slant, serifs, aperture, and the a’s and g’s stories) and looked at by a small model that has learned what letters of a kind look like. A font page shows the six closest.
+- **Similar fonts.** Right-click a family and choose Show Similar Fonts to see the 12 in your library that look most like it, the closest first, measured from the shapes of their letters on your Mac (x-height, weight, contrast and stress, width and spacing, slant, serifs, aperture, and the a’s and g’s stories) and looked at by a small model that has learned what letters of a kind look like.
 - **Preview Options.** Preview text, size, weight and leading, shared by every view.
 - **Light or dark.** Follow macOS, or pick Light or Dark in Preferences → General.
 - **Menu bar.** Click Cicero’s icon in the menu bar to open it, drop fonts or a document on it, or right-click it to add fonts, find the fonts of the document you have open, turn folders on and off, see which fonts are on for apps, or quit. Turn off *Show Cicero in the Dock* in Preferences → General, and Cicero is in the Dock only while one of its windows is open.
@@ -44,17 +44,21 @@ A font manager for macOS. Browse every font on your Mac and in your font folders
 - **The Cicero CLI.** Find and check your fonts from Terminal, scripts and AI agents: `cicero find --class serif --set adobe-latin-3`, `cicero status Inter`, `cicero coverage Inter --text "Łódź"`, with `--json` for scripts. `cicero compare` draws fonts side by side in a picture an AI agent can look at. It also turns fonts on and off, gives them tags, ratings and notes, and puts them in folders, and it works while Cicero is closed. Press Tab to complete commands and the names of your families, tags and folders. Claude Code, Claude Desktop and Codex can use it as an MCP server, `cicero mcp`. Install it with Cicero → Install Cicero CLI ([how it works](help/command-line.md)).
 - **Updates.** Cicero checks GitHub for new versions and offers to install them. Check now with Cicero → Check for Updates, or turn off *Check for updates automatically* in Preferences → General.
 - **Moves itself to Applications.** Opened from the disk image or your Downloads folder, Cicero offers to move itself to the Applications folder, where app folders, opening at login and updates work.
-- **Help.** A [user guide](help/README.md), opened from Help → Cicero Help, with Release Notes and Report an Issue next to it in the Help menu.
+- **Help.** A [user guide](help/README.md), opened from Help → Cicero Help, with What’s New in Cicero, Version History and Report an Issue next to it in the Help menu.
 
 ## Help wanted: fonts beyond Latin
 
 Cicero has mostly been tried with Latin fonts, and a lot of it still assumes them. Family names in your Mac’s language, the Cyrillic and Greek coverage sets and the 780 languages of the Character Toolbox reach further. But the samples the previews start with are Latin, the glyph map puts the letters of every other script into one group, and the classifications Cicero reads from the shapes of letters only measure Latin ones.
 
-If you work with Arabic, Hebrew, Devanagari, Thai, Chinese, Japanese, Korean or any other script, your help would be very welcome. Try Cicero with your fonts and [open an issue](https://github.com/opr-inzn/cicero/issues/new) for anything that looks wrong or is missing: a preview that shows the wrong script, text that runs the wrong way, glyphs grouped in a way that makes no sense for your script, or a coverage set you’d need. Sample fonts, sample texts and pull requests are welcome too.
+If you work with Arabic, Hebrew, Devanagari, Thai, Chinese, Japanese, Korean or any other script, your help would be very welcome. Try Cicero with your fonts and [open an issue](https://github.com/opr-inzn/cicero/issues/new) for anything that looks wrong or is missing: a preview that shows the wrong script, text that runs the wrong way, glyphs grouped in a way that makes no sense for your script, or a coverage set you’d need. Sample fonts, sample texts and pull requests are welcome too: see [Contributing](CONTRIBUTING.md).
+
+## Contributing
+
+Bug reports, sample fonts, sample texts, ideas and pull requests are all welcome. [CONTRIBUTING.md](CONTRIBUTING.md) says how: open an issue before a larger change, open pull requests against `main`, and say how you tested.
 
 ## Roadmap
 
-Coming next: **better similar lists**, from a letter model trained on more families and judged on fonts it has never seen, then **similar styles**, Show Similar Fonts for a single style, so that an italic finds italics and a condensed style condensed ones, **subfolders** in Locations and Folders, and a search field that **searches licenses and descriptions**. How they could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
+Coming next: **subfolders** in Locations and Folders, a search field that **searches licenses and descriptions**, and a **Vault** for your licenses and the files Cicero can’t use, like web fonts, with a license for each client. How they could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
 
 ## Privacy
 
@@ -72,6 +76,5 @@ Classifications Cicero recognizes, from the shapes of the letters or, on macOS 2
 - Order of Latin, Greek and Cyrillic letters: the glyph names, categories and scripts of [GlyphsInfo](https://github.com/schriftgestalt/GlyphsInfo) by Georg Seifert, BSD 3-Clause License.
 - Updates: [Sparkle](https://sparkle-project.org).
 - Typefaces: [Mischief](https://www.lucasportron.com) by Lucas Portron and [ABC Areal](https://abcdinamo.com/typefaces/areal) by Dinamo.
-- Design and functionality inspired by [Typecase](https://typecase.app/) and [Pica](https://pica.joshpuckett.me/).
 
 Cicero is released under the [MIT License](LICENSE). The bundled data keeps its own licenses, included in the app: Hyperglot’s in [Languages-LICENSE.txt](Resources/Languages-LICENSE.txt), and the character set sources’ (MIT, Apache License 2.0 and Unicode License V3) in [CharacterSets-LICENSES.txt](Resources/CharacterSets-LICENSES.txt), and GlyphsInfo’s in [GlyphsInfo-LICENSE.txt](Resources/GlyphsInfo-LICENSE.txt). Sparkle comes with its own license.

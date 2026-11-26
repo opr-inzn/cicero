@@ -1,25 +1,18 @@
 import CiceroCore
 import SwiftUI
 
-/// A titled group of families in a `FamilyRowList`.
 struct FamilyRowSection: Identifiable {
     var id: String
     var title: String?
     var families: [Family]
-    /// Shown when there are no families.
     var emptyText: String?
 }
 
-/// Families as rows with a selection of their own, for the Character Toolbox: click, ⌘- and ⇧-click and
-/// the arrow keys select, double-click or Return opens, right-click for the family menu. A lazy stack, not
-/// a Table or List: those make every row whenever an accessibility client walks the window, which keeps
-/// the app busy for minutes with a thousand families. Section titles scroll with the rows rather than pin, so rows
-/// only meet the bar above them, where they fade out (see `safeAreaBar`) instead of ending at a title's edge.
 struct FamilyRowList<Row: View>: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     let sections: [FamilyRowSection]
     @Binding var selection: Set<String>
-    let open: (String) -> Void
     @ViewBuilder let row: (Family) -> Row
     @State private var anchor = SelectionAnchor()
     @FocusState private var focused: Bool
@@ -28,21 +21,25 @@ struct FamilyRowList<Row: View>: View {
         let ids = sections.flatMap { $0.families.map(\.id) }
         ScrollViewReader { proxy in
             ScrollView {
+                // A lazy stack, not a Table or List: those make every row whenever an accessibility client walks the window.
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(sections) { section in
                         Section {
                             if section.families.isEmpty, let empty = section.emptyText {
-                                Text(empty).foregroundStyle(.tertiary).padding(.horizontal, 12).frame(height: 30)
+                                Text(empty).foregroundStyle(.tertiary).padding(.horizontal, ListRowBackground.contentInset).frame(height: 30)
                             }
-                            ForEach(Array(section.families.enumerated()), id: \.element.id) { index, family in
-                                item(family, isStriped: !index.isMultiple(of: 2), ids: ids)
+                            let families = section.families
+                            ForEach(Array(families.enumerated()), id: \.element.id) { index, family in
+                                item(family, isStriped: !index.isMultiple(of: 2), ids: ids,
+                                     previous: index > 0 ? families[index - 1].id : nil,
+                                     next: index + 1 < families.count ? families[index + 1].id : nil)
                             }
                         } header: {
                             if let title = section.title {
                                 Text(title)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 12)
+                                    .padding(.horizontal, ListRowBackground.contentInset)
                                     .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
                             }
                         }
@@ -54,7 +51,8 @@ struct FamilyRowList<Row: View>: View {
             .focused($focused)
             .focusEffectDisabled()
             .onKeyPress(.return) {
-                guard selection.count == 1, let id = selection.first else { return .ignored }
+                let shown = selection.filter(ids.contains)
+                guard shown.count == 1, let id = shown.first else { return .ignored }
                 open(id)
                 return .handled
             }
@@ -71,17 +69,20 @@ struct FamilyRowList<Row: View>: View {
         }
     }
 
-    private func item(_ family: Family, isStriped: Bool, ids: [String]) -> some View {
+    private func open(_ id: String) {
+        model.openFamilyID = id
+        openWindow(id: WindowID.main)
+    }
+
+    private func item(_ family: Family, isStriped: Bool, ids: [String], previous: String?, next: String?) -> some View {
         let isSelected = selection.contains(family.id)
         return row(family)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, ListRowBackground.contentInset)
             .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
             .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.25)).padding(.horizontal, 4)
-                } else if isStriped {
-                    Rectangle().fill(.quaternary.opacity(0.35))
-                }
+                ListRowBackground(isSelected: isSelected, isStriped: isStriped,
+                                  joinsAbove: isSelected && (previous.map(selection.contains) ?? false),
+                                  joinsBelow: isSelected && (next.map(selection.contains) ?? false))
             }
             .id(family.id)
             .contentShape(.rect)
@@ -91,17 +92,40 @@ struct FamilyRowList<Row: View>: View {
                 FamilySelection.click(family.id, in: ids, selection: &selection, anchor: &anchor)
             })
             .contextMenu { FamilyMenu(families: targets(for: family.id, in: ids).compactMap(model.family), model: model) }
-            .fontDrag { FontDrag(families: targets(for: family.id, in: ids)) } preview: {
-                FamilyDragPreview(family: family, count: targets(for: family.id, in: ids).count)
-            }
+            .familyDrag { targets(for: family.id, in: ids).compactMap(model.family) }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { open(family.id) }
             .accessibilityAction(named: "Select") { FamilySelection.click(family.id, in: ids, selection: &selection, anchor: &anchor) }
     }
 
-    /// What the menu and a drag take: the whole selection when the family is part of it.
     private func targets(for id: String, in ids: [String]) -> [String] {
         selection.contains(id) && selection.count > 1 ? ids.filter(selection.contains) : [id]
+    }
+}
+
+struct ListRowBackground: View {
+    let isSelected: Bool
+    let isStriped: Bool
+    let joinsAbove: Bool
+    let joinsBelow: Bool
+
+    static let inset: CGFloat = 10
+    static let contentInset: CGFloat = 20
+
+    var body: some View {
+        if isSelected {
+            UnevenRoundedRectangle(topLeadingRadius: joinsAbove ? 0 : 6, bottomLeadingRadius: joinsBelow ? 0 : 6,
+                                   bottomTrailingRadius: joinsBelow ? 0 : 6, topTrailingRadius: joinsAbove ? 0 : 6)
+                .fill(Color.accentColor.opacity(0.25))
+                .overlay(alignment: .top) {
+                    if joinsAbove {
+                        Rectangle().fill(Color.selectionSeparator).frame(height: 1).padding(.horizontal, Self.contentInset - Self.inset)
+                    }
+                }
+                .padding(.horizontal, Self.inset)
+        } else if isStriped {
+            RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.35)).padding(.horizontal, Self.inset)
+        }
     }
 }

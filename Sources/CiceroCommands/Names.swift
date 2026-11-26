@@ -1,21 +1,15 @@
 import CiceroCore
 import Foundation
 
-/// Finding a family, style, tag, folder or location by the name the user typed. An exact name, ignoring case, is the
-/// thing; else the command stops with up to five near names: first those the app's search would suggest, then those a
-/// few typing mistakes away (see `Names.mistakes`). Write commands never guess.
-public enum Names {
-    /// How many near names a `notFound` lists.
-    public static let suggestionCount = 5
+enum Names {
+    static let suggestionCount = 5
 
-    /// The family by its name, as the fonts give it (its `id`) or as shown in the Mac's language, ignoring case.
-    public static func family(_ typed: String, in context: LibraryContext) throws -> Family {
+    static func family(_ typed: String, in context: LibraryContext) throws -> Family {
         let families = context.listedFamilies
         let key = fold(typed)
         let found = families.filter { fold($0.id) == key || fold($0.name) == key }
         if found.count == 1 { return found[0] }
         if found.count > 1 {
-            // Families shown under one name: the one whose own name it is, as typed, else ignoring case.
             if let own = found.first(where: { $0.id == typed }) { return own }
             let own = found.filter { fold($0.id) == key }
             if own.count == 1 { return own[0] }
@@ -31,8 +25,7 @@ public enum Names {
         }))
     }
 
-    /// A style of the family by its style name ("Bold Italic") or PostScript name ("Inter-BoldItalic"), ignoring case.
-    public static func style(_ typed: String, of family: Family) throws -> LibraryFace {
+    static func style(_ typed: String, of family: Family) throws -> LibraryFace {
         let key = fold(typed)
         let found = family.faces.filter { fold($0.face.styleName) == key || fold($0.face.postScriptName) == key }
         if found.count == 1 { return found[0] }
@@ -44,8 +37,7 @@ public enum Names {
                            suggestions: suggestions(for: typed, among: family.faces.flatMap { [$0.face.styleName, $0.face.postScriptName] }))
     }
 
-    /// The tag of that name, ignoring case.
-    public static func tag(_ typed: String, in data: UserData) throws -> String {
+    static func tag(_ typed: String, in data: UserData) throws -> String {
         let key = fold(typed)
         let found = data.tags.filter { fold($0) == key }
         if let exact = found.first(where: { $0 == typed }) { return exact }
@@ -54,8 +46,7 @@ public enum Names {
         throw CommandError(.notFound, "No tag is called “\(typed)”.", suggestions: suggestions(for: typed, among: data.tags))
     }
 
-    /// The folder (a plain folder of the app, `sets` in the data) by its name, ignoring case, or its id.
-    public static func folder(_ typed: String, in data: UserData) throws -> FontSet {
+    static func folder(_ typed: String, in data: UserData) throws -> FontSet {
         if let id = UUID(uuidString: typed), let set = data.sets.first(where: { $0.id == id }) { return set }
         let key = fold(typed)
         let found = data.sets.filter { fold($0.name) == key }
@@ -67,8 +58,7 @@ public enum Names {
         throw CommandError(.notFound, "No folder is called “\(typed)”.", suggestions: suggestions(for: typed, among: data.sets.map(\.name)))
     }
 
-    /// The location (a watched folder) by its name as shown, its path, or its id.
-    public static func location(_ typed: String, in data: UserData) throws -> WatchedFolder {
+    static func location(_ typed: String, in data: UserData) throws -> WatchedFolder {
         let folders = data.namedFolders
         if let id = UUID(uuidString: typed), let folder = folders.first(where: { $0.id == id }) { return folder }
         let path = URL(fileURLWithPath: (typed as NSString).expandingTildeInPath).standardizedFileURL.path
@@ -86,10 +76,7 @@ public enum Names {
 
     // MARK: Near names
 
-    /// Up to `suggestionCount` of the names: first those the app's search field would suggest for what's typed (names
-    /// that begin with it, then those with a word that does), then those the fewest typing mistakes away (see
-    /// `mistakes`): near the whole name first, then near its start, then near one of its words.
-    public static func suggestions(for typed: String, among names: [String]) -> [String] {
+    static func suggestions(for typed: String, among names: [String]) -> [String] {
         var seen = Set<String>()
         let unique = names.filter { seen.insert($0).inserted }
         let query = SearchQuery(typed)
@@ -109,29 +96,20 @@ public enum Names {
             if a.part != b.part { return a.part < b.part }
             return a.name.localizedStandardCompare(b.name) == .orderedAscending
         }
-        // A family's own name and the one it shows can both match: one of them is enough.
         return Array(ranked.prefix(suggestionCount).map(\.name))
     }
 
-    /// How many typing mistakes away the typed name is from the name (`part` 0), from its start (1), or from one of its
-    /// words (2), when that's few enough; else nil. "noto serf" is 1 from "noto serif", "skolr" from the start of
-    /// "skolar sans pe trial", and "regualr" from its word "regular". The whole name may be a third of the typed letters
-    /// away, its start or a word only a quarter, as many names have a start or a word near a short name; each at least 1.
-    /// So "intr" is 1 from the start of "inter variable", and "nwr", 2 away, isn't near it.
     static func mistakes(_ typed: String, in name: String) -> (count: Int, part: Int)? {
         guard !typed.isEmpty else { return nil }
         var best: (count: Int, part: Int)?
         let wholeLimit = max(1, typed.count / 3)
         let whole = distance(typed, name, limit: wholeLimit)
         if whole <= wholeLimit { best = (whole, 0) }
-        // A part only counts when it's nearer than the whole name.
         let partLimit = min(max(1, typed.count / 4), (best?.count ?? .max) - 1)
         guard partLimit >= 0 else { return best }
         let letters = Array(name)
-        // The name's start, as long as what's typed, give or take the mistakes; none when the name is shorter.
         let shortest = max(1, typed.count - partLimit), longest = min(letters.count, typed.count + partLimit)
         var parts = shortest <= longest ? (shortest...longest).map { (String(letters.prefix($0)), 1) } : []
-        // Each word: what's typed is a whole word, or the start of one ("regualr", "bld").
         for word in name.split(whereSeparator: { !$0.isLetter && !$0.isNumber }) where word.count < letters.count {
             parts.append((String(word), 2))
             if word.count > typed.count { parts.append((String(word.prefix(typed.count)), 2)) }
@@ -143,14 +121,11 @@ public enum Names {
         return best
     }
 
-    /// Lowercased, without accents, for comparing names.
-    public static func fold(_ name: String) -> String {
+    static func fold(_ name: String) -> String {
         name.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
     }
 
-    /// Damerau–Levenshtein distance (optimal string alignment): insertions, deletions, changes and two letters swapped
-    /// each count 1. Stops early, with `limit + 1`, when the names are further apart than `limit`.
-    public static func distance(_ a: String, _ b: String, limit: Int = .max) -> Int {
+    static func distance(_ a: String, _ b: String, limit: Int = .max) -> Int {
         let a = Array(a), b = Array(b)
         if abs(a.count - b.count) > limit { return limit &+ 1 }
         if a.isEmpty { return b.count }

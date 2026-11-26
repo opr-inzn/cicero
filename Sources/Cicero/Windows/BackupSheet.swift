@@ -3,22 +3,19 @@ import CiceroCore
 import SwiftUI
 
 extension View {
-    /// Presents the Back Up Library sheet.
     func backupSheet(isPresented: Binding<Bool>) -> some View {
         sheet(isPresented: isPresented) { BackupSheet() }
     }
 }
 
-/// Says what a backup holds, offers to include the font files with their count and size, asks
-/// where to save it, and shows progress while it's written.
 struct BackupSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var includeFonts = true
-    /// nil while the library's files are still being counted.
     @State private var fonts: [BackupFont]?
     @State private var progress: BackupProgress?
     @State private var task: Task<Void, Never>?
+    @State private var runID = UUID()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -34,10 +31,10 @@ struct BackupSheet: View {
                     switch progress {
                     case .copying(let done, let total):
                         ProgressView(value: Double(done), total: Double(max(total, 1)))
-                        Text("Copying fonts, \(done.formatted()) of \(total.formatted())")
+                        Text("Copying fonts, \(done.plain) of \(total.plain)…")
                     case .compressing:
                         ProgressView()
-                        Text("Compressing")
+                        Text("Compressing…")
                     }
                 }
                 .progressViewStyle(.linear)
@@ -58,14 +55,15 @@ struct BackupSheet: View {
         }
         .padding(20)
         .frame(width: 520)
+        .interactiveDismissDisabled(progress != nil)
         .task { fonts = await model.backupInventory() }
     }
 
     private var fontsDetail: String {
-        guard let fonts else { return "Counting" }
+        guard let fonts else { return "Counting…" }
         if fonts.isEmpty { return "There are no font files in your library." }
         let size = fonts.reduce(Int64(0)) { $0 + $1.size }
-        return "\(fonts.count == 1 ? "1 file" : "\(fonts.count.formatted()) files"), \(size.formatted(.byteCount(style: .file)))"
+        return "\(fonts.count == 1 ? "1 file" : "\(fonts.count.plain) files"), \(size.formatted(.byteCount(style: .file)))"
     }
 
     private func backUp() {
@@ -78,20 +76,32 @@ struct BackupSheet: View {
         guard panel.runModal() == .OK, let destination = panel.url else { return }
         let fonts = fonts ?? []
         let include = includeFonts && !fonts.isEmpty
+        let run = UUID()
+        runID = run
         progress = include ? .copying(done: 0, total: fonts.count) : .compressing
         task = Task {
+            defer { task = nil }
             do {
                 try await model.backUp(to: destination, fonts: fonts, includeFonts: include) { step in
-                    Task { @MainActor in progress = step }
+                    Task { @MainActor in
+                        if runID == run, task != nil { progress = step }
+                    }
+                }
+                guard !Task.isCancelled else {
+                    dismiss()
+                    return
                 }
                 NSWorkspace.shared.activateFileViewerSelecting([destination])
-                model.showToast(include ? "Backed up your library and \(fonts.count == 1 ? "1 font file" : "\(fonts.count.formatted()) font files")" : "Backed up your library")
+                model.showToast(include ? "Backed up your library and \(fonts.count == 1 ? "1 font file" : "\(fonts.count.plain) font files")" : "Backed up your library")
                 dismiss()
             } catch is CancellationError {
                 dismiss()
             } catch let refusal as KeptItemError {
                 progress = nil
                 model.showToast(refusal.message)
+            } catch let failure as LibraryBackup.Failure {
+                progress = nil
+                model.showToast(failure.message)
             } catch {
                 progress = nil
                 model.showToast("Couldn’t write the backup")

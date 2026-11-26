@@ -1,14 +1,17 @@
 import CiceroCore
 import SwiftUI
 
-/// "213 languages, including English, German, …" with every language in a popover.
 struct LanguagesRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
-    @State private var loaded: Loaded<FaceCoverage>?
+    @State private var loaded: Loaded<Prepared>?
     @State private var showsAll = false
 
-    /// The user's languages lead; then by number of speakers.
+    private struct Prepared {
+        let coverage: FaceCoverage
+        let languages: [Language]
+    }
+
     private static let preferred: [String] = Locale.preferredLanguages.compactMap {
         Locale(identifier: $0).language.languageCode?.identifier(.alpha3)
     }
@@ -16,8 +19,8 @@ struct LanguagesRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Languages").font(.caption).foregroundStyle(.secondary)
-            if let coverage = loaded?.value {
-                let languages = ranked(coverage.supportedLanguages.compactMap(model.languages.language))
+            if let prepared = loaded?.value {
+                let languages = prepared.languages
                 if languages.isEmpty {
                     Text("None").font(.callout)
                 } else {
@@ -26,16 +29,24 @@ struct LanguagesRow: View {
                         .controlSize(.small)
                         .padding(.top, 2)
                         .popover(isPresented: $showsAll, arrowEdge: .leading) {
-                            LanguageList(languages: languages, coverage: coverage)
+                            LanguageList(languages: languages, coverage: prepared.coverage)
                         }
                 }
             } else {
-                ProgressView().controlSize(.small)
+                SamplePlaceholder(size: 13).frame(width: 180)
             }
         }
-        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id) }) { [face] in
-            await model.coverage.coverage(computing: face)
+        .loading($loaded, for: FileFace(face), cached: { [face] in
+            model.coverage.coverage(of: face.id).map(prepare)
+        }) { [face] in
+            async let coverage = model.coverage.coverage(computing: face)
+            await model.languages.load()
+            return prepare(await coverage)
         }
+    }
+
+    private func prepare(_ coverage: FaceCoverage) -> Prepared {
+        Prepared(coverage: coverage, languages: ranked(coverage.supportedLanguages.compactMap(model.languages.language)))
     }
 
     private func ranked(_ languages: [Language]) -> [Language] {
@@ -50,25 +61,36 @@ struct LanguagesRow: View {
 
     private func summary(_ languages: [Language]) -> String {
         let sample = languages.prefix(5).map(\.name).listed()
-        return languages.count <= 5 ? sample : "\(languages.count) languages, including \(sample)"
+        return languages.count <= 5 ? sample : "\(languages.count.plain) languages, including \(sample)"
     }
 }
 
 private struct LanguageList: View {
+    @Environment(AppModel.self) private var model
     let languages: [Language]
     let coverage: FaceCoverage
     @State private var query = ""
+    @State private var showsMissing: String?
+    @State private var cache = SearchCache()
+
+    private struct Results {
+        var scripts: [(name: String, languages: [Language])]
+        var unsupported: [(language: Language, missingCount: Int)]
+    }
+
+    private final class SearchCache {
+        var query: String?
+        var results: Results?
+        var missingCounts: [String: Int] = [:]
+        var unsupportedBySpeakers: [Language]?
+    }
 
     var body: some View {
-        let shown = query.isEmpty ? languages : languages.filter {
-            $0.name.localizedCaseInsensitiveContains(query) || ($0.autonym?.localizedCaseInsensitiveContains(query) ?? false)
-                || $0.scripts.contains { $0.localizedCaseInsensitiveContains(query) }
-        }
-        let scripts = Dictionary(grouping: shown) { $0.scripts.first ?? "Other" }
+        let results = searchResults()
         List {
-            ForEach(scripts.keys.sorted { (scripts[$0]?.count ?? 0) > (scripts[$1]?.count ?? 0) }, id: \.self) { script in
-                Section("\(script) (\(scripts[script]?.count ?? 0))") {
-                    ForEach(scripts[script] ?? []) { language in
+            ForEach(results.scripts, id: \.name) { script in
+                Section("\(script.name) (\(script.languages.count.plain))") {
+                    ForEach(script.languages) { language in
                         HStack {
                             Text(language.name)
                             if let autonym = language.autonym, autonym != language.name {
@@ -76,66 +98,169 @@ private struct LanguageList: View {
                             }
                             Spacer()
                             if coverage.support(for: language.id) == .full {
-                                Image(systemName: "checkmark").foregroundStyle(.secondary).help("Fully supported, including less common characters")
+                                Image(systemName: "checkmark").foregroundStyle(.green)
+                                    .accessibilityLabel("Fully supported")
+                                    .help("Fully supported, including less common characters")
+                            } else {
+                                Image(systemName: "checkmark").foregroundStyle(.secondary)
+                                    .accessibilityLabel("Partially supported")
+                                    .help("Supported, without some less common characters")
                             }
                         }
                     }
                 }
             }
+            if !results.unsupported.isEmpty {
+                Section("Not Supported (\(results.unsupported.count.plain))") {
+                    ForEach(results.unsupported, id: \.language.id) { entry in
+                        unsupportedRow(entry.language, missingCount: entry.missingCount)
+                    }
+                }
+            }
         }
         .listStyle(.plain)
-        // Floating over the list, whose rows scroll up under it, so the list reaches the popover's edges as the
-        // other rows' lists do.
+        .popoverListInsets(top: 0, bottom: 10)
         .topBar {
             TextField("Search", text: $query, prompt: Text("Search languages"))
                 .textFieldStyle(.roundedBorder)
+                .noAutoFill()
                 .padding([.horizontal, .top], 10)
                 .padding(.bottom, 6)
         }
         .frame(width: 320, height: 420)
     }
+
+    private func searchResults() -> Results {
+        if cache.query == query, let results = cache.results { return results }
+        let shown = query.isEmpty ? languages : languages.filter(matches)
+        let grouped = Dictionary(grouping: shown) { $0.scripts.first ?? "Other" }
+        let scripts = grouped.keys.sorted { (grouped[$0]?.count ?? 0) > (grouped[$1]?.count ?? 0) }.map {
+            (name: $0, languages: grouped[$0] ?? [])
+        }
+        let unsupported: [(language: Language, missingCount: Int)]
+        if query.isEmpty {
+            unsupported = []
+        } else {
+            let candidates = cache.unsupportedBySpeakers ?? {
+                let list = model.languages.languages.filter { coverage.support(for: $0.id) == nil }.sorted { $0.speakers > $1.speakers }
+                cache.unsupportedBySpeakers = list
+                return list
+            }()
+            unsupported = candidates.filter(matches).map { language in
+                let missing = cache.missingCounts[language.id] ?? {
+                    let count = model.languages.missingCount(language.id, in: coverage.scalars)
+                    cache.missingCounts[language.id] = count
+                    return count
+                }()
+                return (language, missing)
+            }
+        }
+        let results = Results(scripts: scripts, unsupported: unsupported)
+        cache.query = query
+        cache.results = results
+        return results
+    }
+
+    private func matches(_ language: Language) -> Bool {
+        language.name.localizedCaseInsensitiveContains(query) || (language.autonym?.localizedCaseInsensitiveContains(query) ?? false)
+            || language.scripts.contains { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    private func unsupportedRow(_ language: Language, missingCount: Int) -> some View {
+        let shows = Binding(get: { showsMissing == language.id }, set: { if !$0 { showsMissing = nil } })
+        return HStack {
+            Text(language.name)
+            if let autonym = language.autonym, autonym != language.name {
+                Text(autonym).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text("\(missingCount.plain) missing").foregroundStyle(.secondary)
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+        }
+        .contentShape(.rect)
+        .onTapGesture { showsMissing = language.id }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { showsMissing = language.id }
+        .help("Show the characters the font needs for \(language.name)")
+        .popover(isPresented: shows, arrowEdge: .trailing) {
+            MissingCharacterList(missing: model.languages.missing(language.id, in: coverage.scalars))
+        }
+    }
 }
 
-/// The largest set of each series the face has, and how far it is from the next Latin size, with the characters it
-/// still needs for that in a popover.
 struct CharacterSetsRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
-    @State private var loaded: Loaded<ScalarRanges>?
-    @State private var showsMissing = false
+    @State private var loaded: Loaded<Prepared>?
+    @State private var showsMissing: CharacterSetDefinition?
+
+    private struct Key: Hashable {
+        let face: FileFace
+        let customSets: [CharacterSetDefinition]
+    }
+
+    private struct Prepared {
+        let ranges: ScalarRanges
+        let supported: [CharacterSetDefinition]
+        let nextLatin: (name: String, missing: Int)?
+        let incomplete: [(name: String, sets: [(set: CharacterSetDefinition, missing: Int)])]
+    }
 
     var body: some View {
+        let key = Key(face: FileFace(face), customSets: model.customCharacterSets)
         VStack(alignment: .leading, spacing: 2) {
             Text("Coverage").font(.caption).foregroundStyle(.secondary)
-            if let ranges = loaded?.value {
-                let has = supported(by: ranges)
+            if let prepared = loaded?.value {
+                let has = prepared.supported
                 Text(has.isEmpty ? "None" : has.map(\.name).listed())
                     .font(.callout)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-                if let next = nextLatin(after: has) {
-                    let missing = ranges.missing(sorted: next.scalars)
-                    Text(missing.count == 1 ? "\(next.name) needs 1 more character" : "\(next.name) needs \(missing.count.formatted()) more characters")
+                if let next = prepared.nextLatin {
+                    Text(next.missing == 1 ? "\(next.name) needs 1 more character" : "\(next.name) needs \(next.missing.plain) more characters")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Button("Show Missing") { showsMissing = true }
-                        .controlSize(.small)
-                        .padding(.top, 2)
-                        .popover(isPresented: $showsMissing, arrowEdge: .leading) {
-                            MissingCharacterList(missing: missing)
+                }
+                if !prepared.incomplete.isEmpty {
+                    Menu {
+                        ForEach(prepared.incomplete, id: \.name) { group in
+                            Section(group.name) {
+                                ForEach(group.sets, id: \.set.id) { entry in
+                                    Button("\(entry.set.name) (\(entry.missing.plain) missing)") { showsMissing = entry.set }
+                                }
+                            }
                         }
+                    } label: {
+                        // One text, as a menu's label puts an image of its own first.
+                        Text("Show Missing \(Image(systemName: "chevron.down"))")
+                            .accessibilityLabel("Show Missing")
+                    }
+                    .menuStyle(.button)
+                    .menuIndicator(.hidden)
+                    .controlSize(.small)
+                    .fixedSize()
+                    .padding(.top, 2)
+                    .popover(item: $showsMissing, arrowEdge: .leading) { set in
+                        MissingCharacterList(missing: prepared.ranges.missing(sorted: set.scalars))
+                    }
                 }
             } else {
-                ProgressView().controlSize(.small)
+                SamplePlaceholder(size: 13).frame(width: 180)
             }
         }
-        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id)?.scalars }) { [face] in
-            await model.coverage.coverage(computing: face).scalars
+        .loading($loaded, for: key, cached: { [face] in
+            model.coverage.coverage(of: face.id).map { prepare($0.scalars) }
+        }) { [face] in
+            prepare(await model.coverage.coverage(computing: face).scalars)
         }
     }
 
-    /// The largest set of each series (Google's grouped by script); sets in none, like GF Latin African and
-    /// custom sets, each count on their own.
+    private func prepare(_ ranges: ScalarRanges) -> Prepared {
+        let has = supported(by: ranges)
+        let next = nextLatin(after: has).map { (name: $0.name, missing: ranges.missingCount(sorted: $0.scalars)) }
+        return Prepared(ranges: ranges, supported: has, nextLatin: next, incomplete: incompleteSets(in: ranges))
+    }
+
     private func supported(by ranges: ScalarRanges) -> [CharacterSetDefinition] {
         var best: [String: CharacterSetDefinition] = [:]
         var order: [String] = []
@@ -150,7 +275,18 @@ struct CharacterSetsRow: View {
 
     static let unicodeGroupID = "unicode"
 
-    /// The Latin size after the largest the face has; Latin S for one without any.
+    private func incompleteSets(in ranges: ScalarRanges) -> [(name: String, sets: [(set: CharacterSetDefinition, missing: Int)])] {
+        let groups = model.characterSetCatalog.groups.filter { $0.id != Self.unicodeGroupID }.map { ($0.name, $0.sets) }
+            + [("Your Coverage Sets", model.customCharacterSets)]
+        return groups.compactMap { name, sets in
+            let incomplete = sets.compactMap { set in
+                let missing = ranges.missingCount(sorted: set.scalars)
+                return missing > 0 ? (set: set, missing: missing) : nil
+            }
+            return incomplete.isEmpty ? nil : (name: name, sets: incomplete)
+        }
+    }
+
     private func nextLatin(after has: [CharacterSetDefinition]) -> CharacterSetDefinition? {
         guard let series = model.characterSetCatalog.groups.first(where: { $0.id == CharacterSetCatalog.latinSeriesID })?.sets else { return nil }
         let level = has.first { $0.groupID == CharacterSetCatalog.latinSeriesID }?.level ?? -1
@@ -158,8 +294,6 @@ struct CharacterSetsRow: View {
     }
 }
 
-/// The characters a face still needs for a set, each with its Unicode name and code, and a button that copies them,
-/// to paste into a font editor. They're drawn in the system font, as the face has none of them.
 private struct MissingCharacterList: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -168,11 +302,10 @@ private struct MissingCharacterList: View {
     var body: some View {
         List(missing, id: \.self) { scalar in
             HStack(spacing: 8) {
-                // At the row's leading edge, as far in as the codes are from the trailing one.
                 Text(Self.drawn(scalar))
                     .font(.system(size: 18))
                     .frame(width: 30, alignment: .leading)
-                Text(GlyphSection.name(of: scalar)?.capitalized ?? "Unnamed")
+                Text(GlyphSection.shownName(of: scalar) ?? "Unnamed")
                     .textSelection(.enabled)
                 Spacer()
                 Text(CharacterCodes.unicode(scalar))
@@ -182,43 +315,31 @@ private struct MissingCharacterList: View {
             }
         }
         .listStyle(.plain)
-        // The last row above the button, clear of the fade.
-        .popoverListInsets(top: 4, bottom: 14)
-        // Floating over the list, whose last rows scroll up from under it, frosted under it as they are under the
-        // toolbar: still there, blurred, by the scroll edge effect of a bar starting at the button.
+        .popoverListInsets(top: 2, bottom: 14)
         .bottomBar {
-            // The default button's look, but StillPushButtonStyle's on the list's background: the default one's fill
-            // is see-through, and the rows showed through its label.
-            Button("Copy Characters", systemImage: "doc.on.doc", action: copy)
+            // StillPushButtonStyle on the list's background, as the default button's fill is see-through and the rows showed through its label.
+            Button(missing.count == 1 ? "Copy Character" : "Copy Characters", systemImage: "doc.on.doc", action: copy)
                 .buttonStyle(StillPushButtonStyle())
                 .background(Self.background, in: .rect(cornerRadius: 6))
-                .help("Copies the \(missing.count == 1 ? "character" : "\(missing.count.formatted()) characters"), with a space between each")
+                .help(missing.count == 1 ? "Copy the missing character" : "Copy the \(missing.count.plain) missing characters, separated by spaces")
                 .padding(.bottom, Self.barBottom)
                 .frame(maxWidth: .infinity)
-                // The blur starts at a line, the button's top edge: the rows fade on their way to it, so they don't blur
-                // there from crisp, and less again under it, where they show through blurred.
                 .background {
                     LinearGradient(gradient: Self.fade, startPoint: .top, endPoint: .bottom)
                         .padding(.top, -Self.fadeAbove)
                         .allowsHitTesting(false)
                 }
         }
-        // As tall as the list, up to the height of the other rows' popovers.
-        .frame(width: 340, height: min(420, CGFloat(missing.count) * 30 + 4 + 14 + Self.buttonHeight + Self.barBottom))
+        .frame(width: 340, height: min(420, CGFloat(missing.count) * 30 + 2 + 14 + Self.buttonHeight + Self.barBottom))
     }
 
-    /// A plain list's.
     private static let background = Color(nsColor: .controlBackgroundColor)
-    /// StillPushButtonStyle's.
     private static let buttonHeight: CGFloat = 26
     private static let barBottom: CGFloat = 12
-    /// How far above the button the rows begin to fade, and how far down it they're back to what shows through.
     private static let fadeAbove: CGFloat = 15
     private static let fadeIntoButton: CGFloat = 10
-    /// The fade's strongest, where the blur starts, and what's left of it under the button.
     private static let fadeAtEdge = 0.5
     private static let fadeUnder = 0.15
-    /// Into the list's background, eased so it has no edge: up to the button's top, then back down.
     private static let fade: Gradient = {
         let height = fadeAbove + buttonHeight + barBottom
         let edge = fadeAbove / height
@@ -235,7 +356,6 @@ private struct MissingCharacterList: View {
         return Gradient(stops: up + down + [Gradient.Stop(color: background.opacity(fadeUnder), location: 1)])
     }()
 
-    /// The character; a mark on a dotted circle, as it has nothing to sit on.
     private static func drawn(_ scalar: UInt32) -> String {
         let text = GlyphsSection.text(scalar)
         switch Unicode.Scalar(scalar)?.properties.generalCategory {
@@ -244,78 +364,95 @@ private struct MissingCharacterList: View {
         }
     }
 
-    /// With spaces between them, so a mark doesn't stack on the letter before it.
     private func copy() {
+        // Spaced, so a combining mark doesn't stack on the letter before it.
         GlyphsSection.copy(missing.map(GlyphsSection.text).joined(separator: " "))
         dismiss()
-        model.showToast(missing.count == 1 ? "1 character copied to clipboard" : "\(missing.count.formatted()) characters copied to clipboard")
+        model.showToast(missing.count == 1 ? "1 character copied to clipboard" : "\(missing.count.plain) characters copied to clipboard")
     }
 }
 
-/// Which Unicode blocks the face covers completely, with every block's coverage in a popover.
 struct UnicodeBlocksRow: View {
     @Environment(AppModel.self) private var model
     let face: FontFace
-    @State private var loaded: Loaded<[(block: CharacterSetDefinition, has: Int)]>?
+    @State private var loaded: Loaded<(ranges: ScalarRanges, blocks: [BlockCoverage])>?
     @State private var showsAll = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Unicode Blocks").font(.caption).foregroundStyle(.secondary)
-            if let coverage = loaded?.value {
-                let complete = coverage.filter { $0.has == $0.block.scalars.count }.map(\.block.name)
-                let partial = coverage.count { $0.has > 0 && $0.has < $0.block.scalars.count }
+            if let (ranges, coverage) = loaded?.value {
+                let complete = coverage.filter(\.isComplete).map(\.block.name)
+                let partial = coverage.count { $0.has > 0 && !$0.isComplete }
                 Text(complete.isEmpty ? "None complete" : "Complete: " + complete.listed())
                     .font(.callout)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 if partial > 0 {
-                    Text(partial == 1 ? "1 more block partly covered" : "\(partial) more blocks partly covered")
+                    let word = partial == 1 ? "block" : "blocks"
+                    Text(complete.isEmpty ? "\(partial.plain) \(word) partly covered" : "\(partial.plain) more \(word) partly covered")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Button("Show All") { showsAll = true }
                     .controlSize(.small)
                     .padding(.top, 2)
-                    .popover(isPresented: $showsAll, arrowEdge: .leading) { list(coverage) }
+                    .popover(isPresented: $showsAll, arrowEdge: .leading) { BlockList(ranges: ranges, coverage: coverage) }
             } else {
-                ProgressView().controlSize(.small)
+                SamplePlaceholder(size: 13).frame(width: 180)
             }
         }
-        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id).map { blocks(covered: $0.scalars) } }) { [face] in
+        .loading($loaded, for: FileFace(face), cached: { [face] in model.coverage.coverage(of: face.id).map { ($0.scalars, blocks(covered: $0.scalars)) } }) { [face] in
             let ranges = await model.coverage.coverage(computing: face).scalars
-            return blocks(covered: ranges)
+            return (ranges, blocks(covered: ranges))
         }
     }
 
-    /// Every block, with how many of its characters `ranges` has.
-    private func blocks(covered ranges: ScalarRanges) -> [(block: CharacterSetDefinition, has: Int)] {
+    private func blocks(covered ranges: ScalarRanges) -> [BlockCoverage] {
         let blocks = model.characterSetCatalog.groups.first { $0.id == CharacterSetsRow.unicodeGroupID }?.sets ?? []
-        return blocks.map { ($0, $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
+        return blocks.map { BlockCoverage(block: $0, has: $0.scalars.count - ranges.missingCount(sorted: $0.scalars)) }
     }
+}
 
-    private func list(_ coverage: [(block: CharacterSetDefinition, has: Int)]) -> some View {
+private struct BlockCoverage {
+    let block: CharacterSetDefinition
+    let has: Int
+    var isComplete: Bool { has == block.scalars.count }
+}
+
+private struct BlockList: View {
+    let ranges: ScalarRanges
+    let coverage: [BlockCoverage]
+    @State private var showsMissing: CharacterSetDefinition?
+
+    var body: some View {
         List(coverage, id: \.block.id) { entry in
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Text(entry.block.name)
-                    Spacer()
-                    Text("\(entry.has) of \(entry.block.scalars.count)").monospacedDigit().foregroundStyle(.secondary)
+            Button { if !entry.isComplete { showsMissing = entry.block } } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(entry.block.name)
+                        Spacer()
+                        Text("\(entry.has.plain) of \(entry.block.scalars.count.plain)").monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    ProgressView(value: Double(entry.has), total: Double(max(entry.block.scalars.count, 1)))
+                        .progressViewStyle(.linear)
+                        .controlSize(.mini)
                 }
-                ProgressView(value: Double(entry.has), total: Double(max(entry.block.scalars.count, 1)))
-                    .progressViewStyle(.linear)
-                    .controlSize(.mini)
+                .contentShape(.rect)
+            }
+            .buttonStyle(StillButtonStyle())
+            .help(entry.isComplete ? "" : "Show the missing characters")
+            .popover(item: Binding(get: { showsMissing?.id == entry.block.id ? showsMissing : nil }, set: { showsMissing = $0 }), arrowEdge: .leading) { block in
+                MissingCharacterList(missing: ranges.missing(sorted: block.scalars))
             }
         }
         .listStyle(.plain)
-        .popoverListInsets()
+        .popoverListInsets(top: 3)
         .frame(width: 320, height: 420)
     }
 }
 
 private extension View {
-    /// Room above a popover list's first row and below its last, clear of the popover's rounded corners: the list's
-    /// own insets, so its background still reaches the edges.
     func popoverListInsets(top: CGFloat = 5, bottom: CGFloat = 5) -> some View {
         safeAreaPadding(.top, top).safeAreaPadding(.bottom, bottom)
     }

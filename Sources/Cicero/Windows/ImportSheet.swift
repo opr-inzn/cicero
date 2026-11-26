@@ -1,11 +1,6 @@
 import CiceroCore
 import SwiftUI
 
-/// What another font manager's library has, to pick what comes over: FontExplorer X's Font Library and other fonts
-/// (copied in), its sets, application sets and smart sets, labels (as tags), classifications, ratings, comments (as
-/// notes), activation history and the fonts that were on; Font Book's collections; or FontBase's fonts (copied in),
-/// collections, tags and the fonts that were on. Then progress while it's brought in, and what came over. A library its
-/// app writes to while it's open waits for the app to quit, and is read again then.
 struct ImportSheet: View {
     @State private var prompt: ImportPrompt
     @Environment(AppModel.self) private var model
@@ -14,18 +9,14 @@ struct ImportSheet: View {
     @State private var stage: ImportStage?
     @State private var task: Task<Void, Never>?
     @State private var summary: ImportSummary?
-    /// The other app is open, so its library can't be imported yet.
     @State private var appIsOpen = false
-    /// Reading the library again, as the app left it on quitting.
     @State private var isRereading = false
-    /// What importing copies, once `findCopies` has looked (see `Copies`); the last look's while it looks again.
+    @State private var rereading: Task<Void, Never>?
     @State private var copies: Copies?
+    @State private var candidates: [(path: String, source: String)] = []
     @State private var isLooking = true
-    /// How long the copying has left, from when Import is pressed.
     @State private var estimate = CopyTimeEstimate(intoFontsFolder: true)
-    /// Cicero's Library was chosen here, instead of the Fonts folder, so it can be undone here.
     @State private var choseFontLibrary = false
-    /// The choices' height, and the header's, to fit the sheet to them.
     @State private var contentHeight: CGFloat?
     @State private var headerHeight: CGFloat = 0
 
@@ -51,22 +42,26 @@ struct ImportSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
                 }
-                // As tall as what's in it, up to the sheet's 640 points, so nothing is left empty below the last line.
-                .frame(height: contentHeight.map { min($0, 640 - headerHeight - 70) })
+                .frame(height: contentHeight.map { min($0, max(0, 640 - headerHeight - 70)) })
                 .disabled(stage != nil)
                 Divider()
                 footer
             }
         }
         .frame(width: 600)
+        .interactiveDismissDisabled(stage != nil)
         .onAppear { appIsOpen = isAppRunning }
-        // Again when the fonts go elsewhere: those in already are looked for where they go.
+        .onDisappear { rereading?.cancel() }
+        .onChange(of: prompt.id) {
+            copies = nil
+            candidates = []
+        }
         .task(id: "\(prompt.id) \(model.data.installsIntoFontLibrary)") { await findCopies() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { note in
-            if isOtherApp(note) { appIsOpen = isAppRunning }
+            if isOtherApp(note), stage == nil, summary == nil { appIsOpen = isAppRunning }
         }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { note in
-            guard isOtherApp(note) else { return }
+            guard isOtherApp(note), stage == nil, summary == nil else { return }
             appIsOpen = isAppRunning
             if !appIsOpen { reread() }
         }
@@ -74,7 +69,6 @@ struct ImportSheet: View {
 
     // MARK: Waiting for the other app
 
-    /// The app whose library this is, when it writes to it while open: FontBase's bundle ID.
     private var waitsForBundleID: String? {
         prompt.waitsForQuit && prompt.source == .fontBase ? FontBaseImport.bundleIdentifier : nil
     }
@@ -91,12 +85,14 @@ struct ImportSheet: View {
 
     private var isWaiting: Bool { appIsOpen || isRereading }
 
-    /// Reads the library as the app left it, keeping what the user chose: what's new is chosen as it would be at first.
     private func reread() {
         isRereading = true
-        Task {
-            defer { isRereading = false }
-            guard let fresh = await model.reread(prompt) else { return }
+        rereading?.cancel()
+        rereading = Task {
+            let fresh = await model.reread(prompt)
+            guard !Task.isCancelled else { return }
+            isRereading = false
+            guard let fresh else { return }
             let before = prompt.library
             let defaults = ImportChoices(for: fresh.library)
             let oldSets = Set(before.sets.map(\.id))
@@ -143,7 +139,6 @@ struct ImportSheet: View {
         .padding(20)
     }
 
-    /// What the other app calls the folder its fonts are in.
     private var fontFolderTitle: String {
         prompt.source == .fontBase ? "FontBase’s folder" : "Font Library"
     }
@@ -152,15 +147,13 @@ struct ImportSheet: View {
     private var sections: some View {
         if library.fontFolder != nil || !library.otherFiles.isEmpty {
             section("Fonts") {
-                Text(toCopy.isEmpty ? "They’re in your library already. \(appName)’s own files stay where they are."
-                    : "They’re copied into \(model.installPlace), \(copiedState). \(appName)’s own files stay where they are.")
+                Text(copies != nil && toCopy.isEmpty ? "They’re in your library already. \(appName)’s own files stay where they are."
+                    : "They’re copied into \(model.installPlace). \(appName)’s own files stay where they are.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 2)
-                // Counting the files again for every step of the progress would hold up the window. Not before the first
-                // look has found which are in already: offered for thousands of fonts in already, it would go again.
                 if stage == nil, copies != nil, case let count = copyingCount,
                    FontLibraryOffer.isShown(count: count, chose: choseFontLibrary, installsIntoFontLibrary: model.data.installsIntoFontLibrary) {
                     FontLibraryOffer(count: count, chose: $choseFontLibrary)
@@ -226,13 +219,11 @@ struct ImportSheet: View {
                              isOn: $choices.history)
                 }
                 if !library.active.isEmpty {
-                    checkbox("Activate the fonts that were active", detail: activateDetail, isOn: $choices.activate)
+                    checkbox("Activate previously active fonts", detail: activateDetail, isOn: $choices.activate)
                 }
-                // While the app is open its copies are its own: it deletes them as it quits, unless it's set not to. So
-                // they're only offered once the library has been read again after it quit.
                 if !library.leftoverCopies.isEmpty, !isWaiting {
-                    checkbox("Remove \(appName)’s copies", detail: "\(count(library.leftoverCopies.count, "copy", "copies")) it left in "
-                        + "\(commonFolder(library.leftoverCopies)), to the Trash, so those fonts aren’t on twice.",
+                    checkbox("Remove \(appName)’s copies", detail: "Moves \(count(library.leftoverCopies.count, "copy", "copies")) left in "
+                        + "\(commonFolder(library.leftoverCopies)) to the Trash so those fonts aren’t active twice.",
                              isOn: $choices.removeCopies)
                 }
             }
@@ -257,13 +248,13 @@ struct ImportSheet: View {
     private var footer: some View {
         HStack(spacing: 12) {
             if let stage {
-                progress(stage)
+                ImportProgress(stage: stage, starting: "Importing…", estimate: estimate, stacked: false)
             } else if isRereading {
                 ProgressView().controlSize(.small)
-                Text("Reading \(appName)’s library").font(.callout).foregroundStyle(.secondary)
-            } else if isLooking, !candidates.isEmpty {
+                Text("Reading \(appName)’s library…").font(.callout).foregroundStyle(.secondary)
+            } else if isLooking, library.fontFolder != nil || !library.otherFiles.isEmpty {
                 ProgressView().controlSize(.small)
-                Text("Looking for fonts in your library already").font(.callout).foregroundStyle(.secondary)
+                Text("Checking for fonts already in your library…").font(.callout).foregroundStyle(.secondary)
             } else {
                 Text("Your current setup is saved first, in ~/Library/Application Support/Cicero/Backups.")
                     .font(.callout)
@@ -271,43 +262,16 @@ struct ImportSheet: View {
                     .lineLimit(2)
             }
             Spacer()
-            // While fonts are copied, the task closes the sheet once it has stopped: closing it discards the unzipped
-            // backup, which a copy may still be reading. Once they're copied, the rest goes through.
+            // While fonts are copied, the task closes the sheet once it has stopped: closing it discards the unzipped backup, which a copy may still be reading.
             Button("Cancel", role: .cancel) {
-                if let task { task.cancel() } else { dismiss() }
+                if let task { stage = .stopping; task.cancel() } else { dismiss() }
             }
-            .disabled(stage != nil && !isCopying)
+            .disabled(stage.map { !$0.canStop } ?? false)
             Button("Import") { start() }
                 .keyboardShortcut(.defaultAction)
-                .disabled(stage != nil || !hasChoice || isWaiting)
+                .disabled(stage != nil || !hasChoice || isWaiting || (isLooking && (library.fontFolder != nil || !library.otherFiles.isEmpty)))
         }
         .padding(16)
-    }
-
-    @ViewBuilder
-    private func progress(_ stage: ImportStage) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            switch stage {
-            case .copying(let done, let total):
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                CopyingProgressLine(done: done, total: total, estimate: estimate)
-            case .reading(let done, let total):
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Reading fonts, \(done.formatted()) of \(total.formatted())")
-            case .starting:
-                ProgressView()
-                Text("Importing")
-            }
-        }
-        .progressViewStyle(.linear)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-        .frame(maxWidth: 400, alignment: .leading)
-    }
-
-    private var isCopying: Bool {
-        if case .copying = stage { true } else { false }
     }
 
     private func start() {
@@ -319,6 +283,7 @@ struct ImportSheet: View {
                 let now = ProcessInfo.processInfo.systemUptime
                 Task { @MainActor in
                     guard self.summary == nil else { return }
+                    guard self.stage != .stopping else { return }
                     if case .copying(let done, _) = stage { self.estimate.note(done: done, at: now) }
                     self.stage = stage
                 }
@@ -377,7 +342,6 @@ struct ImportSheet: View {
         )
     }
 
-    /// Whether anything is ticked that the library has.
     private var hasChoice: Bool {
         (choices.fontFolder && library.fontFolder != nil) || (choices.otherFiles && !library.otherFiles.isEmpty)
             || !choices.sets.isEmpty || !choices.smartSets.isEmpty
@@ -386,21 +350,12 @@ struct ImportSheet: View {
             || (choices.history && !library.history.isEmpty) || (choices.activate && !library.active.isEmpty)
     }
 
-    /// How the copies come in: inactive, unless the ones that were active are turned on again.
-    private var copiedState: String {
-        !library.active.isEmpty && choices.activate ? "inactive except the ones that were active" : "inactive"
-    }
-
-    /// Whether Office can use them, and why to quit the other app first.
     private var activateDetail: String {
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
-        // FontBase's own library can't be imported until it has quit.
-        let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first, so they aren’t on twice."
-        return "\(count(library.active.count, "style")), \(toCopy.isEmpty ? "activated" : "activated once they’re copied")." + office + quit
+        let quit = prompt.waitsForQuit ? "" : " Quit \(appName) first so they aren’t active twice."
+        return "\(count(library.active.count, "style")), \(copies != nil && toCopy.isEmpty ? "activated" : "activated once they’re copied")." + office + quit
     }
 
-    /// How many font files the import copies in, as the boxes are ticked: as `ActivationEngine.copyPlan` will count them for
-    /// the progress and the summary. Of the same files, one is copied, also where the box of the one the look took is off.
     private var copyingCount: Int {
         let all = Set(candidates.map(\.path))
         var picked = Set<String>()
@@ -419,45 +374,40 @@ struct ImportSheet: View {
             + "unless you’ve chosen one for it." + yours
     }
 
-    /// The folder the files are in, "~/Library/Fonts/FontBase", or the first one's.
     private func commonFolder(_ paths: [String]) -> String {
         let folders = paths.map { ($0 as NSString).deletingLastPathComponent }
         return ((folders.first ?? "") as NSString).abbreviatingWithTildeInPath
     }
 
-    /// The files importing copies in, as `performImport` will: those Cicero reads already, in a Fonts folder, a location
-    /// (like a Font Library an earlier import added) or Added Fonts, stay as they are, and so do those already copied in
-    /// and those the same as another one (see `Copies`). All of them until the first look.
     private var toCopy: Set<String> {
         let copies = self.copies ?? Copies()
         return Set(candidates.map(\.path)).subtracting(copies.inAlready).subtracting(copies.sameAs.keys)
     }
 
-    /// The files importing would copy in but for those already copied in.
-    private var candidates: [(path: String, source: String)] {
-        var data = model.data
-        var all = choices
-        all.fontFolder = true
-        all.otherFiles = true
-        return LibraryImport.fontFiles(library, choices: all, data: &data, locations: model.locations)
-    }
-
-    /// Of the files importing would copy in, by the other app's paths: those whose copies are where importing would put
-    /// them already, as an earlier import or the offer to copy an earlier import's location in left them, and those the
-    /// same as one before them, whose copy stands for them (see `ActivationEngine.copyPlan`).
     private struct Copies {
         var inAlready: Set<String> = []
         var sameAs: [String: String] = [:]
     }
 
-    /// Looks for the files in already and the same files, reading them off the main thread.
     private func findCopies() async {
         isLooking = true
         let engine = model.importEngine
-        let files = candidates
-        let work = Task.detached(priority: .userInitiated) { engine.copyPlan(files.map(\.source)) }
-        let plan = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+        let library = library
+        let baseData = model.data
+        let locations = model.locations
+        var all = choices
+        all.fontFolder = true
+        all.otherFiles = true
+        let work = Task.detached(priority: .userInitiated) {
+            var data = baseData
+            let files = LibraryImport.fontFiles(library, choices: all, data: &data, locations: locations)
+            let plan = engine.copyPlan(files.map(\.source))
+            return (files: files, plan: plan)
+        }
+        let result = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
         guard !Task.isCancelled else { return }
+        let files = result.files, plan = result.plan
+        candidates = files
         let paths = Dictionary(files.map { ($0.source, $0.path) }, uniquingKeysWith: { first, _ in first })
         copies = Copies(inAlready: Set(files.filter { plan.inAlready[$0.source] != nil }.map(\.path)),
                         sameAs: Dictionary(files.compactMap { file in plan.sameAs[file.source].flatMap { paths[$0] }.map { (file.path, $0) } },
@@ -465,14 +415,13 @@ struct ImportSheet: View {
         isLooking = false
     }
 
-    /// Of `total` files, `copying` copied in and `same` the same as others: ", 3 in your library already", ", in your library
-    /// already" for all of them, ", 2 duplicates".
     private func alreadyNote(total: Int, copying: Int, same: Int) -> String {
+        guard copies != nil else { return "" }
         let inAlready = total - copying - same
         if copying + same == 0, total > 0 { return ", in your library already" }
         var parts: [String] = []
-        if inAlready > 0 { parts.append("\(inAlready.formatted()) in your library already") }
-        if same > 0 { parts.append(same == 1 ? "1 duplicate" : "\(same.formatted()) duplicates") }
+        if inAlready > 0 { parts.append("\(inAlready.plain) in your library already") }
+        if same > 0 { parts.append(same == 1 ? "1 duplicate" : "\(same.plain) duplicates") }
         return parts.isEmpty ? "" : ", " + parts.listed()
     }
 
@@ -486,19 +435,16 @@ struct ImportSheet: View {
         return "\(place) (\(count(library.fontFolderCount, "font file"))\(alreadyNote(total: library.fontFolderCount, copying: copying, same: same)))"
     }
 
-    /// The folders the other files are in, those with the most first, then how many there are: "~/Desktop/Client and
-    /// ~/Documents/Fonts (3 font files)", "~/Desktop/Client, ~/Documents/Fonts and 4 other folders (40 font files)".
     private var otherFilesDetail: String {
         let folders = Dictionary(grouping: library.otherFiles) { ($0 as NSString).deletingLastPathComponent }
             .sorted { $0.value.count != $1.value.count ? $0.value.count > $1.value.count : $0.key < $1.key }
             .map { ($0.key as NSString).abbreviatingWithTildeInPath }
-        let named = folders.count > 3 ? folders.prefix(2) + ["\(folders.count - 2) other folders"] : folders
+        let named = folders.count > 3 ? folders.prefix(2) + ["\((folders.count - 2).plain) other folders"] : folders
         let copying = library.otherFiles.count(where: toCopy.contains)
         let same = library.otherFiles.count { copies?.sameAs[$0] != nil }
         return "\(named.listed()) (\(count(library.otherFiles.count, "font file"))\(alreadyNote(total: library.otherFiles.count, copying: copying, same: same)))"
     }
 
-    /// "12 styles", "4 families and 2 styles", "For TextEdit · 3 styles", "Empty".
     private func detail(_ set: ImportedSet) -> String {
         var parts: [String] = []
         if !set.families.isEmpty { parts.append(count(set.families.count, "family", "families")) }
@@ -513,12 +459,12 @@ struct ImportSheet: View {
         switch smart.rules.count {
         case 0: "No rules"
         case 1: "1 rule"
-        default: "\(smart.rules.count) rules, \(smart.matchAll ? "all" : "any") of them"
+        default: "\(smart.rules.count.plain) rules, \(smart.matchAll ? "all" : "any") of them"
         }
     }
 
     private func count(_ number: Int, _ singular: String, _ plural: String? = nil) -> String {
-        number == 1 ? "1 \(singular)" : "\(number.formatted()) \(plural ?? singular + "s")"
+        number == 1 ? "1 \(singular)" : "\(number.plain) \(plural ?? singular + "s")"
     }
 
     // MARK: Done
@@ -547,7 +493,6 @@ struct ImportSheet: View {
 
     private func resultLines(_ summary: ImportSummary) -> [String] {
         var lines: [String] = []
-        // In the other app's words, as the sheet listed them: "12 collections as folders".
         let sets = prompt.source == .fontExplorer ? "set" : "collection"
         let labels = prompt.source == .fontExplorer
         let kinds: [(Int, String, String)] = [
@@ -563,9 +508,12 @@ struct ImportSheet: View {
             lines.append("\(count(summary.notCopied, "font file")) couldn’t be copied. Import again to try \(summary.notCopied == 1 ? "it" : "them") again.")
         }
         if summary.activated > 0 {
-            lines.append("\(count(summary.activated, "style")) activated, as they were in \(appName).")
+            let one = summary.activated == 1
+            lines.append("\(count(summary.activated, "style")) activated, as \(one ? "it was" : "they were") in \(appName).")
             if prompt.source == .fontBase {
-                lines.append("When FontBase opens, it activates them again, from copies of its own, so they’re on twice. Deactivate them in FontBase to stop that.")
+                lines.append(one
+                    ? "When FontBase opens, it activates it again from its own copy, so it’s active twice. Deactivate it in FontBase to prevent this."
+                    : "When FontBase opens, it activates them again from its own copies, so they’re active twice. Deactivate them in FontBase to prevent this.")
             }
         }
         if summary.removedCopies > 0 {
@@ -574,9 +522,8 @@ struct ImportSheet: View {
         if summary.ratedFamilies > 0 { lines.append("\(count(summary.ratedFamilies, "family", "families")) rated.") }
         if summary.classifiedFamilies > 0 { lines.append("\(count(summary.classifiedFamilies, "family", "families")) classified.") }
         if summary.notedFamilies > 0 {
-            lines.append(summary.notedFamilies == 1 ? "1 family with a note from its comments." : "\(summary.notedFamilies.formatted()) families with notes from their comments.")
+            lines.append(summary.notedFamilies == 1 ? "1 family with a note from its comments." : "\(summary.notedFamilies.plain) families with notes from their comments.")
         }
-        // Before what didn't come over: with nothing new, importing again says so first.
         if lines.isEmpty { lines.append("Nothing new: Cicero has all of it from before.") }
         if summary.notFound > 0 {
             let kinds = switch prompt.source {
@@ -599,7 +546,6 @@ struct ImportSheet: View {
     }
 }
 
-/// A small bullet before each line.
 private struct BulletLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {

@@ -1,52 +1,29 @@
 import Foundation
 import Synchronization
 
-/// Where Cicero keeps and finds things.
 public struct Locations: Sendable {
-    /// ~/Library/Application Support/Cicero
     public var support: URL
-    /// ~/Library/Caches/Cicero
     public var caches: URL
-    /// ~/Library/Fonts
     public var userFonts: URL
-    /// /Library/Fonts
     public var allUsersFonts: URL
-    /// The folders macOS keeps its own fonts in, /System/Library/Fonts. CoreText's lists of fonts leave some of
-    /// them out (Times, Courier, Iowan Old Style, Seravek, many Noto fonts), though every app can use them.
     public var systemFonts: [URL]
-    /// The user's home folder, whose own folders (Downloads, Desktop…) moving fonts never puts in the Trash. By
-    /// default the one `userFonts` is in.
-    public var home: URL
-    /// Where Creative Cloud keeps the Adobe Fonts that Adobe apps turned on for themselves, as for a document
-    /// that uses them: a hidden folder whose fonts only Adobe apps load, under hidden names.
     public var adobeFontsInAdobeApps: URL?
-    /// Creative Cloud's list of the Adobe Fonts it keeps, with each one's page on Adobe Fonts' website (see
-    /// `AdobeFontsPages`).
     public var adobeFontsList: URL?
-    /// ~/Cicero/Library, where Cicero's Font Library is unless the user moves it (see `UserData.fontLibraryPath`).
-    /// By default in the home folder `userFonts` is in, so a test run with another home keeps its own.
     public var defaultFontLibrary: URL
-    /// ~/Cicero/Inactive: fonts Cicero keeps while they're off, those it moved out of an app's own folder, so the app
-    /// stops loading them, and those earlier versions moved out of ~/Library/Fonts, until they go back (see
-    /// `ActivationEngine.emptyInactiveFolder`). In the home folder, where the user sees it, rather than in Application
-    /// Support, which apps that remove an app delete with it. Beside `defaultFontLibrary` by default, so a test run with
-    /// another home keeps its own.
+    // In the home folder, not in Application Support, which apps that remove an app delete with it, fonts and all.
     public var inactiveFolder: URL
 
-    /// ~/Cicero/Font Library, where the Font Library was at first: one still there moves to `defaultFontLibrary` (see
-    /// `ActivationEngine.moveFromFormerPlace`).
     public var formerDefaultFontLibrary: URL {
         defaultFontLibrary.deletingLastPathComponent().appendingPathComponent("Font Library", isDirectory: true)
     }
 
-    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [], home: URL? = nil,
+    public init(support: URL, caches: URL, userFonts: URL, allUsersFonts: URL, systemFonts: [URL] = [],
                 adobeFontsInAdobeApps: URL? = nil, adobeFontsList: URL? = nil, defaultFontLibrary: URL? = nil, inactiveFolder: URL? = nil) {
         self.support = support
         self.caches = caches
         self.userFonts = userFonts
         self.allUsersFonts = allUsersFonts
         self.systemFonts = systemFonts
-        self.home = home ?? userFonts.deletingLastPathComponent().deletingLastPathComponent()
         self.adobeFontsInAdobeApps = adobeFontsInAdobeApps
         self.adobeFontsList = adobeFontsList
         let defaultFontLibrary = defaultFontLibrary
@@ -65,45 +42,31 @@ public struct Locations: Sendable {
             userFonts: home.appendingPathComponent("Library/Fonts", isDirectory: true),
             allUsersFonts: URL(fileURLWithPath: "/Library/Fonts", isDirectory: true),
             systemFonts: [URL(fileURLWithPath: "/System/Library/Fonts", isDirectory: true)],
-            home: realHome,
             adobeFontsInAdobeApps: home.appendingPathComponent("Library/Application Support/Adobe/CoreSync/plugins/livetype/.w", isDirectory: true),
             adobeFontsList: home.appendingPathComponent("Library/Application Support/Adobe/CoreSync/plugins/livetype/.c/entitlements.xml")
         )
     }
 
-    /// The home folder from the user's account, also when a test run gives Cicero another one (CFFIXED_USER_HOME),
-    /// so its Downloads and Desktop stay safe from moving fonts too.
-    private static var realHome: URL? {
-        guard let entry = getpwuid(getuid()), let directory = entry.pointee.pw_dir else { return nil }
-        return URL(fileURLWithPath: String(cString: directory), isDirectory: true)
-    }
-
-    /// Where the Inactive folder was before, newest first, until what's in them moves to `inactiveFolder` (see
-    /// `ActivationEngine.moveFormerInactiveFolders`): in Cicero's support folder up to 0.11.0, and called Deactivated
-    /// there up to 0.10.10.
     public var formerInactiveFolders: [URL] {
         Self.formerInactiveNames.map { support.appendingPathComponent($0, isDirectory: true) }
     }
 
     private static let formerInactiveNames = ["Inactive", "Deactivated"]
 
-    /// The Inactive folder, and each former one while it's there: what's in them is off and listed, and moves out as it
-    /// goes on.
+    public var allInactiveFolders: [URL] {
+        [inactiveFolder] + formerInactiveFolders
+    }
+
     public var inactiveFolders: [URL] {
         [inactiveFolder] + formerInactiveFolders.filter { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    /// In the Inactive folder, or a former one.
     public func isInInactiveFolder(_ path: String) -> Bool {
-        // The former folders' paths without making their URLs: scans ask for every file.
         if path.hasPrefix(inactiveFolder.path + "/") { return true }
         let support = self.support.path + "/"
         return path.hasPrefix(support) && Self.formerInactiveNames.contains { path.hasPrefix(support + $0 + "/") }
     }
 
-    /// The Inactive folder, made if it isn't there, for a file going in. When it can't be made, as when the home folder
-    /// has a file named Cicero, the former one in Cicero's support folder, so turning a font off still works; a later
-    /// launch moves what's there (see `ActivationEngine.moveFormerInactiveFolders`).
     public func inactiveFolderForNewFiles() throws -> URL {
         let fm = FileManager.default
         do {
@@ -117,37 +80,17 @@ public struct Locations: Sendable {
     }
 }
 
-/// An immutable snapshot of every font Cicero knows about, built off the main thread by
-/// `LibraryScanner` with everything views need precomputed.
 public struct Library: Sendable {
-    /// Sorted by name (Finder order).
     public let families: [Family]
-    /// Font files CoreText couldn't read.
     public let unreadableFiles: [String]
-    /// Every file macOS currently has active.
     public let activePaths: Set<String>
-    /// Changes whenever anything visible about the library changes (files, stamps, states, folders).
     public let fingerprint: Int
-    /// Files that changed or went away since the library the scanner built before this one, and those back from out of
-    /// reach, so whatever was read from them can be dropped: what was made for a file while it was away, as the grid drew
-    /// it while it went, stood in for a file that wasn't there.
-    public let changedPaths: Set<String>
-    /// Watched folders that can't be read now, and why. Their fonts are out of the library until they're back.
+    public var changedPaths: Set<String>
     public let unavailableFolders: [UUID: FolderAvailability]
-    /// Font files in watched folders that a cloud service keeps online only, by folder. They're left out of the
-    /// library, as reading one would download it.
     public let onlineOnlyFiles: [UUID: [String]]
-    /// Families whose files are all out of reach for now (online only, in a watched folder that isn't there, or
-    /// on a disk that isn't connected): not in `families`, but not gone either.
     public let offlineFamilies: Set<String>
-    /// Font files the library had that are out of reach for now, in a watched folder that isn't there or on a disk that
-    /// isn't connected; not those online only. Back, they're the files they were, not new ones.
     public let offlinePaths: Set<String>
-    /// Font files added one at a time that are gone for good (see `Reachability.isGone`), for the user's list of them
-    /// to drop. Looked for off the main thread, as a file on a server that stopped answering can take a while.
     public let goneFiles: Set<String>
-    /// Whether any face is on until Cicero quits (Activate Temporarily), worked out once with the snapshot: the sidebar
-    /// asks as it draws, and a pass over every face took about 30 ms at 20,000 families.
     public let hasFacesOnUntilQuit: Bool
 
     public init(families: [Family], unreadableFiles: [String], activePaths: Set<String>, fingerprint: Int, changedPaths: Set<String> = [],
@@ -190,13 +133,9 @@ public struct Library: Sendable {
     private let index: [String: Int]
     private let search: [SearchFields]
 
-    /// What a search looks in for a family, lowercased.
     private struct SearchFields: Sendable {
-        /// Its names and its styles'.
         var names: String
-        /// Its foundry, and its styles' PostScript names, designers and vendor IDs.
         var others: String
-        /// See `Family.searchTerms`.
         var terms: [String]
     }
 
@@ -206,10 +145,6 @@ public struct Library: Sendable {
 
     public func position(of id: String) -> Int? { index[id] }
 
-    /// Whether a family matches a search (see `SearchQuery`) by its name (also the one in the Mac's language it shows),
-    /// its styles' names, its foundry, or a style's PostScript name, designer or vendor ID; by what kind of family its
-    /// fonts say it is (see `Family.searchTerms`); or by the app's `note`, other `texts` and `terms` for it, lowercased,
-    /// like its classification and tags. Keywords are looked for in the note too, as in the names.
     public func matches(_ family: Family, search query: SearchQuery, note: String? = nil, texts: [String] = [], terms: [String] = []) -> Bool {
         guard !query.isEmpty, let position = index[family.id] else { return true }
         let fields = search[position]
@@ -219,17 +154,12 @@ public struct Library: Sendable {
 
 public enum ScanProgress: Sendable, Equatable {
     case finding
-    /// Reading files, new ones for the most part.
     case identifying(done: Int, total: Int)
-    /// Reading files again that the library on screen has already, most of them: changed ones, or every file after an
-    /// update that learns more from each, or after Rebuild Library.
     case updating(done: Int, total: Int)
 }
 
-/// What a scan needs to know besides the disk.
 public struct ScanInput: Equatable, Sendable {
     public var folders: [WatchedFolder]
-    /// Font files added one at a time, listed where they are like a folder's (see `WatchedFolder.addedFilesID`).
     public var files: [String]
     public var records: ActivationRecords
 
@@ -240,79 +170,56 @@ public struct ScanInput: Equatable, Sendable {
     }
 }
 
-/// Finds every font file (CoreText's active fonts, macOS's font folders, ~/Library/Fonts, /Library/Fonts, the
-/// watched folders, the files added one at a time and Cicero's Inactive folder), reads new or changed files,
-/// and builds a `Library`.
-/// Parsed faces and Date Added are cached in `Locations.caches` by path, modification date and size;
-/// the decoded cache stays in memory between scans. Cancellation stops it between phases.
 public final class LibraryScanner: Sendable {
     private let locations: Locations
     private let registrar: any FontRegistrar
     private let cacheURL: URL
     private let libraryURL: URL
     private let state = Mutex(State())
-    /// Writes the caches in the order scans finish.
     private let saving: DispatchQueue
-    /// Whether scans write their caches; false for a reader that scans while Cicero is open, which writes them itself.
     private let saves: Bool
 
     private struct State {
         var files: [String: CachedFile] = [:]
         var loaded = false
         var dirty = false
-        /// Finder-order positions from the last full sort, so scans with no new family skip `localizedStandardCompare`
-        /// (see `sorted`).
         var ranks: [String: Int] = [:]
-        /// The last library built and a hash of what it was built from, so an unchanged rescan returns it as is.
         var last: (inputs: Int, library: Library)?
-        /// The stamps of the files the last library was built from.
         var lastStamps: [String: FaceStamp] = [:]
-        /// Whether a library was built yet (see `Library.changedPaths`).
         var built = false
-        /// The library restored at launch (see `savedLibrary`), which the window shows until a scan builds one.
         var restored: Library?
-        /// The fingerprint of the library last saved for the next launch.
+        var offlineKnown: [String: Set<String>] = [:]
+        var changedSinceTaken = Set<String>()
         var savedFingerprint: Int?
-        /// The library `savedLibrary` read, as saved, until a library is saved: fingerprints differ from one launch to the
-        /// next, so the first scan's library is compared with it instead.
         var onDisk: Library?
-        /// Set by `clearCache`: the next scan reads every file it finds again, but keeps what it knows of the
-        /// ones out of reach.
-        var rereadAll = false
-        /// The files the latest scan found, for a scan told which files changed to start from; and that scan's
-        /// number, so a scan that started earlier but found its files later doesn't replace them.
+        var rereadsAsked = 0
+        var rereadsDone = 0
+        var lastBuiltScan = 0
         var lastFind: Find?
         var lastFindScan = 0
         var scans = 0
     }
 
-    /// What a scan found on disk and from fontd, before reading any file.
     private struct Find {
         var input: ScanInput
         var found: [String: FoundFile]
         var reach: OutOfReach
-        /// Whether fontd gave its list of active files (see `confirmFontsFolders`).
         var listed: Bool
-        /// The walks of the folders FSEvents watches, as this find walked or replayed them, for a scan after a
-        /// fonts-changed notice to replay (see `scan`).
         var walks: [WalkKey: Walk] = [:]
     }
 
-    /// A folder as `enumerate` walked it.
     struct WalkKey: Hashable, Sendable {
         var path: String
         var includingHidden: Bool
         var skipping: [String]
     }
 
-    /// What `enumerate` found in a folder, in the order it found it.
     struct Walk: Sendable {
         var files: [(path: String, stamp: FaceStamp)] = []
         var onlineOnly: [String] = []
     }
 
     #if CICERO_MEASURE
-    /// What the last scan to end looked at, for the app performance runs' checks (`MeasureRun`).
     public static let lastScanDetail = Mutex("")
     #endif
 
@@ -320,8 +227,6 @@ public final class LibraryScanner: Sendable {
         self.init(locations: locations, registrar: CoreTextRegistrar())
     }
 
-    /// `registrar` supplies the system's active font files; tests pass a fake. With `saves` false, scans read the
-    /// caches but never write them.
     public init(locations: Locations, registrar: any FontRegistrar, saves: Bool = true) {
         self.locations = locations
         self.saves = saves
@@ -331,8 +236,6 @@ public final class LibraryScanner: Sendable {
         libraryURL = locations.caches.appendingPathComponent("library.cache", isDirectory: false)
     }
 
-    /// The library the last scan built, as saved after it, for the window to show until this launch's first scan
-    /// is done. Faces turned on until Cicero quit, or for an application set before a logout or restart, are off again.
     public func savedLibrary(records: ActivationRecords) -> Library? {
         Signposts.library.withIntervalSignpost("Restore library") {
             guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
@@ -342,7 +245,6 @@ public final class LibraryScanner: Sendable {
                 guard case .active(.temporary) = state else { return state }
                 if let record = records.temporary[path], record.scope == .whileAppsRun, record.session == session { return state }
                 asSaved = false
-                // What `faceState` says of a file that isn't active.
                 if let app, records.appFolderOrigins[path] == nil { return .appOnly(app) }
                 return .inactive
             }
@@ -354,10 +256,6 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// The library the last scan saved, with each face on or off as macOS has it now, for a reader that doesn't scan,
-    /// like the `cicero` tool; nil when there's none. What macOS lists as active is on, and so is a file in macOS's own
-    /// folders, or in a Fonts folder unless macOS has it off; a file Cicero registered that the list leaves out is asked
-    /// about, as a scan does. `lastSaved` is when the library was saved.
     public func savedLibraryAsNow(records: ActivationRecords) -> (library: Library, lastSaved: Date?)? {
         guard let data = try? Data(contentsOf: libraryURL, options: .mappedIfSafe) else { return nil }
         let saved = (try? FileManager.default.attributesOfItem(atPath: libraryURL.path))?[.modificationDate] as? Date
@@ -382,21 +280,10 @@ public final class LibraryScanner: Sendable {
         return library.map { ($0, saved) }
     }
 
-    /// Writes what was read from files and not saved yet, by a scan still reading too, and waits for the caches being
-    /// written: as Cicero quits, so the next launch reads only the files left.
     public func flush() {
         saving.sync { saveCacheIfNeeded() }
     }
 
-    /// With `changes`, the files FSEvents says changed since the last scan (as `FolderWatcher` reports them),
-    /// only those are looked at again, which takes a few milliseconds instead of a walk through every folder
-    /// and fontd's whole list, which can take seconds on a busy Mac. It scans everything when the input
-    /// changed or a change needs it, such as a file in a folder whose fonts are online only.
-    /// With `keepingWalksExcept` (and no `changes`), as after CoreText's fonts-changed notice, which says only that fonts
-    /// were turned on or off: fontd is asked again, and the folders FSEvents watches aren't walked again but replayed as
-    /// the last scan walked them, which took 1.9 s at 20,000 families; except those holding these files, the ones on a
-    /// server (FSEvents doesn't hear of other Macs' changes), and all of them when the input changed or the last scan
-    /// walked none. macOS's own font folders and the Inactive folders, which nothing watches, are walked again.
     @concurrent
     public func scan(_ input: ScanInput, changes: Set<String>? = nil, keepingWalksExcept kept: Set<String>? = nil,
                      progress: @escaping @Sendable (ScanProgress) -> Void) async throws -> Library {
@@ -412,9 +299,9 @@ public final class LibraryScanner: Sendable {
         }
         #endif
         progress(.finding)
-        let (number, last, rereadAll) = state.withLock { state in
+        let (number, last, rereads, rereadAll) = state.withLock { state in
             state.scans += 1
-            return (state.scans, state.lastFind, state.rereadAll)
+            return (state.scans, state.lastFind, state.rereadsAsked, state.rereadsAsked > state.rereadsDone)
         }
         let finding = signposter.beginInterval("Find")
         let known = loadCache()
@@ -422,10 +309,9 @@ public final class LibraryScanner: Sendable {
         if let changes, !rereadAll, let last, last.input == input, let refound = refind(last, changes: changes) {
             find = refound
         } else {
-            // Asking fontd for the active files takes ~100 ms, as long as walking the folders; do both at once.
             let registrar = registrar
             async let active = Self.activeFontURLs(registrar)
-            let replaying = changes == nil && kept != nil && !rereadAll && last?.input == input ? last?.walks : nil
+            let replaying = changes == nil && kept != nil && !rereadAll && last?.input.folders == input.folders && last?.input.files == input.files ? last?.walks : nil
             var (found, reach, walks, replayed) = enumerateFolders(input, replaying: replaying, except: kept ?? [])
             #if CICERO_MEASURE
             if kept != nil { detail = "fontd, \(replayed) of \(walks.count) folders replayed" }
@@ -435,6 +321,7 @@ public final class LibraryScanner: Sendable {
             for path in found.keys where ActiveSource.isAdobeFonts(path) { found[path]!.folderIDs.append(WatchedFolder.adobeFontsID) }
             try confirmFontsFolders(&found, listed: !activeURLs.isEmpty)
             confirmRegistered(&found, records: input.records)
+            leaveOutWhatWent(input, found: &found, reach: &reach)
             reach.leaveOut(found)
             find = Find(input: input, found: found, reach: reach, listed: !activeURLs.isEmpty, walks: walks)
         }
@@ -443,7 +330,7 @@ public final class LibraryScanner: Sendable {
             state.lastFind = find
             state.lastFindScan = number
         }
-        let (found, reach) = (find.found, find.reach)
+        var (found, reach) = (find.found, find.reach)
         signposter.endInterval("Find", finding)
         try Task.checkCancellation()
 
@@ -460,39 +347,55 @@ public final class LibraryScanner: Sendable {
             parsed = await parse(stale, progress: report)
             signposter.endInterval("Parse", parsing)
         }
-        // What was read is in the cache already (see `parse`), so the scan that replaced this one reads only the rest:
-        // one of everything, after an update that reads every file again, would otherwise never finish while fonts
-        // kept changing.
         try Task.checkCancellation()
+        if leaveOutWhatWent(input, found: &found, reach: &reach) {
+            reach.leaveOut(found)
+            parsed = parsed.filter { found[$0.key] != nil }
+            state.withLock { state in if state.lastFindScan == number { state.lastFind = nil } }
+        }
 
-        let files = updateCache(found: found, parsed: parsed, keeping: reach)
-        if rereadAll { state.withLock { $0.rereadAll = false } }
+        let files = updateCache(found: found, parsed: parsed, keeping: reach, scan: number)
+        if rereadAll { state.withLock { $0.rereadsDone = max($0.rereadsDone, rereads) } }
         let inputs = Self.inputHash(found: found, records: input.records, reach: reach)
         if parsed.isEmpty, let last = state.withLock({ $0.last }), last.inputs == inputs {
             return last.library
         }
-        let library = signposter.withIntervalSignpost("Build") { build(found: found, files: files, input: input, reach: reach, read: Set(parsed.keys)) }
-        state.withLock { $0.last = (inputs, library) }
-        // After a few changed files the caches are written once the library is back, as on a busy Mac that can
-        // take longer than everything else.
-        let save = { [self] in
+        let (built, offlineKnown) = signposter.withIntervalSignpost("Build") {
+            build(found: found, files: files, input: input, reach: reach, read: Set(parsed.keys), scan: number)
+        }
+        let newest = state.withLock { state -> Library? in
+            guard number > state.lastBuiltScan else { return nil }
+            var changed = Set(state.lastStamps.filter { found[$0.key]?.stamp != $0.value }.keys)
+            if state.built {
+                for path in found.keys where state.lastStamps[path] == nil && !parsed.keys.contains(path) { changed.insert(path) }
+            }
+            state.built = true
+            state.changedSinceTaken.formUnion(changed)
+            changed = state.changedSinceTaken
+            state.lastStamps = found.mapValues(\.stamp)
+            state.restored = nil
+            state.offlineKnown = offlineKnown
+            var library = built
+            library.changedPaths = changed
+            state.lastBuiltScan = number
+            state.last = (inputs, library)
+            return library
+        }
+        guard let library = newest else { return built }
+        saving.async { [self] in
             signposter.withIntervalSignpost("Save cache") {
                 saveCacheIfNeeded()
                 saveLibraryIfNeeded(library)
             }
         }
-        if changes != nil { saving.async(execute: save) } else { saving.sync(execute: save) }
         return library
     }
 
-    /// The last scan's files with the changed ones looked at again, as a full scan would find them; nil when one
-    /// needs a full scan: one Cicero moved out of an app's folder, one out of reach, on a disk that isn't
-    /// connected or online only, a symlink, or one outside the folders scanned.
     private func refind(_ last: Find, changes: Set<String>) -> Find? {
         guard changes.count <= 200 else { return nil }
         let input = last.input
         var found = last.found
-        for path in changes where Self.isFontFile(path) {
+        for path in changes where FontFormat.isFontFile(path) {
             if input.records.appFolderOrigins[path] != nil || last.reach.onlineOnlyPaths.contains(path) || last.reach.disconnectedFiles.contains(path) {
                 return nil
             }
@@ -516,7 +419,6 @@ public final class LibraryScanner: Sendable {
                 found[path] = nil
                 continue
             }
-            // As `enumerateFolders` finds it, folder by folder.
             let previous = found[path]
             var file = FoundFile(stamp: stamp, isActive: false)
             var listed = added
@@ -540,9 +442,6 @@ public final class LibraryScanner: Sendable {
                 found[path] = nil
                 continue
             }
-            // A file that was there keeps what fontd said of it. A new one in a Fonts folder is on, as macOS turns on
-            // whatever is put there, if a few seconds later (the scan after it says, see `AppModel.fontsChanged`);
-            // any other is off unless Cicero registered it before (as `confirmRegistered` asks).
             file.isActive = previous?.isActive ?? file.inFontsFolder
             if !file.isActive, file.inFontsFolder || input.records.inPlace.contains(path) || input.records.temporary[path] != nil {
                 file.isActive = (file.inFontsFolder && !last.listed) || registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
@@ -550,16 +449,12 @@ public final class LibraryScanner: Sendable {
             if ActiveSource.isAdobeFonts(path) { file.folderIDs.append(WatchedFolder.adobeFontsID) }
             found[path] = file
         }
-        // An added file the last scan of everything found gone that's back isn't gone any more.
         var reach = last.reach
         reach.goneFiles = reach.goneFiles.filter { found[$0] == nil }
-        // The walks of the folders holding these files are out of date: the next scan after a notice walks them again.
         let walks = last.walks.filter { key, _ in !Self.holds(key.path, any: changes) }
         return Find(input: input, found: found, reach: reach, listed: last.listed, walks: walks)
     }
 
-    /// Whether `enumerate` lists a file under a folder: none of the folders between them, nor the file, is
-    /// hidden (unless `includingHidden`) or a package.
     private static func isListed(_ path: String, in folder: URL, includingHidden: Bool) -> Bool {
         let components = path.dropFirst(folder.path.count + 1).split(separator: "/")
         if !includingHidden, components.contains(where: { $0.hasPrefix(".") }) { return false }
@@ -571,11 +466,14 @@ public final class LibraryScanner: Sendable {
         return true
     }
 
-    /// Has the next scan read every file it finds again. What was read from files out of reach for now is
-    /// kept, so their families still count as away rather than gone.
+    public func tookChanges(_ paths: Set<String>) {
+        guard !paths.isEmpty else { return }
+        state.withLock { $0.changedSinceTaken.subtract(paths) }
+    }
+
     public func clearCache() {
         state.withLock {
-            $0.rereadAll = true
+            $0.rereadsAsked += 1
             $0.dirty = true
             $0.last = nil
             $0.savedFingerprint = nil
@@ -583,7 +481,6 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// Everything a build depends on besides the cached faces, combined in any order.
     private static func inputHash(found: [String: FoundFile], records: ActivationRecords, reach: OutOfReach) -> Int {
         var sum: UInt64 = 0
         func add(_ hash: (inout Hasher) -> Void) {
@@ -628,7 +525,6 @@ public final class LibraryScanner: Sendable {
         var isActive: Bool
         var folderIDs: [UUID] = []
         var appName: String?
-        /// In ~/Library/Fonts or /Library/Fonts.
         var inFontsFolder = false
     }
 
@@ -637,24 +533,18 @@ public final class LibraryScanner: Sendable {
         registrar.activeFontURLs()
     }
 
-    /// What a scan couldn't get at: watched folders it couldn't read, files a cloud service keeps online only,
-    /// and files added one at a time whose disk isn't connected. What was read from them before is kept.
     struct OutOfReach: Sendable {
         var folders: [UUID: FolderAvailability] = [:]
-        /// The unavailable folders' paths, each with a "/" at the end.
         var folderPaths: [String] = []
         var onlineOnly: [UUID: [String]] = [:]
         var onlineOnlyPaths: Set<String> = []
         var disconnectedFiles: Set<String> = []
-        /// Files added one at a time that are gone for good, which no scan needs to look for again.
         var goneFiles: Set<String> = []
 
-        /// Whether the faces read from a file the scan didn't find are worth keeping: it's only out of reach.
         func keeps(_ path: String) -> Bool {
             onlineOnlyPaths.contains(path) || disconnectedFiles.contains(path) || folderPaths.contains { path.hasPrefix($0) }
         }
 
-        /// Online-only files that are in the library anyway, being active (which downloads them), aren't left out.
         mutating func leaveOut(_ found: [String: FoundFile]) {
             onlineOnly = onlineOnly.compactMapValues { paths in
                 let left = paths.filter { found[$0] == nil }
@@ -664,18 +554,37 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// Whether any of `paths` is in the folder at `path`, by its path as given or with its symlinks resolved.
-    private static func holds(_ path: String, any paths: Set<String>) -> Bool {
-        guard !paths.isEmpty else { return false }
-        let given = path + "/", resolved = realPath(path) + "/"
-        return paths.contains { $0.hasPrefix(given) || $0.hasPrefix(resolved) }
+    @discardableResult
+    private func leaveOutWhatWent(_ input: ScanInput, found: inout [String: FoundFile], reach: inout OutOfReach) -> Bool {
+        var went: [String] = []
+        for folder in input.folders where folder.id != WatchedFolder.adobeAppsID && reach.folders[folder.id] == nil {
+            guard let availability = FolderAvailability.of(folder.path),
+                  folder.id != WatchedFolder.fontLibraryID || availability != .notFound
+            else { continue }
+            reach.folders[folder.id] = availability
+            reach.folderPaths.append(folder.path + "/")
+            went.append(folder.path + "/")
+        }
+        if !went.isEmpty { found = found.filter { path, _ in !went.contains(where: path.hasPrefix) } }
+        var disconnected = false
+        for path in input.files where found[path] != nil && Reachability.disconnectedVolume(of: path) != nil {
+            found[path] = nil
+            reach.disconnectedFiles.insert(path)
+            disconnected = true
+        }
+        return !went.isEmpty || disconnected
     }
 
-    /// Walks every folder scanned. The folders FSEvents watches (the Fonts folders, the input's folders, Adobe's) are
-    /// replayed from `replaying` where it has them, unless on a server or holding a file in `except`; the walks of those
-    /// folders are returned for the next scan, with how many were replayed.
+    private static func holds(_ path: String, any paths: Set<String>) -> Bool {
+        guard !paths.isEmpty else { return false }
+        let resolved = realPath(path)
+        let given = path + "/", resolvedPrefix = resolved + "/"
+        return paths.contains { $0 == path || $0 == resolved || $0.hasPrefix(given) || $0.hasPrefix(resolvedPrefix) }
+    }
+
     private func enumerateFolders(_ input: ScanInput, replaying: [WalkKey: Walk]? = nil, except: Set<String> = [])
         -> ([String: FoundFile], OutOfReach, [WalkKey: Walk], Int) {
+        let excluded = except.isEmpty ? except : Set(except.flatMap { [$0, Self.realPath($0)] })
         var found: [String: FoundFile] = [:]
         found.reserveCapacity(4096)
         var reach = OutOfReach()
@@ -684,7 +593,8 @@ public final class LibraryScanner: Sendable {
         func walk(_ folder: URL, includingHidden: Bool = false, skipping: [String] = [], onlineOnly: ((String) -> Void)? = nil,
                   _ body: (String, FaceStamp) -> Void) {
             let key = WalkKey(path: folder.path, includingHidden: includingHidden, skipping: skipping)
-            if let kept = replaying?[key], Reachability.isOnLocalDisk(folder.path), !Self.holds(folder.path, any: except) {
+            // Never replayed on a server: FSEvents doesn't hear of other Macs' changes there.
+            if let kept = replaying?[key], Reachability.isOnLocalDisk(folder.path), !Self.holds(folder.path, any: excluded) {
                 for file in kept.files { body(file.path, file.stamp) }
                 if let onlineOnly { kept.onlineOnly.forEach(onlineOnly) }
                 walks[key] = kept
@@ -707,20 +617,15 @@ public final class LibraryScanner: Sendable {
                 found[path] = FoundFile(stamp: stamp, isActive: false, inFontsFolder: true)
             }
         }
-        // macOS's own fonts are on, whether or not CoreText's list has them. Its hidden ones (".SFNS") have
-        // names starting with a dot, which the library leaves out.
+        // macOS's own fonts are on, whether or not CoreText's list has them. Its hidden ones (".SFNS") have names starting with a dot, which the library leaves out.
         for folder in locations.systemFonts {
-            Self.enumerate(folder) { path, stamp in
+            walk(folder) { path, stamp in
                 found[path] = FoundFile(stamp: stamp, isActive: true)
             }
         }
         let inactive = locations.inactiveFolders.map { WatchedFolder(id: WatchedFolder.inactiveFolderID, path: $0.path) }
-        // A location or the Font Library that holds the Inactive folder, as the home folder or ~/Cicero would, leaves it
-        // out: what's in it is Cicero's, off, and belongs with the folder it came from.
         let inactivePaths = inactive.flatMap { [$0.path + "/", Self.realPath($0.path) + "/"] }
         for folder in input.folders + inactive {
-            // Adobe's folders and Cicero's own are listed only when they're there; the Font Library counts as away when
-            // it's on a disk that isn't connected, or one Cicero may not read, like the user's folders.
             if folder.id != WatchedFolder.adobeAppsID && folder.id != WatchedFolder.inactiveFolderID,
                let availability = FolderAvailability.of(folder.path) {
                 if folder.id == WatchedFolder.fontLibraryID && availability == .notFound { continue }
@@ -737,21 +642,19 @@ public final class LibraryScanner: Sendable {
                 if found[path]!.appName == nil { found[path]!.appName = folder.appName }
             }
             let onlineOnly = { (path: String) in reach.onlineOnly[folder.id, default: []].append(path) }
-            // The Inactive folders aren't watched: always walked.
             if folder.id == WatchedFolder.inactiveFolderID {
                 Self.enumerate(folder.url, skipping: skipped, onlineOnly: onlineOnly, add)
             } else {
                 walk(folder.url, skipping: skipped, onlineOnly: onlineOnly, add)
             }
         }
-        // Adobe Fonts that Adobe apps turned on for themselves are on in those apps, and Creative Cloud's to switch.
         if let folder = locations.adobeFontsInAdobeApps {
             walk(folder, includingHidden: true) { path, stamp in
                 if found[path] == nil { found[path] = FoundFile(stamp: stamp, isActive: false) }
                 found[path]!.appName = "Adobe"
             }
         }
-        for path in input.files where Self.isFontFile(path) {
+        for path in input.files where FontFormat.isFontFile(path) {
             guard let stamp = Self.stamp(ofPath: path) else {
                 if Reachability.disconnectedVolume(of: path) != nil {
                     reach.disconnectedFiles.insert(path)
@@ -767,7 +670,6 @@ public final class LibraryScanner: Sendable {
             if found[path] == nil { found[path] = FoundFile(stamp: stamp, isActive: false) }
             found[path]!.folderIDs.append(WatchedFolder.addedFilesID)
         }
-        // Files Cicero moved out of an app's folder to turn them off still belong with that folder.
         for (path, origin) in input.records.appFolderOrigins where found[path] != nil {
             guard let folder = input.folders.first(where: { $0.appName != nil && origin.hasPrefix($0.path + "/") }) else { continue }
             found[path]!.folderIDs.append(folder.id)
@@ -780,22 +682,20 @@ public final class LibraryScanner: Sendable {
     private func addActive(_ urls: [URL], to found: inout [String: FoundFile], linked: [(real: String, chosen: String)]) {
         for url in urls {
             var path = url.path(percentEncoded: false)
-            // A file in a folder reached through a symlink goes by the path the folder was found at.
             if found[path] == nil, let folder = linked.first(where: { path.hasPrefix($0.real) }) {
                 let chosen = folder.chosen + path.dropFirst(folder.real.count)
                 if found[chosen] != nil { path = chosen }
             }
             if found[path] != nil {
                 found[path]!.isActive = true
-            } else if Self.isFontFile(path), let stamp = Self.stamp(ofPath: path) {
+            } else if FontFormat.isFontFile(path), let stamp = Self.stamp(ofPath: path) {
                 found[path] = FoundFile(stamp: stamp, isActive: true)
             }
         }
     }
 
-    /// The folders scanned that are reached through a symlink, each as CoreText may name it and as it was chosen (with a
-    /// "/" at the end), longest first: fontd names the files it has active by their paths with every symlink resolved.
     private func linkedFolders(_ input: ScanInput) -> [(real: String, chosen: String)] {
+        // fontd names the files it has active by their paths with every symlink resolved.
         let folders = Set([locations.userFonts.path, locations.allUsersFonts.path] + input.folders.map(\.path)
             + input.files.map { ($0 as NSString).deletingLastPathComponent })
         return folders.flatMap { folder in
@@ -803,12 +703,8 @@ public final class LibraryScanner: Sendable {
         }.sorted { $0.real.count > $1.real.count }
     }
 
-    /// Files in the Fonts folders are active unless macOS says otherwise, as for one turned off in macOS or
-    /// one macOS hasn't noticed yet. Its list leaves out files whose fonts have hidden names, so files missing
-    /// from it are asked about one by one; without a list at all, they count as active. Those its list of fonts it
-    /// has off names are off without asking: after an import there can be tens of thousands, and asking about
-    /// each keeps fontd busy for seconds. A scan another one replaced stops asking.
     private func confirmFontsFolders(_ found: inout [String: FoundFile], listed: Bool) throws {
+        // CoreText's list of active files leaves out files whose fonts have hidden names, so those missing from it are asked about.
         let unconfirmed = found.filter { $0.value.inFontsFolder && !$0.value.isActive }.keys
         guard listed else {
             for path in unconfirmed { found[path]!.isActive = true }
@@ -821,24 +717,13 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// The files Cicero registered itself (in place, or for a while) that CoreText's list leaves out are asked
-    /// about one by one, like those in the Fonts folders: the list hides some fonts though they're on, as copies
-    /// of the macOS fonts it hides (Iowan Old Style, Times).
     private func confirmRegistered(_ found: inout [String: FoundFile], records: ActivationRecords) {
+        // CoreText's list hides some fonts though they're on, as copies of the macOS fonts it hides (Iowan Old Style, Times).
         for path in records.inPlace.union(records.temporary.keys) where found[path]?.isActive == false {
             found[path]!.isActive = registrar.isActive(URL(fileURLWithPath: path, isDirectory: false))
         }
     }
 
-    private static func isFontFile(_ path: String) -> Bool {
-        FontFileReader.fontExtensions.contains((path as NSString).pathExtension.lowercased())
-    }
-
-    /// Every font file under a folder, except inside packages and hidden ones (AppleDouble "._" files look like fonts).
-    /// Paths start with the folder's own path, as the user chose it, even when it goes through a symlink.
-    /// With `onlineOnly`, files a cloud service has taken off the Mac go there instead: reading one would
-    /// download it.
-    /// `skipping`: folders (each with a "/" at the end) whose files are left out.
     private static func enumerate(_ folder: URL, includingHidden: Bool = false, skipping: [String] = [], onlineOnly: ((String) -> Void)? = nil,
                                   _ body: (String, FaceStamp) -> Void) {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
@@ -847,10 +732,11 @@ public final class LibraryScanner: Sendable {
         // Walked where it really is: the enumerator doesn't follow a folder that's a symlink itself.
         guard let enumerator = FileManager.default.enumerator(
             at: URL(fileURLWithPath: resolved, isDirectory: true), includingPropertiesForKeys: Array(keys),
+            // Hidden files skipped, as AppleDouble "._" files look like fonts.
             options: includingHidden ? [.skipsPackageDescendants] : [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return }
         for case let url as URL in enumerator {
-            guard FontFileReader.fontExtensions.contains(url.pathExtension.lowercased()),
+            guard FontFormat.fileExtensions.contains(url.pathExtension.lowercased()),
                   let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
                   let modified = values.contentModificationDate, let size = values.fileSize
             else { continue }
@@ -858,6 +744,7 @@ public final class LibraryScanner: Sendable {
             if !skipping.isEmpty, skipping.contains(where: path.hasPrefix) { continue }
             if resolved != chosen, path.hasPrefix(resolved) { path = chosen + path.dropFirst(resolved.count) }
             if !skipping.isEmpty, skipping.contains(where: path.hasPrefix) { continue }
+            // Reading a file a cloud service has taken off the Mac would download it.
             if let onlineOnly, Reachability.isOnlineOnly(path) {
                 onlineOnly(path)
                 continue
@@ -866,18 +753,20 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// The path with every symlink resolved, as the enumerator and FSEvents report files (e.g. /private/var for /var); as
-    /// it is when it doesn't exist.
+    public static func fontFiles(in folder: URL) -> [String] {
+        var paths: [String] = []
+        enumerate(folder) { path, _ in paths.append(path) }
+        return paths
+    }
+
     static func realPath(_ path: String) -> String {
         guard let resolved = realpath(path, nil) else { return path }
         defer { free(resolved) }
         return String(cString: resolved)
     }
 
-    /// The paths besides this one that CoreText may name a file by when a symlink leads to it: fontd resolves every
-    /// symlink as Foundation does, which leaves /private off /private/var and /private/tmp, unlike `realPath`. None
-    /// when no symlink does.
     static func linkedPaths(_ path: String) -> Set<String> {
+        // fontd resolves symlinks as Foundation does, which leaves /private off /private/var and /private/tmp, unlike realpath.
         Set([realPath(path), (path as NSString).resolvingSymlinksInPath]).subtracting([path])
     }
 
@@ -890,36 +779,35 @@ public final class LibraryScanner: Sendable {
 
     // MARK: Reading
 
-    /// Stops starting files when the task is cancelled, and returns those it read. Each goes into the cache as it's
-    /// read, which is written every few seconds while reading takes longer, so neither a scan that's replaced nor
-    /// Cicero quitting (see `flush`) loses what was read: after an update that has every file read again, the next
-    /// scan, or the next launch, reads only the rest. `progress` gets the number of files read.
     private func parse(_ files: [String: FoundFile], progress: @escaping @Sendable (Int) -> Void) async -> [String: CachedFile] {
         let total = files.count
         var results: [String: CachedFile] = [:]
         results.reserveCapacity(total)
+        var done = 0
         var saved = ContinuousClock.now
-        await withTaskGroup(of: (String, CachedFile).self) { group in
+        await withTaskGroup(of: (String, CachedFile?).self) { group in
             var pending = files.map { ($0.key, $0.value.stamp) }[...]
             func addNext() {
                 guard let (path, stamp) = pending.popFirst() else { return }
                 group.addTask {
-                    // Its descriptors aren't kept (see `FontLoader`). A file is read only when it's new or changed, so
-                    // fonts made from the path before are out of date, like the stand-in for a file that was moved away
-                    // and back: the grid still drew it as it went, from no file, which macOS answers with its "?" font
-                    // for one that's on.
+                    // Fonts FontLoader made from this path before are out of date: a file moved away and back would still draw from no file, which macOS answers with its "?" font.
                     let faces = FontFileReader.faces(atPath: path)
                     FontLoader.shared.invalidate(paths: [path])
+                    // Nothing read from a file whose disk went away meanwhile or that changed while read: kept as unreadable, it would never be read again.
+                    if faces.isEmpty, !Self.isStill(path, stamp: stamp) { return (path, nil) }
                     return (path, CachedFile(stamp: stamp, dateAdded: FontFileReader.dateAdded(atPath: path), faces: faces))
                 }
             }
             for _ in 0..<max(2, ProcessInfo.processInfo.activeProcessorCount) { addNext() }
             while let (path, file) = await group.next() {
-                results[path] = file
-                keep(path, file)
-                if results.count % 200 == 0 || results.count == total {
-                    progress(results.count)
-                    if results.count < total, ContinuousClock.now - saved > .seconds(2) {
+                done += 1
+                if let file {
+                    results[path] = file
+                    keep(path, file)
+                }
+                if done % 200 == 0 || done == total {
+                    progress(done)
+                    if done < total, ContinuousClock.now - saved > .seconds(2) {
                         saved = .now
                         saving.async { [self] in saveCacheIfNeeded() }
                     }
@@ -930,8 +818,13 @@ public final class LibraryScanner: Sendable {
         return results
     }
 
-    /// Whether most of these files are ones the library on screen has already, the last one built or else the one
-    /// restored at launch, so that reading them is updating it rather than identifying fonts.
+    private static func isStill(_ path: String, stamp: FaceStamp) -> Bool {
+        let file = open(path, O_RDONLY | O_CLOEXEC)
+        guard file >= 0 else { return false }
+        close(file)
+        return Self.stamp(ofPath: path) == stamp
+    }
+
     private func listsAlready(_ files: [String: FoundFile]) -> Bool {
         let (stamps, restored) = state.withLock { ($0.lastStamps, $0.restored) }
         if !stamps.isEmpty { return files.keys.count { stamps[$0] != nil } * 2 >= files.count }
@@ -958,7 +851,6 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// Adds a file a scan read, for the next one too if this one is replaced.
     private func keep(_ path: String, _ file: CachedFile) {
         state.withLock { state in
             state.files[path] = file
@@ -966,13 +858,15 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// Adds what was read, drops files that are gone, and returns the cache for the found files and the
-    /// ones only out of reach, which needn't be read again when they're back.
-    private func updateCache(found: [String: FoundFile], parsed: [String: CachedFile], keeping reach: OutOfReach) -> [String: CachedFile] {
+    private func updateCache(found: [String: FoundFile], parsed: [String: CachedFile], keeping reach: OutOfReach, scan number: Int) -> [String: CachedFile] {
         state.withLock { state in
             let before = state.files.count
-            state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) }
-            state.files.merge(parsed) { _, new in new }
+            if number >= state.lastBuiltScan {
+                state.files = state.files.filter { found[$0.key] != nil || reach.keeps($0.key) }
+            }
+            for (path, file) in parsed where number >= state.lastBuiltScan || state.files[path] == nil {
+                state.files[path] = file
+            }
             if !parsed.isEmpty || state.files.count != before { state.dirty = true }
             return state.files
         }
@@ -992,10 +886,9 @@ public final class LibraryScanner: Sendable {
         #endif
         let fm = FileManager.default
         try? fm.createDirectory(at: locations.caches, withIntermediateDirectories: true)
-        try? FaceCache.encode(snapshot).write(to: cacheURL, options: .atomic)
+        if (try? FaceCache.encode(snapshot).write(to: cacheURL, options: .atomic)) == nil { state.withLock { $0.dirty = true } }
     }
 
-    /// Saves the library for the next launch (see `savedLibrary`) when it isn't the one saved last.
     private func saveLibraryIfNeeded(_ library: Library) {
         guard saves else { return }
         let changed = state.withLock { state in
@@ -1006,10 +899,9 @@ public final class LibraryScanner: Sendable {
         }
         guard changed else { return }
         try? FileManager.default.createDirectory(at: locations.caches, withIntermediateDirectories: true)
-        try? LibraryCache.encode(library).write(to: libraryURL, options: .atomic)
+        if (try? LibraryCache.encode(library).write(to: libraryURL, options: .atomic)) == nil { state.withLock { $0.savedFingerprint = nil } }
     }
 
-    /// Whether the library cache would hold the same for both.
     private static func savesAlike(_ a: Library, _ b: Library) -> Bool {
         a.families == b.families && a.unreadableFiles == b.unreadableFiles && a.activePaths == b.activePaths
             && a.unavailableFolders == b.unavailableFolders && a.onlineOnlyFiles == b.onlineOnlyFiles
@@ -1021,7 +913,7 @@ public final class LibraryScanner: Sendable {
     private struct FaceKey: Hashable {
         var family: String
         var postScriptName: String
-        /// Some fonts' italics are named exactly like their uprights, so the name alone doesn't make two files copies.
+        // Some fonts' italics are named exactly like their uprights, so the name alone doesn't make two files copies.
         var isItalic: Bool
     }
 
@@ -1034,8 +926,7 @@ public final class LibraryScanner: Sendable {
         var app: String?
     }
 
-    /// `read` are the files this scan read (see `Library.changedPaths`).
-    private func build(found: [String: FoundFile], files: [String: CachedFile], input: ScanInput, reach: OutOfReach, read: Set<String>) -> Library {
+    private func build(found: [String: FoundFile], files: [String: CachedFile], input: ScanInput, reach: OutOfReach, read: Set<String>, scan number: Int) -> (Library, [String: Set<String>]) {
         var candidates: [FaceKey: [Candidate]] = [:]
         candidates.reserveCapacity(files.values.reduce(0) { $0 + $1.faces.count })
         var unreadable: [String] = []
@@ -1056,8 +947,6 @@ public final class LibraryScanner: Sendable {
             }
         }
 
-        // One face per PostScript name (and slant) within a family: the active file wins, the others are its other
-        // copies. Different families keep their own faces even when names clash (the Problems view says so).
         var byFamily: [String: [(LibraryFace, Set<UUID>, FaceStamp)]] = [:]
         for (_, copies) in candidates {
             let sorted = copies.sorted { Self.precedes($0, $1) }
@@ -1066,8 +955,9 @@ public final class LibraryScanner: Sendable {
             for copy in sorted.dropFirst() where copy.face.path != winner.face.path && !others.contains(where: { $0.face.path == copy.face.path }) {
                 others.append(FaceCopy(face: copy.face, state: copy.state, app: copy.app))
             }
-            let face = LibraryFace(face: winner.face, state: winner.state, copies: others, dateAdded: sorted.compactMap(\.dateAdded).min(), app: winner.app)
             let folderIDs = Set(sorted.flatMap(\.folderIDs))
+            let face = LibraryFace(face: winner.face, state: winner.state, copies: others, dateAdded: sorted.compactMap(\.dateAdded).min(), app: winner.app,
+                                   folderIDs: folderIDs)
             byFamily[winner.face.familyName, default: []].append((face, folderIDs, winner.stamp))
         }
 
@@ -1078,7 +968,8 @@ public final class LibraryScanner: Sendable {
         let grouped = byFamily
         var families = Array(byFamily.keys).concurrentMap { name in
             let members = grouped[name]!
-            let faces = members.map(\.0).sorted { Self.stylePrecedes($0.face, $1.face) }
+            let order = Self.axisOrder(of: members.map(\.0.face))
+            let faces = members.map(\.0).sorted { Self.stylePrecedes($0.face, $1.face, axisOrder: order) }
             return Family(
                 name: name, faces: faces, state: Self.familyState(of: faces),
                 folderIDs: members.reduce(into: Set<UUID>()) { $0.formUnion($1.1) },
@@ -1090,11 +981,19 @@ public final class LibraryScanner: Sendable {
 
         var offline = Set<String>()
         var offlinePaths = Set<String>()
-        for (path, file) in files where found[path] == nil && reach.keeps(path) {
+        var offlineKnown: [String: Set<String>] = [:]
+        func keepOffline(_ path: String, families: Set<String>) {
             if !reach.onlineOnlyPaths.contains(path) { offlinePaths.insert(path) }
-            for face in file.faces where byFamily[face.familyName] == nil && !face.familyName.hasPrefix(".") && !face.familyName.isEmpty {
-                offline.insert(face.familyName)
-            }
+            offlineKnown[path] = families
+            for name in families where byFamily[name] == nil { offline.insert(name) }
+        }
+        for (path, file) in files where found[path] == nil && reach.keeps(path) {
+            keepOffline(path, families: Set(file.faces.map(\.familyName).filter { !$0.hasPrefix(".") && !$0.isEmpty }))
+        }
+        // What was out of reach before stays so while its disk is away, also when the face cache doesn't know it (deleted, or from an older version).
+        let carried = state.withLock { state in state.restored.map(Self.offlineKnown) ?? state.offlineKnown }
+        for (path, families) in carried where found[path] == nil && files[path] == nil && reach.keeps(path) {
+            keepOffline(path, families: families)
         }
 
         var hasher = Hasher()
@@ -1108,6 +1007,7 @@ public final class LibraryScanner: Sendable {
                 hasher.combine(face.state)
                 hasher.combine(face.copies)
                 hasher.combine(face.app)
+                hasher.combine(face.folderIDs)
                 hasher.combine(face.dateAdded)
                 hasher.combine(stamps[face.id])
             }
@@ -1116,52 +1016,58 @@ public final class LibraryScanner: Sendable {
         hasher.combine(reach.folders)
         hasher.combine(reach.onlineOnly)
         hasher.combine(offline)
-        let changed: Set<String> = state.withLock { state in
-            var changed = Set(state.lastStamps.filter { found[$0.key]?.stamp != $0.value }.keys)
-            // Files back without being read again, their faces kept while they were out of reach; to the first library,
-            // every file is new. One read again is new to `FontLoader` already (see `FontLoader.keep`).
-            if state.built {
-                for path in found.keys where state.lastStamps[path] == nil && !read.contains(path) { changed.insert(path) }
-            }
-            state.built = true
-            state.lastStamps = found.mapValues(\.stamp)
-            state.restored = nil
-            return changed
-        }
-        return Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: changed,
-                       unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
-                       goneFiles: reach.goneFiles)
+        let library = Library(families: families, unreadableFiles: unreadable, activePaths: activePaths, fingerprint: hasher.finalize(), changedPaths: [],
+                              unavailableFolders: reach.folders, onlineOnlyFiles: reach.onlineOnly, offlineFamilies: offline, offlinePaths: offlinePaths,
+                              goneFiles: reach.goneFiles)
+        return (library, offlineKnown)
     }
 
-    /// A family's styles in order, as a foundry lists them. Lightest first, by each named instance's place on the
-    /// weight axis, as a variable font's instances share one weight class. Then along the designer's own axes, in the
-    /// font's order, lowest first, as they name families within the family, like Sans, Text and Serif on a Serif
-    /// axis. Then narrowest first, Sans Compressed and Sans Condensed before Sans; then along the
-    /// other registered axes, like optical size; and each upright before its italic.
-    static func stylePrecedes(_ a: FontFace, _ b: FontFace) -> Bool {
+    private static func offlineKnown(in library: Library) -> [String: Set<String>] {
+        var known: [String: Set<String>] = [:]
+        for face in library.families.lazy.flatMap(\.faces) {
+            for copy in [FaceCopy(face)] + face.copies { known[copy.face.path, default: []].insert(copy.face.familyName) }
+        }
+        for path in library.offlinePaths where known[path] == nil { known[path] = library.offlineFamilies }
+        return known
+    }
+
+    static func axisOrder(of faces: [FontFace]) -> [String: Int] {
+        var order: [String: Int] = [:]
+        for face in faces.sorted(by: { $0.id < $1.id }) {
+            for axis in face.axes where order[axis.tag] == nil { order[axis.tag] = order.count }
+        }
+        return order
+    }
+
+    static func stylePrecedes(_ a: FontFace, _ b: FontFace, axisOrder: [String: Int] = [:]) -> Bool {
         if a.styleWeight != b.styleWeight { return a.styleWeight < b.styleWeight }
-        if let order = precedes(a, b, along: { $0.first?.isUppercase == true }) { return order }
+        if let order = precedes(a, b, axisOrder: axisOrder, along: { $0.first?.isUppercase == true }) { return order }
         if a.styleWidth != b.styleWidth { return a.styleWidth < b.styleWidth }
-        if let order = precedes(a, b, along: { $0.first?.isUppercase != true && !["wght", "wdth", "ital", "slnt"].contains($0) }) {
+        if let order = precedes(a, b, axisOrder: axisOrder, along: { $0.first?.isUppercase != true && !["wght", "wdth", "ital", "slnt"].contains($0) }) {
             return order
         }
         if a.isItalic != b.isItalic { return !a.isItalic }
-        if a.styleName != b.styleName { return a.styleName.caseInsensitiveCompare(b.styleName) == .orderedAscending }
+        let names = a.styleName.caseInsensitiveCompare(b.styleName)
+        if names != .orderedSame { return names == .orderedAscending }
         return a.id < b.id
     }
 
-    /// Whether `a` sits lower than `b` on the first of the axes `tags` picks, in `a`'s order, that they're apart on;
-    /// nil when they aren't apart on any, or don't share them.
-    private static func precedes(_ a: FontFace, _ b: FontFace, along tags: (String) -> Bool) -> Bool? {
-        for axis in a.axes where tags(axis.tag) {
-            if let value = b.axes.first(where: { $0.tag == axis.tag })?.value, value != axis.value { return axis.value < value }
+    private static func precedes(_ a: FontFace, _ b: FontFace, axisOrder: [String: Int], along tags: (String) -> Bool) -> Bool? {
+        // One order of axes for the whole family, one without the axis first: its faces can list different axes, in different orders.
+        let all = Set((a.axes + b.axes).map(\.tag)).filter(tags).sorted { (axisOrder[$0] ?? .max, $0) < (axisOrder[$1] ?? .max, $1) }
+        for tag in all {
+            let x = a.axes.first(where: { $0.tag == tag })?.value, y = b.axes.first(where: { $0.tag == tag })?.value
+            guard let x else { if y == nil { continue } else { return true } }
+            guard let y else { return false }
+            if x.isNaN || y.isNaN {
+                if x.isNaN && y.isNaN { continue }
+                return x.isNaN
+            }
+            if x != y { return x < y }
         }
         return nil
     }
 
-    /// Active copies first — those Cicero can turn off before the rest, so the Problems view can offer Deactivate —
-    /// then by path. Adobe Fonts only Adobe apps load come last: they stand for a font only when the library has no
-    /// other copy of it, so one of the user's own stays theirs to switch.
     private static func precedes(_ a: Candidate, _ b: Candidate) -> Bool {
         let rankA = rank(a), rankB = rank(b)
         if rankA != rankB { return rankA < rankB }
@@ -1194,11 +1100,9 @@ public final class LibraryScanner: Sendable {
         return .inactive
     }
 
-    /// Where an active file is activated from, judged by its path and Cicero's records.
     static func activeSource(of path: String, locations: Locations, records: ActivationRecords) -> ActiveSource {
         if path.hasPrefix("/System/") || path.hasPrefix("/Library/Application Support/Apple/") { return .macOS }
         if locations.systemFonts.contains(where: { path.hasPrefix($0.path + "/") }) { return .macOS }
-        // Also one in a Fonts folder, which is turned off there, on for a while.
         if let temporary = records.temporary[path], !ActiveSource.isAdobeFonts(path) { return .temporary(temporary.scope) }
         if path.hasPrefix(locations.allUsersFonts.path + "/") { return .allUsers }
         if path.hasPrefix(locations.userFonts.path + "/") { return .fontsFolder }
@@ -1222,7 +1126,6 @@ public final class LibraryScanner: Sendable {
         return apps.count == 1 ? .appOnly(apps.first!) : .inactive
     }
 
-    /// "Monotype" and "MONOTYPE" are one foundry: the spelling seen first (by family order) wins.
     static func unifyingManufacturerCase(_ families: [Family]) -> [Family] {
         var spellings: [String: String] = [:]
         return families.map { family in
@@ -1237,31 +1140,24 @@ public final class LibraryScanner: Sendable {
         }
     }
 
-    /// Finder order of the names they show. A full `localizedStandardCompare` sort costs tens of milliseconds, so its
-    /// result is remembered as ranks and reused while no new name appears.
     private func sorted(_ families: [Family]) -> [Family] {
-        // A family shown in the Mac's language by that name, and its own after it, so two that show alike stay apart.
         let keys = families.map { $0.name == $0.id ? $0.id : $0.name + "\u{0}" + $0.id }
-        let order: [String] = state.withLock { state in
+        let order: [Int] = state.withLock { state in
             if keys.allSatisfy({ state.ranks[$0] != nil }) {
-                return keys.sorted { state.ranks[$0]! < state.ranks[$1]! }
+                return keys.indices.sorted { state.ranks[keys[$0]]! < state.ranks[keys[$1]]! }
             }
-            // Sorted from a fixed starting order, so the result never depends on dictionary order.
-            let sorted = keys.sorted(by: <).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-            state.ranks = Dictionary(uniqueKeysWithValues: sorted.enumerated().map { ($1, $0) })
+            let sorted = keys.indices.sorted { keys[$0] < keys[$1] }.sorted { keys[$0].localizedStandardCompare(keys[$1]) == .orderedAscending }
+            state.ranks = Dictionary(sorted.enumerated().map { (keys[$1], $0) }, uniquingKeysWith: { first, _ in first })
             return sorted
         }
-        let byKey = Dictionary(uniqueKeysWithValues: zip(keys, families))
-        return order.map { byKey[$0]! }
+        return order.map { families[$0] }
     }
 }
 
-/// Foundry names as the files give them, tidied for display.
-public enum Foundry {
+enum Foundry {
     private static let suffixes = [", Inc.", " Inc", " LLC", " Ltd.", " GmbH", " AG", " S.A.", " B.V.", " Corporation", " Corp."]
 
-    /// Drops "Inc."/"LLC"/"GmbH"…, URLs, copyright lines and over-long strings; nil when nothing useful is left.
-    public static func normalized(_ raw: String?) -> String? {
+    static func normalized(_ raw: String?) -> String? {
         guard var name = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty, name.count <= 60 else { return nil }
         let lowercased = name.lowercased()
         guard !lowercased.contains("http"), !lowercased.contains("www."), !lowercased.hasPrefix("copyright"), !name.contains("©") else { return nil }
@@ -1283,8 +1179,7 @@ public enum Foundry {
 }
 
 extension Array where Element: Sendable {
-    /// `map` across all cores, for work done once per family that adds up to tens of milliseconds over a library.
-    func concurrentMap<T: Sendable>(_ transform: @Sendable (Element) -> T) -> [T] {
+    public func concurrentMap<T: Sendable>(_ transform: @Sendable (Element) -> T) -> [T] {
         [T](unsafeUninitializedCapacity: count) { buffer, initialized in
             guard let base = buffer.baseAddress else { return }
             let slots = Slots(base: base)
@@ -1296,7 +1191,6 @@ extension Array where Element: Sendable {
     }
 }
 
-/// Where `concurrentMap` puts its results: each iteration writes its own element, so the threads never share one.
 private struct Slots<T>: @unchecked Sendable {
     let base: UnsafeMutablePointer<T>
 }

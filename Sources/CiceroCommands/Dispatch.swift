@@ -2,20 +2,15 @@ import AppKit
 import CiceroCore
 import Foundation
 
-/// Makes a change the one way it may be made now (Design B): while Cicero is open, Cicero makes it (`Requests`); while
-/// it's closed, the command makes it itself, holding `AppLock` so a Cicero that starts meanwhile waits for it.
 @MainActor
 public enum WriteDispatcher {
-    /// How long a Cicero that's open may leave the lock free before the command takes it for one that can't (a
-    /// version from before the command could write). A Cicero that's starting, or that waited for another command,
-    /// takes it within moments.
     static let startingCicero: TimeInterval = 15
-    /// How long the command waits for another `cicero` command's change.
     static let otherCommand: Duration = .seconds(60)
 
     public static func perform(_ request: WriteRequest, environment: ToolEnvironment) async throws -> JSON {
         let support = environment.locations.support
         var freeSince: Date?
+        var commandSince: ContinuousClock.Instant?
         while true {
             if let lock = AppLock.take(support: support) {
                 guard runningApp(environment) != nil else {
@@ -32,29 +27,35 @@ public enum WriteDispatcher {
                 continue
             }
             freeSince = nil
-            if runningApp(environment) != nil {
+            if runningApp(environment) != nil, !commandHolds(support: support) {
+                commandSince = nil
                 guard let answer = try await Requests.send(request, support: support) else { continue }
                 if let error = CommandError(answer: answer) { throw error }
                 return answer
             }
-            // Another cicero command is making a change.
-            guard let lock = AppLock.wait(support: support, timeout: otherCommand) else {
+            let since = commandSince ?? .now
+            if ContinuousClock.now - since > otherCommand {
                 throw CommandError(.busy, "The Cicero CLI is making another change. Nothing changed. Try again in a moment.")
             }
-            lock.release()
+            commandSince = since
+            try await Task.sleep(for: .milliseconds(50))
         }
     }
 
-    /// Asked of the process itself too: without a run loop, the command's list of running apps isn't told when one quits.
-    static func runningApp(_ environment: ToolEnvironment) -> NSRunningApplication? {
+    static func commandHolds(support: URL) -> Bool {
+        let text = (try? String(contentsOf: AppLock.url(support: support), encoding: .utf8)) ?? ""
+        return text.split(separator: "\n", omittingEmptySubsequences: false).first == "command"
+    }
+
+    nonisolated static func runningApp(_ environment: ToolEnvironment) -> NSRunningApplication? {
         NSRunningApplication.runningApplications(withBundleIdentifier: environment.appBundleID).first {
+            // Asked of the process too: without a run loop, the command's list of running apps isn't told when one quits.
             !$0.isTerminated && kill($0.processIdentifier, 0) == 0
         }
     }
 
-    /// With Cicero closed and the lock held: the library scanned first when fonts turn on or off, so the files are where
-    /// the change finds them, and again after, so the saved library has what changed.
     private static func closed(_ request: WriteRequest, environment: ToolEnvironment) async throws -> JSON {
+        if try LibraryContext.loadUserData(environment).isFromNewerVersion { throw CommandError(.failed, UserData.newerVersionMessage) }
         try repairIfNeeded(environment)
         let context = request.command.needsLibrary
             ? try await LibraryContext.load(environment, rescan: request.command.activates, shown: request.shown)
@@ -62,13 +63,14 @@ public enum WriteDispatcher {
         let writer = ClosedAppWriter(environment: environment, data: context.savedData)
         let answer = try await WriteRunner.run(request, in: context, writer: writer)
         if writer.activated { _ = try? await LibraryContext.load(environment, rescan: true) }
+        if writer.saveFailed {
+            throw CommandError(.failed, "The change couldn’t be saved in \(environment.userDataURL.path). Check that the disk has space and can be written to.")
+        }
         return answer
     }
 }
 
 extension WriteDispatcher {
-    /// Repairs the records after a command that stopped while it turned fonts on or off (see `ActivationJournal`), with
-    /// the lock held.
     static func repairIfNeeded(_ environment: ToolEnvironment) throws {
         let support = environment.locations.support
         guard let journal = ActivationJournal.read(support: support) else { return }
@@ -80,15 +82,13 @@ extension WriteDispatcher {
     }
 }
 
-/// Makes changes while Cicero is closed, as Cicero would: user-data.json written as `UserDataStore` writes it, at once
-/// and onto the disk, and fonts turned on and off with the same `ActivationEngine`.
 @MainActor
 final class ClosedAppWriter: Writer {
     let environment: ToolEnvironment
     private let store: UserDataStore
     private(set) var data: UserData
-    /// Whether fonts turned on or off.
     private(set) var activated = false
+    private(set) var saveFailed = false
 
     init(environment: ToolEnvironment, data: UserData) {
         self.environment = environment
@@ -100,11 +100,13 @@ final class ClosedAppWriter: Writer {
 
     func update(_ change: (inout UserData) -> Void) {
         change(&data)
+        if !store.hasSavedData, environment.defaults.object(forKey: ClassificationGuesses.guessingKey) == nil {
+            environment.defaults.set(true, forKey: ClassificationGuesses.askingKey)
+        }
         store.save(data)
-        store.flush(durably: true)
+        if !store.flush(durably: true) { saveFailed = true }
     }
 
-    /// As the app has it (`AppModel.engine`).
     private var engine: ActivationEngine {
         var engine = ActivationEngine(locations: environment.locations, registrar: environment.registrar)
         engine.fontLibrary = data.fontLibrary?.url
@@ -112,17 +114,17 @@ final class ClosedAppWriter: Writer {
         return engine
     }
 
-    func activate(_ faces: [LibraryFace], untilQuit: Bool, title: String) async -> ActivationResult {
-        let journal = begin(faces, turningOn: true)
+    func activate(_ faces: [LibraryFace], untilQuit: Bool) async throws -> ActivationResult {
+        try begin(faces, turningOn: true)
         let result = await engine.activate(faces, method: .inPlace, records: data.records)
-        finish(result, journal: journal)
+        finish(result)
         return result
     }
 
-    func deactivate(_ faces: [LibraryFace]) async -> ActivationResult {
-        let journal = begin(faces, turningOn: false)
+    func deactivate(_ faces: [LibraryFace]) async throws -> ActivationResult {
+        try begin(faces, turningOn: false)
         let result = await engine.deactivate(faces, records: data.records)
-        finish(result, journal: journal)
+        finish(result)
         return result
     }
 
@@ -130,21 +132,22 @@ final class ClosedAppWriter: Writer {
         _ = try? await LibraryContext.load(environment, rescan: true)
     }
 
-    /// What's about to turn, written down first (see `ActivationJournal`); false when it couldn't be.
-    private func begin(_ faces: [LibraryFace], turningOn: Bool) -> Bool {
+    // Nothing turns without the note: a command stopped halfway would leave changes the records never learn of.
+    private func begin(_ faces: [LibraryFace], turningOn: Bool) throws {
         let journal = ActivationJournal(turningOn: turningOn, paths: faces.map(\.face.path))
-        return (try? journal.write(support: environment.locations.support)) != nil
+        guard (try? journal.write(support: environment.locations.support)) != nil else {
+            throw CommandError(.failed, "Couldn’t write a note in \(environment.locations.support.path) before the change, so nothing changed. Check that the disk has space and can be written to.")
+        }
     }
 
-    /// As the app's `finish`: the records saved, and added files a copy was installed of forgotten; then the journal goes.
-    private func finish(_ result: ActivationResult, journal: Bool) {
+    private func finish(_ result: ActivationResult) {
         activated = true
-        // For the end-to-end test of a command that stops here, before the records are saved.
         if ProcessInfo.processInfo.environment["CICERO_STOP_BEFORE_RECORDS"] == "1" { exit(9) }
         update { data in
             data.records = result.records
             data.forgetInstalledAddedFiles()
         }
-        if journal { ActivationJournal.remove(support: environment.locations.support) }
+        // Kept when the records couldn't be saved, so the next program to hold the lock repairs them.
+        if !saveFailed { ActivationJournal.remove(support: environment.locations.support) }
     }
 }

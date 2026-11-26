@@ -1,19 +1,13 @@
 import CryptoKit
 import Foundation
+import Synchronization
 
-/// What the `cicero` command is turning on or off while Cicero is closed, written down (onto the disk itself) before it
-/// starts and taken away once the activation records are saved. A command that stops in between (killed, the Mac
-/// switched off) leaves fonts on or off, or files moved, that the records don't know about. The next program to hold
-/// `AppLock`, the command or Cicero at launch, repairs the records from what's true now (`repair`) and takes the journal
-/// away. Nothing turns on or off again: the records follow what macOS and the files say.
 public struct ActivationJournal: Codable, Equatable, Sendable {
     public struct Entry: Codable, Equatable, Sendable {
         public var path: String
-        /// The file's contents, to find it again if it moves into the Inactive folder (out of an app's folder).
         public var digest: String?
     }
 
-    /// On, or off.
     public var turningOn: Bool
     public var entries: [Entry]
 
@@ -31,10 +25,10 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
         (try? Data(contentsOf: url(support: support))).flatMap { try? JSONDecoder().decode(ActivationJournal.self, from: $0) }
     }
 
-    /// Written whole and onto the disk, before anything turns.
     public func write(support: URL) throws {
         let url = Self.url(support: support)
         try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        // Whole and onto the disk itself before anything turns, or a command stopped halfway leaves changes the records never learn of.
         try JSONEncoder().encode(self).write(to: url, options: .atomic)
         _ = UserDataStore.syncToDisk(url)
     }
@@ -43,10 +37,6 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
         try? FileManager.default.removeItem(at: url(support: support))
     }
 
-    /// The records as they'd be had the command finished: each file turned on where it is that macOS has on is in
-    /// `inPlace`, each turned off isn't (nor on for a while); a file that went from an app's folder into the Inactive
-    /// folder has its origin noted, found by its contents; one that went back has it forgotten. Files in a Fonts folder
-    /// need nothing: macOS keeps whether they're on. Doing it again changes nothing more.
     public func repair(_ records: ActivationRecords, registrar: any FontRegistrar, locations: Locations) -> ActivationRecords {
         var records = records
         let fm = FileManager.default
@@ -54,14 +44,15 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
         let inactive = locations.inactiveFolders
         for entry in entries {
             let path = entry.path
-            // Turned on out of the Inactive folder, back into its app's folder.
             if let origin = records.appFolderOrigins[path] {
-                if !fm.fileExists(atPath: path), fm.fileExists(atPath: origin) { records.appFolderOrigins[path] = nil }
+                if !fm.fileExists(atPath: path), fm.fileExists(atPath: origin) {
+                    records.appFolderOrigins[path] = nil
+                    if turningOn, registrar.isActive(URL(fileURLWithPath: origin, isDirectory: false)) { records.inPlace.insert(origin) }
+                }
                 continue
             }
             if fontsFolders.contains(where: path.hasPrefix) { continue }
             let exists = fm.fileExists(atPath: path)
-            // Turned off out of an app's folder, into the Inactive folder.
             if !turningOn, !exists, WatchedFolder.detectAppName(forPath: path) != nil, let digest = entry.digest {
                 let known = Set(records.appFolderOrigins.keys)
                 let moved = inactive.lazy.flatMap { folder in Self.files(in: folder) }.first { candidate in
@@ -90,5 +81,74 @@ public struct ActivationJournal: Codable, Equatable, Sendable {
     private static func files(in folder: URL) -> [String] {
         guard let walker = FileManager.default.enumerator(atPath: folder.path) else { return [] }
         return walker.compactMap { ($0 as? String).map { folder.appendingPathComponent($0).path } }
+    }
+}
+
+public struct AppFolderMoves: Codable, Sendable {
+    private static let lock = Mutex(())
+
+    struct Move: Codable, Sendable {
+        var moved: String
+        var origin: String
+        var digest: String?
+    }
+
+    var moves: [Move] = []
+
+    static func url(support: URL) -> URL {
+        support.appendingPathComponent("moved-out-of-app-folders.json", isDirectory: false)
+    }
+
+    static func note(_ entries: [(moved: String, origin: String)], support: URL) throws {
+        guard !entries.isEmpty else { return }
+        try lock.withLock { _ in
+            let url = url(support: support)
+            var list = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(AppFolderMoves.self, from: $0) } ?? AppFolderMoves()
+            for entry in entries {
+                list.moves.append(Move(moved: entry.moved, origin: entry.origin, digest: ActivationJournal.digest(of: entry.origin)))
+            }
+            try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+            try JSONEncoder().encode(list).write(to: url, options: .atomic)
+            _ = UserDataStore.syncToDisk(url)
+        }
+    }
+
+    public static func exists(support: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url(support: support).path)
+    }
+
+    public static func recover(_ records: ActivationRecords, support: URL) -> ActivationRecords {
+        guard let data = try? Data(contentsOf: url(support: support)),
+              let list = try? JSONDecoder().decode(AppFolderMoves.self, from: data) else { return records }
+        var records = records
+        let fm = FileManager.default
+        for move in list.moves where records.appFolderOrigins[move.moved] == nil && fm.fileExists(atPath: move.moved) {
+            // The Inactive folder has other files too, set aside by Replace or a restore, which may have taken the same name since.
+            guard let digest = move.digest, ActivationJournal.digest(of: move.moved) == digest else { continue }
+            records.appFolderOrigins[move.moved] = move.origin
+        }
+        return records
+    }
+
+    public static func remove(recorded: Set<String>, support: URL) {
+        lock.withLock { _ in
+            let url = url(support: support)
+            guard let data = try? Data(contentsOf: url),
+                  var list = try? JSONDecoder().decode(AppFolderMoves.self, from: data) else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            list.moves.removeAll { recorded.contains($0.moved) }
+            if list.moves.isEmpty {
+                try? FileManager.default.removeItem(at: url)
+            } else if let encoded = try? JSONEncoder().encode(list) {
+                try? encoded.write(to: url, options: .atomic)
+                _ = UserDataStore.syncToDisk(url)
+            }
+        }
+    }
+
+    public static func remove(support: URL) {
+        lock.withLock { _ in try? FileManager.default.removeItem(at: url(support: support)) }
     }
 }

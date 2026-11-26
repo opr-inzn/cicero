@@ -1,14 +1,11 @@
 import Foundation
+import Synchronization
 
-/// `app.lock` in Cicero's support folder, so one program at a time writes Cicero's data and moves its fonts: Cicero
-/// holds it from launch until it quits, and the `cicero` command while it makes a change with Cicero closed. While
-/// Cicero holds it, the command asks Cicero to make the change (see `Requests` in CiceroCommands). An advisory lock
-/// (`flock`): macOS lets go of it when the program that holds it stops, also when it crashes.
-public final class AppLock: @unchecked Sendable {
-    private var descriptor: Int32
+public final class AppLock: Sendable {
+    private let descriptor: Mutex<Int32>
 
     private init(descriptor: Int32) {
-        self.descriptor = descriptor
+        self.descriptor = Mutex(descriptor)
     }
 
     deinit { release() }
@@ -17,38 +14,56 @@ public final class AppLock: @unchecked Sendable {
         support.appendingPathComponent("app.lock", isDirectory: false)
     }
 
-    /// What holds the lock, as written in the file by `take`: Cicero (by its name, for "Cicero (Beta)") or the command.
     public enum Holder: Equatable, Sendable {
         case command
         case app(name: String)
+        case unknown
 
         var text: String {
             switch self {
             case .command: "command\n"
-            case .app(let name): "app\n\(name)\n"
+            case .app(let name): "app\n\(name)\n\(Int(Date.now.timeIntervalSince1970))\n"
+            case .unknown: ""
             }
         }
 
         init(text: String) {
             let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-            self = lines.first == "app" && lines.count > 1 ? .app(name: String(lines[1])) : .command
+            switch lines.first {
+            case "app" where lines.count > 1: self = .app(name: String(lines[1]))
+            case "command": self = .command
+            default: self = .unknown
+            }
         }
     }
 
     public enum Attempt {
         case taken(AppLock)
-        /// Something else holds it.
         case held
-        /// The file can't be made or opened, so no lock can be had at all.
         case unavailable
     }
 
-    /// Takes the lock if nothing holds it, and writes who holds it in the file.
     public static func attempt(support: URL, holder: Holder = .command) -> Attempt {
         try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-        let descriptor = open(url(support: support).path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644)
+        let path = url(support: support).path
+        var descriptor = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644)
+        // One left by `sudo cicero` belongs to root and can only be replaced, once no one holds it: holding no lock, Cicero and the command could write at once.
+        if descriptor < 0, errno == EACCES || errno == EPERM {
+            let readOnly = open(path, O_RDONLY | O_CLOEXEC)
+            guard readOnly >= 0 else { return .unavailable }
+            defer { close(readOnly) }
+            guard flock(readOnly, LOCK_EX | LOCK_NB) == 0 else { return errno == EWOULDBLOCK ? .held : .unavailable }
+            guard isNamed(path, by: readOnly) else { return .held }
+            if unlink(path) == 0 { descriptor = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644) }
+        }
         guard descriptor >= 0 else { return .unavailable }
+        // Still the file at that path once locked, or another process replaced it meanwhile, and the lock would be on a file no one else opens.
         guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            let error = errno
+            close(descriptor)
+            return error == EWOULDBLOCK ? .held : .unavailable
+        }
+        guard isNamed(path, by: descriptor) else {
             close(descriptor)
             return .held
         }
@@ -58,28 +73,26 @@ public final class AppLock: @unchecked Sendable {
         return .taken(AppLock(descriptor: descriptor))
     }
 
-    /// The lock, if nothing holds it; nil when something does, or the file can't be made.
+    private static func isNamed(_ path: String, by descriptor: Int32) -> Bool {
+        var held = stat(), named = stat()
+        return fstat(descriptor, &held) == 0 && stat(path, &named) == 0 && held.st_dev == named.st_dev && held.st_ino == named.st_ino
+    }
+
     public static func take(support: URL, holder: Holder = .command) -> AppLock? {
         if case .taken(let lock) = attempt(support: support, holder: holder) { return lock }
         return nil
     }
 
-    /// Who holds the lock, as the holder wrote it; worth asking only while `take` fails.
     public static func holder(support: URL) -> Holder {
         Holder(text: (try? String(contentsOf: url(support: support), encoding: .utf8)) ?? "")
     }
 
-    /// The lock, once what holds it lets go, looking every 50 ms; nil when that takes longer than `timeout`.
-    public static func wait(support: URL, timeout: Duration) -> AppLock? {
-        let deadline = ContinuousClock.now + timeout
-        while true {
-            if let lock = take(support: support) { return lock }
-            if ContinuousClock.now >= deadline { return nil }
-            Thread.sleep(forTimeInterval: 0.05)
-        }
+    public static func appStarted(support: URL) -> Date? {
+        let lines = ((try? String(contentsOf: url(support: support), encoding: .utf8)) ?? "").split(separator: "\n")
+        guard lines.first == "app", lines.count > 2, let seconds = TimeInterval(lines[2]) else { return nil }
+        return Date(timeIntervalSince1970: seconds)
     }
 
-    /// Whether something holds the lock now.
     public static func isHeld(support: URL) -> Bool {
         guard FileManager.default.fileExists(atPath: url(support: support).path) else { return false }
         guard let lock = take(support: support) else { return true }
@@ -87,11 +100,14 @@ public final class AppLock: @unchecked Sendable {
         return false
     }
 
-    /// Lets go of it; the next `take` gets it.
     public func release() {
-        guard descriptor >= 0 else { return }
-        flock(descriptor, LOCK_UN)
-        close(descriptor)
-        descriptor = -1
+        let fd = descriptor.withLock { fd -> Int32 in
+            let current = fd
+            fd = -1
+            return current
+        }
+        guard fd >= 0 else { return }
+        flock(fd, LOCK_UN)
+        close(fd)
     }
 }

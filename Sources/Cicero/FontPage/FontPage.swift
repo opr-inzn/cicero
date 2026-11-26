@@ -2,22 +2,19 @@ import AppKit
 import CiceroCore
 import SwiftUI
 
-/// One family's page, pushed over the browser: a type tester, every style, then the glyphs, the ligatures among them,
-/// one under the other.
 struct FontPage: View {
     @Environment(AppModel.self) private var model
-    @Environment(PreviewSettings.self) private var preview
     let familyID: String
     @State private var glyphColumns: Int?
-    /// The ligatures and characters of the face shown, when they weren't ready as the page opened.
     @State private var loaded: (face: FaceID, content: PageContent)?
 
-    /// A style and the version of its file: a new version is read again.
-    private struct Reading: Equatable {
-        let face: FaceID
-        let generation: Int
-    }
     @FocusState private var focused: Bool
+    @State private var position = ScrollPosition()
+    @State private var keeper = TopRowKeeper()
+    @State private var title = GlyphsTitle()
+    @State private var solidTop = false
+    @State private var glyphQuery = ""
+    @State private var openCell = OpenCell()
 
     var body: some View {
         if let family = model.family(familyID) {
@@ -30,70 +27,102 @@ struct FontPage: View {
     }
 
     private func page(_ family: Family) -> some View {
-        // The style the text is set in, whose glyphs the page lists.
-        let face = model.previewStyle(of: family, weight: preview.weight).face.face
-        // Usually ready before the page opens: the browser starts on a family when it's selected. While another style's
-        // are read, the last one's stay, in that style, rather than a spinner in their place; so do those of the file
-        // before it changed, as a spinner would take the page's height away and leave it scrolled to the top. Their
-        // glyphs by ID aren't drawn again meanwhile (see `GlyphGridRow`).
+        let face = model.previewStyle(of: family).face.face
         let ready = model.pageContents.content(of: face) ?? loaded.flatMap { $0.face == face.id ? $0.content : nil }
         let shown = ready.map { (face: face, content: $0) } ?? loaded.flatMap { last in
             family.faces.first { $0.id == last.face }.map { (face: $0.face, content: last.content) }
         }
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Header(family: family)
-                Divider()
-                TypeTester(family: family)
-                // With one style the tester already shows it.
-                if family.faces.count > 1 {
+        return ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Header(family: family)
+                    Divider()
+                    TypeTester(family: family)
                     StyleRows(family: family)
-                }
-                // Lazy for the glyphs, which can run to thousands of cells. Their group titles scroll with them
-                // rather than pin, so the cells only meet the toolbar, where they fade out, instead of showing
-                // between it and a pinned title and ending at the title's edge. Only rows about one height go in it:
-                // it guesses the height of rows it hasn't placed from those it has, and with the styles in it too
-                // (fifty of them are 2,000 pt) the guesses swung so far that, scrolled to the end, the page laid
-                // itself out again and again at full CPU.
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    // Glyphs and ligatures together, once the page's width is known: one arriving after the other, or
-                    // their cells after their titles, moved what was already there.
-                    if let shown {
-                        if let glyphColumns {
-                            let content = shown.content
-                            GlyphsSection(family: family, face: shown.face, columns: glyphColumns, sections: content.glyphs,
-                                          characterCount: content.characterCount, ligatures: content.ligatures,
-                                          ligatureCharacters: content.ligatureCharacters, alternates: content.alternates,
-                                          generation: content.generation)
+                    // Not the styles in this lazy stack: their rows, far taller than glyph rows, made it lay the page out again and again at full CPU.
+                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                        if let shown {
+                            if let glyphs = glyphsSection(family, shown) {
+                                glyphs
+                            }
+                        } else {
+                            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
                         }
-                    } else {
-                        ProgressView().frame(maxWidth: .infinity).padding(.vertical, 56)
                     }
                 }
+                .modifier(GlyphColumnsReader(columns: $glyphColumns))
+                .environment(\.topRowKeeper, keeper)
+                .environment(\.glyphsTitle, title)
+                .coordinateSpace(.named(TopRowKeeper.space))
             }
-            // The stack's width is the scroll view's less the Info panel's inset, never the rows', so this settles
-            // at once; only a change in the count redraws the glyphs.
-            .onGeometryChange(for: Int.self) { GlyphsSection.columns(fitting: $0.size.width) } action: { glyphColumns = $0 }
+            .scrollPosition($position)
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { [keeper] in keeper.visibleTop = $1 }
+            .onScrollGeometryChange(for: Bool.self) { [titleY = title.y] geometry in titleY.map { geometry.contentOffset.y >= $0 - GlyphsSection.titleGap + 2 } ?? false } action: { solidTop = $1 }
+            .hardTopScrollEdge(solidTop)
+            .overlay(alignment: .top) {
+                if solidTop {
+                    Color.canvas.frame(height: 2).background(Color.canvas.ignoresSafeArea(edges: .top))
+                }
+            }
+            .onAppear { [keeper, _position] in keeper.scrollTo = { _position.wrappedValue.scrollTo(y: $0) } }
+            .onDisappear { [keeper] in keeper.scrollTo = nil }
+            // The font list under this page in the navigation stack keeps the focus, and defaultFocus counts only when the window opens.
+            .task { focused = true }
+            .task(id: FileFace(family.regular.face)) {
+                model.pageFeatures.prepare(family.regular.face)
+            }
+            // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
+            .task(id: FileFace(face)) {
+                let content = await model.pageContents.content(loading: face)
+                guard !Task.isCancelled else { return }
+                loaded = (face.id, content)
+            }
+            .background(Color.canvas)
+            .contextMenu { FamilyMenu(families: [family], model: model) }
+            .focusable()
+            .focused($focused)
+            .focusEffectDisabled()
+            .defaultFocus($focused, true)
+            .navigationTitle(family.name)
+            .toolbar {
+                ToolbarCapsule { InfoButton() }
+                ToolbarGap()
+            }
+            .onKeyPress(phases: .down) { press in
+                // SwiftUI hands keys to this page before the sample text's NSTextView, which is inside it, so typing there would jump too.
+                guard !(NSApp.keyWindow?.firstResponder is NSTextView) else { return .ignored }
+                guard press.modifiers.isDisjoint(with: [.command, .control]), let scalar = Self.typed(press.characters),
+                      let glyphs = glyphsSection(family, shown), let row = glyphs.row(of: scalar)
+                else { return .ignored }
+                CellPopover.shared.close(animated: false)
+                openCell.cell = .character(scalar)
+                proxy.scrollTo(row, anchor: .center)
+                return .handled
+            }
+            .onExitCommand { model.openFamilyID = nil }
         }
-        // Here, not on a row of the lazy stack, which wouldn't see a change of style while scrolled out of view.
-        .task(id: Reading(face: face.id, generation: FontLoader.shared.generation(of: face.path))) {
-            loaded = (face.id, await model.pageContents.content(loading: face))
+    }
+
+    private func glyphsSection(_ family: Family, _ shown: (face: FontFace, content: PageContent)?) -> GlyphsSection? {
+        guard let shown, let glyphColumns else { return nil }
+        let content = shown.content
+        return GlyphsSection(family: family, face: shown.face, columns: glyphColumns, sections: content.glyphs,
+                             glyphCount: content.glyphCount, alternateCount: content.alternateCount, ligatures: content.ligatures,
+                             ligatureCharacters: content.ligatureCharacters, alternates: content.alternates,
+                             generation: content.generation, query: $glyphQuery, open: openCell)
+    }
+
+    private static func typed(_ characters: String) -> UInt32? {
+        guard let scalar = characters.unicodeScalars.first, characters.unicodeScalars.count == 1 else { return nil }
+        // AppKit gives the arrow, function and other special keys characters of their own in private use, from U+F700.
+        guard !(0xF700...0xF8FF).contains(scalar.value) else { return nil }
+        switch scalar.properties.generalCategory {
+        case .control, .format, .spaceSeparator, .lineSeparator, .paragraphSeparator: return nil
+        default: return scalar.value
         }
-        .background(Color.canvas)
-        // The page takes focus when it opens, rather than the first field on it, the type tester's size.
-        .focusable()
-        .focused($focused)
-        .focusEffectDisabled()
-        .defaultFocus($focused, true)
-        .navigationTitle(family.name)
-        // No Preview Options: the page has its own size, tracking and alignment, and takes the weight from the
-        // browser's. Its Leading, `PreviewSettings.lineSpacing`, is shared by every font page.
-        .toolbar { ToolbarCapsule { InfoButton() } }
-        .onExitCommand { model.openFamilyID = nil }
     }
 }
 
-/// The family name in its own regular face, a line of facts, and Activate/Deactivate.
 private struct Header: View {
     @Environment(AppModel.self) private var model
     let family: Family
@@ -107,8 +136,8 @@ private struct Header: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            Spacer(minLength: 16)
-            // Worded as in the family's right-click menu: "Activate in All Apps" for one in Adobe's folder.
+            .layoutPriority(1)
+            Spacer(minLength: 0)
             let titles = ActivationTitles([family])
             HStack(spacing: 8) {
                 if family.hasActivatable {
@@ -122,21 +151,20 @@ private struct Header: View {
                         .disabled(true)
                         .help(lockedReason)
                 }
-                // Creative Cloud turns Adobe Fonts on and off, not Cicero: on the family's page on Adobe Fonts' website.
                 if hasAdobeFonts {
                     if let page = CreativeCloud.page(for: family) {
                         Button("Manage in Adobe Fonts") { NSWorkspace.shared.open(page) }
-                            .help("Opens the family’s page on Adobe Fonts, where you turn it on and off")
+                            .help("Open the family’s page on Adobe Fonts to activate or deactivate it")
                     } else {
                         Button("Manage in Creative Cloud") { CreativeCloud.open() }
                     }
                 }
             }
+            .fixedSize()
         }
         .padding(.horizontal, 24)
-        .padding(.top, 20)
+        .padding(.top, 8)
         .padding(.bottom, 16)
-        // The family's menu, as in the browser; the sample below has it too.
         .contentShape(.rect)
         .contextMenu { FamilyMenu(families: [family], model: model) }
     }
@@ -144,45 +172,36 @@ private struct Header: View {
     private var summary: String {
         var parts: [String] = []
         if let foundry = model.foundryName(of: family) { parts.append(foundry) }
-        parts.append(family.format.rawValue)
         if family.isVariable { parts.append("Variable") }
         parts.append("\(family.stylesLabel) · \(activation)")
         return parts.joined(separator: " · ")
     }
 
-    /// How many styles are active, partly active (on in one app only, like those in an Adobe folder) and
-    /// inactive, leaving out the kinds with none: "3 active · 2 partly active", "2 inactive".
     private var activation: String {
         let partly = family.faces.count { if case .appOnly = $0.state { true } else { false } }
         let counts = [(family.activeCount, "active"), (partly, "partly active"), (family.faces.count - family.activeCount - partly, "inactive")]
-        return counts.filter { $0.0 > 0 }.map { "\($0.0.formatted()) \($0.1)" }.joined(separator: " · ")
+        return counts.filter { $0.0 > 0 }.map { "\($0.0.plain) \($0.1)" }.joined(separator: " · ")
     }
 
     private var hasAdobeFonts: Bool { family.faces.contains(where: \.isAdobeFonts) }
 
     private var lockedReason: String {
         switch family.faces.first?.state.source {
-        case .macOS: "Installed with macOS, so it can’t be turned off"
-        case .allUsers: "Installed for all users; an administrator has to remove it"
-        case .app: "Comes with an app, which manages it"
+        case .macOS: "Installed with macOS, so it can’t be deactivated"
+        case .allUsers: "Installed for all users; only an administrator can deactivate or remove it"
+        case .app: "Installed and managed by another app"
         default: "Managed outside Cicero"
         }
     }
 }
 
-/// The family's name in its own regular face, for the header: 34 pt on a line as tall as most fonts' names take, the same
-/// for every family, so headers don't grow with a font's line spacing; or, when its glyphs reach further than the room
-/// around that line, like Zapfino's swashes, smaller, just as much as it takes for them to fit whole, in the middle of it.
-/// Cut short with "…" when it's wider than the room.
 private struct FamilyName: View {
     let name: String
     let face: FontFace
     static let size: CGFloat = 34
-    /// The line, and the room its glyphs may take above it, short of the toolbar's edge, and below it, short of the summary.
     static let line: CGFloat = 41
     static let above: CGFloat = 16
     static let below: CGFloat = 4
-    /// Room before the name for glyphs reaching back past its start, like a swash on a first capital.
     static let lead: CGFloat = 12
 
     var body: some View {
@@ -208,15 +227,14 @@ private struct FamilyName: View {
             return (font, line, CTLineGetBoundsWithOptions(line, .useGlyphPathBounds))
         }
         var set = line(size)
-        // On the line as the font's own spacing would put it, its ascent and descent in the middle of it.
         let ascent = CTFontGetAscent(set.font), descent = CTFontGetDescent(set.font)
         var baseline = above + (Self.line - ascent - descent) / 2 + ascent
         if !set.ink.isNull, baseline - set.ink.maxY < 0 || baseline - set.ink.minY > area.height {
             set = line(size * min(1, area.height / set.ink.height))
             baseline = (area.height - set.ink.height) / 2 + set.ink.maxY
         }
-        let ellipsis = TextLine("…", font: set.font, kerning: 0).line
-        let shown = CTLineCreateTruncatedLine(set.line, max(1, area.width - lead), .end, ellipsis) ?? set.line
+        let ellipsis = TextLine("…", font: set.font, kerning: 0, showsNotdef: false).line
+        let shown = CTLineCreateTruncatedLine(set.line, max(1, area.width - lead), .middle, ellipsis) ?? set.line
         context.saveGState()
         context.setFillColor(color)
         context.textMatrix = .identity
@@ -228,32 +246,26 @@ private struct FamilyName: View {
     }
 }
 
-/// A large, editable sample in one style.
 private struct TypeTester: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
     let family: Family
     @AppStorage("typeTester.size") private var size = 72.0
     @AppStorage("typeTester.alignment") private var alignment = Self.savedAlignment
-    /// The space added between letters, in percent of the em, on top of the font's kerning: the page's own, not the
-    /// overview's, which sets every font with its own spacing.
     @AppStorage("typeTester.tracking") private var tracking = Self.savedTracking
-    /// What's typed over the text in a font's own script, on this family's page only (see `TesterText.shownText`).
     @State private var ownScript: OwnScriptText?
-    /// The case the text was last put in with the AA, Aa and aa buttons, which the editor converts it to as a step to undo.
     @State private var caseChange: CaseChange?
 
     var body: some View {
-        let (face, weight) = model.previewStyle(of: family, weight: preview.weight)
+        let (face, weight) = model.previewStyle(of: family)
         let variations = model.variations(for: family, face: face.id)
         VStack(spacing: 0) {
             TesterControls {
-                stylePicker(isAdjusted: !variations.isEmpty)
+                stylePicker(face: face, isAdjusted: !variations.isEmpty)
                 sliders
                 buttons(hasAxes: !face.face.axes.isEmpty)
             }
             .padding(.top, 12)
-            // A style on a server is read off the main thread first, in the room the editor takes at least.
             ReadingFonts(paths: [face.face.path]) {
                 TesterText(family: family, face: face.face,
                            font: FontLoader.shared.font(face.face, size: size, weight: weight, variations: variations,
@@ -266,36 +278,53 @@ private struct TypeTester: View {
     }
 
     @ViewBuilder
-    private func stylePicker(isAdjusted: Bool) -> some View {
+    private func stylePicker(face: LibraryFace, isAdjusted: Bool) -> some View {
         if family.faces.count > 1 {
-            Picker("Style", selection: choice(isAdjusted: isAdjusted)) {
-                Text("Automatic").tag(StyleChoice.automatic)
-                Divider()
-                ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
-                if isAdjusted {
-                    Divider()
-                    Text("Custom").tag(StyleChoice.custom)
+            ZStack {
+                Picker("Style", selection: .constant(0)) { Text(longestStyleTitle).tag(0) }
+                    .labelsHidden()
+                    .hidden()
+                    .accessibilityHidden(true)
+                Picker("Style", selection: choice(face: face, isAdjusted: isAdjusted)) {
+                    ForEach(family.faces) { Text($0.face.styleName).tag(StyleChoice.style($0.id)) }
+                    if isAdjusted {
+                        Divider()
+                        Text("Custom").tag(StyleChoice.custom)
+                    }
                 }
+                .labelsHidden()
             }
-            .fixedSize()
-            .help("Which style to show; Automatic shows the regular style, or a style the search names, like Italic")
+            .frame(maxWidth: 220, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .help("Choose which style to preview (defaults to Regular, or a style matched by your search)")
             .layoutValue(key: TesterControls.RoleKey.self, value: .menu)
         }
     }
 
-    /// The text's size, tracking and leading.
+    private static var longestStyleCache: [String: (count: Int, title: String)] = [:]
+
+    private var longestStyleTitle: String {
+        if let cached = Self.longestStyleCache[family.id], cached.count == family.faces.count { return cached.title }
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        var titles = family.faces.map(\.face.styleName)
+        if family.faces.contains(where: { !$0.face.axes.isEmpty }) { titles.append("Custom") }
+        let title = titles.max { ($0 as NSString).size(withAttributes: [.font: font]).width < ($1 as NSString).size(withAttributes: [.font: font]).width } ?? ""
+        if Self.longestStyleCache.count >= 64 { Self.longestStyleCache.removeAll(keepingCapacity: true) }
+        Self.longestStyleCache[family.id] = (family.faces.count, title)
+        return title
+    }
+
     @ViewBuilder
     private var sliders: some View {
         slider("Size", symbol: "textformat", $size, range: 12...240, unit: " pt")
+            .help("Font size in points")
         slider("Tracking", symbol: "arrow.left.and.right.text.vertical", $tracking, range: -10...40, step: 0.5, unit: "%")
-            .help("The space added between letters, in percent of the em, on top of the font’s kerning")
+            .help("Extra space between letters, as a percentage of the em, added to the font’s kerning")
         slider("Leading", symbol: "arrow.up.and.down.text.horizontal",
                Binding { preview.lineSpacing } set: { preview.lineSpacing = $0 }, range: PreviewSettings.lineSpacings, step: 5, unit: "%")
-            .help("The distance between lines, in percent of the size")
+            .help("Line spacing, as a percentage of the font size")
     }
 
-    /// A symbol for a label, as in a layout app's character panel, with the word as its tooltip, a slider that narrows
-    /// where the row is short of room, and the value, which takes a number typed in too.
     private func slider(_ title: String, symbol: String, _ value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1,
                         unit: String) -> some View {
         Group {
@@ -305,8 +334,9 @@ private struct TypeTester: View {
                 .foregroundStyle(.secondary)
                 .fixedSize()
                 .layoutValue(key: TesterControls.RoleKey.self, value: .label)
-            // Ideally as narrow as at the least: the row they fit in is the menu's, while they fit at all.
-            ValueSlider(value: value, range: range, step: step).frame(minWidth: 80, idealWidth: 80, maxWidth: .infinity)
+            ValueSlider(value: value, range: range, step: step)
+                .accessibilityLabel(title)
+                .frame(minWidth: 80, idealWidth: 80, maxWidth: .infinity)
                 .layoutValue(key: TesterControls.RoleKey.self, value: .slider)
             ValueField(title, value: value, range: range, step: step, unit: unit, alignment: .leading)
                 .layoutValue(key: TesterControls.RoleKey.self, value: .value)
@@ -323,54 +353,37 @@ private struct TypeTester: View {
         }
     }
 
-    /// The Style menu's choice: Custom once an axis has been moved, until a style is chosen again.
-    private func choice(isAdjusted: Bool) -> Binding<StyleChoice> {
+    private func choice(face: LibraryFace, isAdjusted: Bool) -> Binding<StyleChoice> {
         Binding {
-            isAdjusted ? .custom : model.pageStyleID.map(StyleChoice.style) ?? .automatic
+            isAdjusted ? .custom : .style(face.id)
         } set: { choice in
-            switch choice {
-            case .automatic: model.pageStyleID = nil
-            case .style(let id): model.pageStyleID = id
-            case .custom: return
-            }
+            guard case .style(let id) = choice else { return }
+            model.pageStyleID = id == model.unchosenStyle(of: family).face.id ? nil : id
             model.familyAxes[family.id] = nil
         }
     }
 }
 
 private enum StyleChoice: Hashable {
-    case automatic
     case style(FaceID)
     case custom
 }
 
-/// Shows the Info panel at its Axes tab, or hides it when it's showing them.
 private struct AxesButton: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Button {
-            let isShowing = model.isInfoPresented && model.infoTab == .axes
+            let isShowing = model.isInfoShown && model.infoTab == .axes
             model.infoTab = .axes
-            model.isInfoPresented = !isShowing
+            model.isInfoShown = !isShowing
         } label: {
             Label("Axes", systemImage: "slider.horizontal.3")
         }
-        .help("Move the style’s axes, in the Info panel")
+        .help("Adjust the style’s variable axes in the Info panel")
     }
 }
 
-/// The type tester's controls: the Style menu, the sliders with their labels and values, the alignment, case and Axes
-/// buttons. On one row wherever the sliders fit at their narrowest, else the sliders on a row of their own under the
-/// menu: with the Info panel open, a narrow window has too little for all of them. On one row, the sliders share the
-/// width the row leaves, as long as each other, but past `longestSlider` each, up to `groupGap` more goes either side
-/// of them first, so they stand as a group between the menu and the buttons; on a row of their own, they share all of
-/// it. Either way the last value or button ends where the row does. Each slider's symbol, slider and value are 8 pt
-/// apart, the group 32 pt from the menu and the buttons, everything else 16: a value's field is as wide as its widest
-/// value, so the room after a shorter one adds to the 16 pt to the next symbol, and 16 pt either side of the group
-/// looked narrower than that. A layout of its own, not `ViewThatFits` over the two ways, which made each of them
-/// afresh, menu, fields and buttons, whenever it weighed them again: with each letter typed and each step of a slider,
-/// a third of a second.
 private struct TesterControls: Layout {
     enum Role {
         case menu, label, slider, value, button
@@ -382,7 +395,6 @@ private struct TesterControls: Layout {
 
     struct Cache {
         var roles: [Role]
-        /// Each one's ideal size: the sliders' is their narrowest.
         var sizes: [CGSize]
     }
 
@@ -401,13 +413,11 @@ private struct TesterControls: Layout {
             return CGSize(width: proposed ?? width(of: row, cache), height: height(of: row, cache))
         }
         let (top, bottom) = twoRows(cache)
-        return CGSize(width: max(proposed ?? 0, width(of: top, cache), width(of: bottom, cache)),
+        return CGSize(width: proposed ?? max(width(of: top, cache), width(of: bottom, cache)),
                       height: height(of: top, cache) + 10 + height(of: bottom, cache))
     }
 
-    /// How long a slider grows on the row with the menu and buttons before the room either side of them does.
     static let longestSlider: CGFloat = 180
-    /// The most room added either side of the sliders, on top of their 32 pt.
     static let groupGap: CGFloat = 16
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
@@ -417,11 +427,10 @@ private struct TesterControls: Layout {
         }
         let (top, bottom) = twoRows(cache)
         let topHeight = height(of: top, cache)
-        // The menu at the left, the buttons at the right.
         let buttons = top.filter { cache.roles[$0] == .button }
         var x = bounds.minX
         for index in top {
-            if index == buttons.first { x = bounds.maxX - width(of: buttons, cache) }
+            if index == buttons.first { x = max(x, bounds.maxX - width(of: buttons, cache)) }
             subviews[index].place(at: CGPoint(x: x, y: bounds.minY + topHeight / 2), anchor: .leading,
                                   proposal: ProposedViewSize(cache.sizes[index]))
             x += cache.sizes[index].width + 16
@@ -430,8 +439,6 @@ private struct TesterControls: Layout {
         place(bottom, in: rest, subviews, cache)
     }
 
-    /// `row` from the left of `bounds`, in the middle of its height, the sliders sharing what the rest leave; `grouped`, with
-    /// up to `groupGap` of it either side of them once they're `longestSlider` long (see `TesterControls`).
     private func place(_ row: [Int], in bounds: CGRect, _ subviews: Subviews, _ cache: Cache, grouped: Bool = false) {
         let sliders = row.filter { cache.roles[$0] == .slider }
         let room = max(0, bounds.width - width(of: row, cache))
@@ -447,10 +454,8 @@ private struct TesterControls: Layout {
             case (true, false): before = min(left, Self.groupGap)
             case (false, false): break
             }
-            // The rest to the sliders again.
             extra += (left - before - after) / CGFloat(sliders.count)
         }
-        // What follows the sliders' last value.
         let afterGroup = group.last.flatMap { last in row.drop { $0 != last }.dropFirst().first }
         var x = bounds.minX
         for index in row {
@@ -470,7 +475,6 @@ private struct TesterControls: Layout {
         return self.width(of: Array(cache.roles.indices), cache) <= width
     }
 
-    /// The menu and buttons, then the sliders with their symbols.
     private func twoRows(_ cache: Cache) -> (top: [Int], bottom: [Int]) {
         let top = cache.roles.indices.filter { cache.roles[$0] == .menu || cache.roles[$0] == .button }
         return (top, cache.roles.indices.filter { [.label, .slider, .value].contains(cache.roles[$0]) })
@@ -493,7 +497,6 @@ private struct TesterControls: Layout {
     }
 }
 
-/// The type tester's text, a view of its own so that typing updates it alone, not the controls above it.
 private struct TesterText: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
@@ -506,6 +509,8 @@ private struct TesterText: View {
     let caseChange: CaseChange?
     @Binding var ownScript: OwnScriptText?
     @Bindable private var store = TesterTextStore.shared
+    @State private var decided: (face: FaceID, sample: String?)?
+    @State private var typed: String?
 
     private var text: String {
         get { store.text }
@@ -519,7 +524,6 @@ private struct TesterText: View {
         let room = Self.room(for: text.wrappedValue, glyphs: shownGlyphs(glyphs.wrappedValue), in: font, kerning: kerning,
                              lineHeight: lineHeightPoints)
         let lowered = Self.lowered(in: font, room: room)
-        // As tall as its lines, so it grows with the page instead of scrolling inside it (see `SampleEditor`).
         SampleEditor(text: text, glyphs: glyphs, defaultText: defaultText, family: family.id, face: face, font: font,
                      kerning: kerning, lineHeight: lineHeightPoints, alignment: alignment.paragraph, margin: 24,
                      roomAbove: room.above, roomBelow: room.below, caseChange: caseChange) {
@@ -528,28 +532,34 @@ private struct TesterText: View {
             .frame(minHeight: 280)
             .padding(.top, Self.padding + lowered)
             .padding(.bottom, Self.padding - lowered)
-            // Out over the page's margins, for glyphs reaching past the lines' ends, like a swash at the start of one.
             .padding(.horizontal, -24)
-            // Around the text too, which has it in its own menu (see `SampleEditor`).
             .contentShape(.rect)
             .contextMenu { FamilyMenu(families: [family], model: model) }
-            // Text left empty as the last page closed, which the editor doesn't hear about.
             .onAppear {
                 if self.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     self.text = Self.defaultText
                     store.glyphs = []
                 }
             }
+            .onChange(of: face.id, initial: true) { decided = (face.id, freshSample) }
+            .onChange(of: store.text) { _, new in if new != typed { decided = (face.id, freshSample) } }
     }
 
-    /// The text to show and type into: what's been typed, kept from one page to the next, or, for a font with none of its
-    /// letters, like a Syriac font for Latin text, text in its own script, which typing changes on this page only. The
-    /// glyphs pasted into it, and what it goes back to when it's left empty.
-    private var shownText: (text: Binding<String>, glyphs: Binding<[SampleGlyphRun]>, defaultText: String) {
+    private var freshSample: String? {
         let sample = model.scriptSamples.text(text, for: face, long: true)
-        guard sample != text else { return ($store.text, $store.glyphs, Self.defaultText) }
+        return sample == text ? nil : sample
+    }
+
+    private var shownText: (text: Binding<String>, glyphs: Binding<[SampleGlyphRun]>, defaultText: String) {
+        let decided = decided.flatMap { $0.face == face.id ? $0 : nil }
+        guard let sample = decided.map(\.sample) ?? freshSample else {
+            let text = Binding { store.text } set: {
+                typed = $0
+                store.text = $0
+            }
+            return (text, $store.glyphs, Self.defaultText)
+        }
         let family = family.id
-        // Read as they're set, as the editor sets the text and then its glyphs.
         func own() -> OwnScriptText? { ownScript.flatMap { $0.family == family ? $0 : nil } }
         let text = Binding { own()?.text ?? sample } set: {
             ownScript = OwnScriptText(family: family, text: $0, glyphs: own()?.glyphs ?? [])
@@ -560,17 +570,10 @@ private struct TesterText: View {
         return (text, glyphs, sample)
     }
 
-    /// The pasted glyphs this style draws, as it draws them.
     private func shownGlyphs(_ runs: [SampleGlyphRun]) -> [CGGlyph] {
         runs.compactMap { $0.glyph.family == family.id ? $0.glyph.glyph(in: font, face: face) : nil }
     }
 
-    /// Room above and below the lines for glyphs that reach past them, which would otherwise run into the controls
-    /// above or what follows. The editor sets each line in the middle of its height (see `SampleEditor.Style.raise`),
-    /// so glyphs need room where they reach past the font's ascent or descent by more than half of what the line
-    /// spacing adds to the font's height, like a script font's ascenders, or at all when the lines are closer than the
-    /// font is tall. Its glyphs' own reach counts where it's greater than the font's (see `TextLine`).
-    /// Glyphs pasted into the text, like a swash, count with their own reach.
     static func room(for text: String, glyphs: [CGGlyph], in font: CTFont, kerning: Double,
                      lineHeight: Double) -> (above: CGFloat, below: CGFloat) {
         let line = TextLine(text, font: font, kerning: kerning)
@@ -585,21 +588,12 @@ private struct TesterText: View {
         return (max(0, ascent - fontAscent - raise).rounded(.up), max(0, descent - fontDescent - raise).rounded(.up))
     }
 
-    /// Above and below the text, between the controls and the styles.
     static let padding: CGFloat = 20
-    /// From the end of the text to the capitals of the styles' title: `StyleRows`' room above it, its title row's, and
-    /// the title's own above its capitals.
     static let titleBelow: CGFloat = 12 + 6 + 3
 
-    /// How far the text sits below the middle of its room, so that it looks in the middle between the controls and the
-    /// styles' title: its first line's capitals as far below the controls as its last line's baseline is above the
-    /// title. Each line sits in the middle of its height by the font's ascent and descent, so with a font whose ascent
-    /// ends at its capitals the text looked high, the more so as the title is further below it than the controls above.
-    /// No further than the padding either way, so the text never reaches the controls or the styles.
     static func lowered(in font: CTFont, room: (above: CGFloat, below: CGFloat)) -> CGFloat {
         let ascent = CTFontGetAscent(font).rounded(), descent = CTFontGetDescent(font).rounded()
         let capHeight = CTFontGetCapHeight(font)
-        // A font that says nothing of its capitals, as if they were as far below its ascent as its descent goes.
         let aboveCapitals = capHeight > 0 && capHeight <= ascent ? ascent - capHeight : descent
         let lowered = (descent - aboveCapitals + room.below - room.above + titleBelow) / 2
         return min(padding, max(-padding, lowered))
@@ -608,17 +602,12 @@ private struct TesterText: View {
     static let defaultText = "Sphinx of black quartz, judge my vow."
 }
 
-/// Text typed over the sample in a font's own script, and the glyphs pasted into it, on one family's page.
 struct OwnScriptText {
     let family: String
     let text: String
     let glyphs: [SampleGlyphRun]
 }
 
-/// The type tester's text, kept from one page to the next and for the next launch: saved a second after typing stops, and
-/// as Cicero quits, rather than with each letter. SwiftUI draws every view with an `@AppStorage` again whenever anything
-/// is saved to the defaults, whatever the key, so with each letter typed the browser behind the page was drawn again too,
-/// and Settings and the Compare window where they were open.
 @Observable
 private final class TesterTextStore {
     static let shared = TesterTextStore()
@@ -628,7 +617,6 @@ private final class TesterTextStore {
     var text: String {
         didSet { saveSoon() }
     }
-    /// The glyphs pasted into it (see `SampleGlyph`).
     var glyphs: [SampleGlyphRun] {
         didSet { saveSoon() }
     }
@@ -639,13 +627,13 @@ private final class TesterTextStore {
         let text = (UserDefaults.standard.string(forKey: Self.key) ?? TesterText.defaultText) as NSString
         self.text = text as String
         let saved = UserDefaults.standard.data(forKey: Self.glyphsKey).flatMap { try? JSONDecoder().decode([SampleGlyphRun].self, from: $0) }
-        // Those whose characters are still there, should the text have been changed without them.
-        glyphs = (saved ?? []).filter { NSMaxRange($0.range) <= text.length && text.substring(with: $0.range) == $0.glyph.characters }
+        glyphs = (saved ?? []).filter { $0.isIn(text) }
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { TesterTextStore.shared.save() }
         }
     }
 
+    // Not with each letter: SwiftUI draws every view with an @AppStorage again whenever anything is saved to the defaults, whatever the key.
     private func saveSoon() {
         pendingSave?.cancel()
         pendingSave = Task {
@@ -668,47 +656,105 @@ private final class TesterTextStore {
 }
 
 private extension TypeTester {
-    /// What Preview Options' Tracking was set to, before it moved here.
     static var savedTracking: Double {
         UserDefaults.standard.object(forKey: "preview.tracking") as? Double ?? 0
     }
 
-    /// Centered, unless the left alignment was chosen when there were only those two.
     static var savedAlignment: SampleAlignment {
         UserDefaults.standard.object(forKey: "typeTester.centered") as? Bool == false ? .leading : .center
     }
 }
 
-/// Every style with its own switch, laid out like a table. Not a Table, which scrolls by itself
-/// rather than with the page. Each style is set as it is: the features chosen in the Info panel are for the text above, and
-/// the preview text is for the browser, so each style shows the family's name.
-/// Weight when the styles are of more than one (see `Family.stylesDifferInWeight`), then a column for each other axis
-/// the styles sit apart on, like Width or one of the designer's own, in the order the styles are listed by (see
-/// `Family.styleAxes`).
+private struct GlyphColumnsReader: ViewModifier {
+    @Binding var columns: Int?
+    @Environment(\.infoPanelShown) private var infoShown
+    @Environment(\.displayScale) private var scale
+    @State private var width: CGFloat?
+
+    func body(content: Content) -> some View {
+        let isSliding = (infoShown > 0 && infoShown < 1) || SidebarRoom.shared.isSliding
+        content
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                self.width = width
+                // Not while a panel slides: the room it takes is measured a frame apart from the page's width, and in between the count would flicker.
+                if !isSliding || columns == nil { columns = resting(width) }
+            }
+            .onChange(of: isSliding) { _, sliding in
+                if !sliding, let width { columns = resting(width) }
+            }
+    }
+
+    private func resting(_ width: CGFloat) -> Int {
+        GlyphsSection.columns(fitting: width + InfoPanelOverlay.room(shown: infoShown, scale: scale) - SidebarRoom.shared.hiddenWidth)
+    }
+}
+
 private struct StyleRows: View {
     @Environment(AppModel.self) private var model
     let family: Family
+    @State private var tableWidth: CGFloat?
+    @State private var metricsCache = MetricsCache()
+    private static let gap: CGFloat = 24
+    private static let narrowestPreview: CGFloat = 200
 
-    var body: some View {
-        let model = self.model
+    private struct Metrics {
+        let axes: [(tag: String, name: String, width: CGFloat)]
+        let statusWidth: CGFloat
+        let showsWeight: Bool
+        let showsFormat: Bool
+        let styleIdealWidth: CGFloat
+        let others: CGFloat
+        let gaps: CGFloat
+    }
+
+    private final class MetricsCache {
+        var key: (id: String, faces: [FaceID], states: [FaceState])?
+        var metrics: Metrics?
+    }
+
+    private func metrics() -> Metrics {
+        let ids = family.faces.map(\.id)
+        let states = family.faces.map(\.state)
+        if let key = metricsCache.key, key.id == family.id, key.faces == ids, key.states == states, let cached = metricsCache.metrics {
+            return cached
+        }
         let headerFont = NSFont.systemFont(ofSize: NSFont.preferredFont(forTextStyle: .subheadline).pointSize, weight: .semibold)
         let axes = family.styleAxes.map { (tag: $0.tag, name: $0.name, width: Self.width(fitting: [$0.name], in: headerFont)) }
-        // As wide as the longest name, up to a point: some run to Serif Compressed Thin Italic.
-        let styleWidth = Self.width(fitting: family.faces.map(\.face.styleName), in: .preferredFont(forTextStyle: .body), minimum: 140, maximum: 240)
-        // The switch and the longest status its styles say, or come to with their switches, so turning one on or off
-        // doesn't move the columns; the rest of the page's width goes to the samples.
         let statuses = family.faces.flatMap { style in
             [style.state.label, "Active", "Inactive"] + (style.app.map { [FaceState.appOnly($0).label] } ?? [])
         }
         let statusWidth = 26 + 8 + Self.width(fitting: statuses, in: .preferredFont(forTextStyle: .body))
         let showsWeight = family.stylesDifferInWeight
+        let showsFormat = Set(family.faces.map { ($0.face.path as NSString).pathExtension.lowercased() }).count > 1
+        let others = [statusWidth, showsWeight ? 56 : 0, showsFormat ? 56 : 0].reduce(0, +) + axes.map(\.width).reduce(0, +)
+        let gaps = CGFloat(2 + (showsWeight ? 1 : 0) + (showsFormat ? 1 : 0) + axes.count) * Self.gap
+        let styleIdealWidth = Self.width(fitting: family.faces.map(\.face.styleName), in: .preferredFont(forTextStyle: .body), minimum: 140, maximum: .greatestFiniteMagnitude)
+        let result = Metrics(axes: axes, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat,
+                             styleIdealWidth: styleIdealWidth, others: others, gaps: gaps)
+        metricsCache.key = (family.id, ids, states)
+        metricsCache.metrics = result
+        return result
+    }
+
+    var body: some View {
+        let model = self.model
+        let m = metrics()
+        let axes = m.axes
+        let statusWidth = m.statusWidth
+        let showsWeight = m.showsWeight
+        let showsFormat = m.showsFormat
+        let styleRoom = tableWidth.map { $0 - Self.narrowestPreview - m.others - m.gaps } ?? 240
+        let styleWidth = min(m.styleIdealWidth, max(140, styleRoom))
+        // Not lazy: in a lazy stack, rows each as high as their own font's line moved the page below, and with it the glyph row `TopRowKeeper` keeps at the top.
         VStack(spacing: 0) {
-            row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
-                Text("Styles")
+            row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat) {
+                Text("Preview")
             } style: {
                 Text("Style")
             } weight: {
                 Text("Weight")
+            } format: {
+                Text("Format")
             } axes: {
                 ForEach(axes, id: \.tag) { Text($0.name).frame(width: $0.width, alignment: .leading) }
             } status: {
@@ -719,14 +765,16 @@ private struct StyleRows: View {
             .padding(.vertical, 6)
             ForEach(family.faces) { style in
                 Divider()
-                row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight) {
+                row(styleWidth: styleWidth, statusWidth: statusWidth, showsWeight: showsWeight, showsFormat: showsFormat) {
                     FontText(text: model.scriptSamples.text(family.name, for: style.face), face: style.face, size: 20,
-                             weight: style.face.styleWeight)
+                             weight: style.face.styleWeight, showsPlaceholder: true)
                         .foregroundStyle(Color.ink)
                 } style: {
                     Text(style.face.styleName)
                 } weight: {
-                    Text("\(Int(style.face.styleWeight.rounded()))").monospacedDigit().foregroundStyle(.secondary)
+                    Text(Int(style.face.styleWeight.rounded()).formatted(.number.grouping(.never))).monospacedDigit().foregroundStyle(.secondary)
+                } format: {
+                    Text((style.face.path as NSString).pathExtension.uppercased()).foregroundStyle(.secondary)
                 } axes: {
                     ForEach(axes, id: \.tag) { axis in
                         Text(style.face.styleValue(on: axis.tag)?.formatted(.number.grouping(.never).precision(.fractionLength(0...1))) ?? "")
@@ -739,14 +787,13 @@ private struct StyleRows: View {
                         MiniSwitch(position: model.position(of: style), isEnabled: style.canActivate || style.canDeactivate) {
                             model.toggle(style, in: family)
                         }
-                        Text(style.state.label).foregroundStyle(.secondary).lineLimit(1)
+                        Text(style.state.label).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     }
                 }
                 .padding(.vertical, 8)
                 .contentShape(.rect)
                 .contextMenu { StyleMenu(family: family, face: style, model: model) }
-                // Onto a set in the sidebar, which takes just this style.
-                .fontDrag { FontDrag(family: family.id, style: style.face.postScriptName) } preview: {
+                .styleDrag(style, of: family) {
                     FontText(text: "\(family.name) \(style.face.styleName)", face: style.face, size: 20, weight: style.face.styleWeight)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -755,25 +802,25 @@ private struct StyleRows: View {
             }
             Divider()
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tableWidth = $0 }
         .padding(.horizontal, 24)
-        // Counted in where the type tester's text sits (`TesterText.titleBelow`).
         .padding(.top, 12)
     }
 
-    /// As wide as the widest of `texts` set in `font`, within `minimum` and `maximum`.
     private static func width(fitting texts: [String], in font: NSFont, minimum: CGFloat = 56, maximum: CGFloat = .infinity) -> CGFloat {
         let widest = texts.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
         return min(max(minimum, widest.rounded(.up)), maximum)
     }
 
-    private func row(styleWidth: CGFloat, statusWidth: CGFloat, showsWeight: Bool,
+    private func row(styleWidth: CGFloat, statusWidth: CGFloat, showsWeight: Bool, showsFormat: Bool,
                      @ViewBuilder preview: () -> some View, @ViewBuilder style: () -> some View,
-                     @ViewBuilder weight: () -> some View, @ViewBuilder axes: () -> some View,
+                     @ViewBuilder weight: () -> some View, @ViewBuilder format: () -> some View, @ViewBuilder axes: () -> some View,
                      @ViewBuilder status: () -> some View) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Self.gap) {
             preview().frame(maxWidth: .infinity, alignment: .leading)
-            style().lineLimit(1).frame(width: styleWidth, alignment: .leading)
+            style().lineLimit(1).truncationMode(.middle).frame(width: styleWidth, alignment: .leading)
             if showsWeight { weight().frame(width: 56, alignment: .leading) }
+            if showsFormat { format().lineLimit(1).frame(width: 56, alignment: .leading) }
             axes().lineLimit(1)
             status().frame(width: statusWidth, alignment: .leading)
         }

@@ -1,13 +1,11 @@
 import CiceroCore
 
 extension AppModel {
-    /// Asks for a name and a colour, starting with the first colour no tag has, and makes a tag, given to `families`.
     func newTag(for families: [Family] = []) {
-        newTagRequest = NewTagRequest(families: families, color: TagColor.next(after: data.tagColors.values))
+        let request = NewTagRequest(families: families, color: TagColor.next(after: data.tagColors.values))
+        ask { $0.newTagRequest = request }
     }
 
-    /// Makes a tag in the colour (nil: none) and gives it to the families, which keep the ones they have. A name that's
-    /// taken gives them that tag, in the colour it has.
     func addTag(named name: String, color: TagColor?, to families: [Family] = []) {
         data.addTag(named: name, color: color, to: families.map(\.id))
     }
@@ -22,45 +20,41 @@ extension AppModel {
         }
     }
 
-    /// Takes the tags off every family, and out of smart set rules.
     func deleteTags(_ names: Set<String>) {
         data.deleteTags(names)
         deselect { if case .tag(let name) = $0 { names.contains(name) } else { false } }
     }
 
     func setColor(_ color: TagColor?, forTags names: [String]) {
+        var data = data
         for name in names { data.tagColors[name] = color }
+        self.data = data
     }
 
     func hasTag(_ tag: String, _ family: Family) -> Bool {
         data.familyTags[family.id]?.contains(tag) ?? false
     }
 
-    /// Gives the families the tag, or takes it off them; each keeps its other tags.
     func setTag(_ tag: String, _ isOn: Bool, for families: [Family]) {
         data.setTag(tag, isOn, for: families.map(\.id))
     }
 
-    /// Takes every tag off the families.
     func removeTags(from families: [Family]) {
         var data = data
         for family in families { data.familyTags[family.id] = nil }
         self.data = data
     }
 
-    /// The colours of the family's tags, in the order the tags were made; one without a colour has no dot.
-    func tagColors(of family: Family) -> [TagColor] {
+    func tagDots(of family: Family) -> [TagDot] {
         tagDots[family.id] ?? []
     }
 
     // MARK: Ratings
 
-    /// The stars the user gave the family, 1…5; nil for none.
     func rating(of family: Family) -> Int? {
         data.familyRatings[family.id]
     }
 
-    /// Gives the families this many stars, 1…5; nil takes their rating away.
     func setRating(_ stars: Int?, for families: [Family]) {
         let stars = stars.flatMap { (1...5).contains($0) ? $0 : nil }
         var data = data
@@ -72,7 +66,6 @@ extension AppModel {
         data.familyNotes[family.id]
     }
 
-    /// The family's note as written; nothing but spaces and new lines takes it away.
     func setNote(_ note: String, for family: Family) {
         let note = note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note
         guard data.familyNotes[family.id] != note else { return }

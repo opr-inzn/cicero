@@ -1,25 +1,12 @@
 import Foundation
 
-/// Reads an object store of a Chromium IndexedDB folder (an Electron app's `IndexedDB/file__0.indexeddb.leveldb`, with
-/// big values in `file__0.indexeddb.blob` next to it), for importing another app's library. Read-only, and only what
-/// the app last wrote: the LevelDB files the MANIFEST names (every one when it can't be read), newest write of each
-/// key winning. The files are anyone's: every read is checked, and what can't be read is left out rather than trusted.
-///
-/// The layers, outside in: LevelDB (a write-ahead `.log` of write batches, and sorted `.ldb` tables, either kind maybe
-/// Snappy-compressed); Chromium's keys (a prefix of database, object store and index IDs, then the encoded IndexedDB
-/// key); Blink's envelope (a value too big to keep inline is in a blob file, and may be Snappy-compressed); and V8's
-/// serialization of the JavaScript value itself.
-public enum ChromiumIndexedDB {
-    public enum Failure: Error, Equatable {
-        /// No LevelDB there, or no database or object store of that name in it.
+enum ChromiumIndexedDB {
+    enum Failure: Error, Equatable {
         case notFound
     }
 
-    /// The values of the object store `store` in the database `database`, by their string keys. Keys that aren't
-    /// strings and values that can't be read are left out.
-    public static func values(in leveldb: URL, database: String, store: String) throws -> [String: JSValue] {
+    static func values(in leveldb: URL, database: String, store: String) throws -> [String: JSValue] {
         let entries = try LevelDB.read(leveldb)
-        // Database IDs by name: global metadata (prefix 0, 0, 0), type 201, the origin, then the name.
         var databaseID: Int?
         for (key, value) in entries {
             var reader = IndexedDBBytes(key)
@@ -31,7 +18,6 @@ public enum ChromiumIndexedDB {
             if let id = try? valueReader.varint() { databaseID = id }
         }
         guard let databaseID else { throw Failure.notFound }
-        // Object store IDs by name: the database's metadata (prefix db, 0, 0), type 200, then the name.
         var storeID: Int?
         for (key, value) in entries {
             var reader = IndexedDBBytes(key)
@@ -43,7 +29,6 @@ public enum ChromiumIndexedDB {
         }
         guard let storeID else { throw Failure.notFound }
 
-        // Records (index 1) and the blobs of those kept in blob files (index 3), by key.
         var records: [String: [UInt8]] = [:]
         var blobs: [String: [UInt8]] = [:]
         for (key, value) in entries {
@@ -60,11 +45,9 @@ public enum ChromiumIndexedDB {
         var values: [String: JSValue] = [:]
         for (name, record) in records {
             var reader = IndexedDBBytes(record)
-            // The record's version, then the value as Blink wrote it.
             guard (try? reader.varint()) != nil else { continue }
             var bytes = Array(record[reader.offset...])
             if bytes.starts(with: [0xFF, 0x11, 0x01]) {
-                // Kept in a blob file: which one is in the record's blob entry.
                 var header = IndexedDBBytes(bytes)
                 header.offset = 3
                 guard (try? header.varint()) != nil, let index = try? header.varint(),
@@ -84,8 +67,6 @@ public enum ChromiumIndexedDB {
         return values
     }
 
-    /// The number of the `index`th blob in a record's blob entry: each is whether it's a file, its number, its type,
-    /// then its size, or a file's name and date.
     static func blobNumber(_ entry: [UInt8], index: Int) -> Int? {
         var reader = IndexedDBBytes(entry)
         for position in 0... {
@@ -101,7 +82,6 @@ public enum ChromiumIndexedDB {
         return nil
     }
 
-    /// The IDs a key starts with: one byte saying how many bytes each takes, then each, least significant first.
     struct KeyPrefix {
         var database: Int
         var store: Int
@@ -116,14 +96,12 @@ public enum ChromiumIndexedDB {
     }
 }
 
-/// A JavaScript value as V8 serialized it: what JSON has, and undefined.
 public indirect enum JSValue: Equatable, Sendable {
     case null
     case bool(Bool)
     case number(Double)
     case string(String)
     case array([JSValue])
-    /// Properties in the order they were written.
     case object([(key: String, value: JSValue)])
 
     public static func == (lhs: JSValue, rhs: JSValue) -> Bool {
@@ -164,7 +142,7 @@ public indirect enum JSValue: Equatable, Sendable {
     }
 }
 
-/// Bytes read from the front, each read checked.
+// The files are anyone's: check every read, and leave out what can't be read rather than trust it.
 struct IndexedDBBytes {
     enum Failure: Error { case truncated, malformed }
 
@@ -194,7 +172,6 @@ struct IndexedDBBytes {
         return bytes[offset..<offset + count]
     }
 
-    /// LevelDB's, Chromium's and V8's unsigned varints, up to 64 bits.
     mutating func varint() throws -> Int {
         var result: UInt64 = 0
         var shift: UInt64 = 0
@@ -219,7 +196,6 @@ struct IndexedDBBytes {
 
     mutating func uint32() throws -> UInt32 { UInt32(try littleEndian(4)) }
 
-    /// A Chromium string with its length: how many UTF-16 code units, then them, big-endian.
     mutating func stringWithLength() throws -> String {
         let count = try varint()
         guard count <= (bytes.count - offset) / 2 else { throw Failure.truncated }
@@ -237,7 +213,6 @@ struct IndexedDBBytes {
 
 // MARK: LevelDB
 
-/// The live entries of a LevelDB folder: each key's newest value, deleted ones left out.
 enum LevelDB {
     static func read(_ folder: URL) throws -> [[UInt8]: [UInt8]] {
         let fm = FileManager.default
@@ -273,7 +248,6 @@ enum LevelDB {
         return Int(name[..<dot])
     }
 
-    /// The tables the MANIFEST that CURRENT names has, and the first log still in use; nil when it can't be read.
     static func liveFiles(_ folder: URL, names: [String]) -> (tables: Set<Int>, log: Int)? {
         guard let current = try? String(contentsOf: folder.appendingPathComponent("CURRENT"), encoding: .utf8) else { return nil }
         let manifestName = current.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -290,12 +264,12 @@ enum LevelDB {
             do {
                 while !reader.isAtEnd {
                     switch try reader.varint() {
-                    case 1: _ = try reader.take(try reader.varint())  // comparator
+                    case 1: _ = try reader.take(try reader.varint())
                     case 2: log = try reader.varint()
-                    case 3, 4: _ = try reader.varint()  // next file number, last sequence
-                    case 5: _ = try reader.varint(); _ = try reader.take(try reader.varint())  // compact pointer
-                    case 6: _ = try reader.varint(); tables.remove(try reader.varint())  // deleted file
-                    case 7:  // new file: level, number, size, smallest and largest keys
+                    case 3, 4: _ = try reader.varint()
+                    case 5: _ = try reader.varint(); _ = try reader.take(try reader.varint())
+                    case 6: _ = try reader.varint(); tables.remove(try reader.varint())
+                    case 7:
                         _ = try reader.varint()
                         tables.insert(try reader.varint())
                         _ = try reader.varint()
@@ -311,14 +285,12 @@ enum LevelDB {
             }
         }
         guard readAny, !failed else { return nil }
-        // Every table it names should be there; when one isn't, read them all rather than miss one.
         guard tables.allSatisfy({ number in names.contains { fileNumber($0) == number && ($0.hasSuffix(".ldb") || $0.hasSuffix(".sst")) } }) else {
             return nil
         }
         return (tables, previousLog > 0 ? min(log, previousLog) : log)
     }
 
-    /// The write batches of a log: a sequence number, a count, then each put (1, key, value) or delete (0, key).
     static func readLog(_ bytes: [UInt8], _ keep: ([UInt8], UInt64, [UInt8]?) -> Void) {
         readLogRecords(bytes) { record in
             var reader = IndexedDBBytes(record)
@@ -338,8 +310,6 @@ enum LevelDB {
         }
     }
 
-    /// The records of a log file: 32 KB blocks of fragments, each with a checksum, its length and whether it's a
-    /// whole record or its first, a middle or its last part. A torn or damaged fragment ends its record.
     static func readLogRecords(_ bytes: [UInt8], _ body: ([UInt8]) -> Void) {
         let blockSize = 32768
         var offset = 0
@@ -381,12 +351,10 @@ enum LevelDB {
         }
     }
 
-    /// A table: the footer gives the index block, whose entries give the data blocks. A key ends with 8 bytes of
-    /// sequence number and kind (1 a value, 0 a deletion).
     static func readTable(_ bytes: [UInt8], _ keep: ([UInt8], UInt64, [UInt8]?) -> Void) throws {
         guard bytes.count >= 48 else { throw IndexedDBBytes.Failure.truncated }
         var footer = IndexedDBBytes(Array(bytes[(bytes.count - 48)...]))
-        _ = try footer.varint(); _ = try footer.varint()  // metaindex
+        _ = try footer.varint(); _ = try footer.varint()
         let indexOffset = try footer.varint()
         let indexSize = try footer.varint()
         let index = try block(bytes, offset: indexOffset, size: indexSize)
@@ -408,9 +376,8 @@ enum LevelDB {
         }
     }
 
-    /// A block's contents, uncompressed: it's followed by its compression (0 none, 1 Snappy) and a checksum.
     private static func block(_ bytes: [UInt8], offset: Int, size: Int) throws -> [UInt8] {
-        guard offset >= 0, size >= 0, offset <= bytes.count, size + 5 <= bytes.count - offset else { throw IndexedDBBytes.Failure.truncated }
+        guard offset >= 0, size >= 0, offset <= bytes.count, size <= bytes.count - offset - 5 else { throw IndexedDBBytes.Failure.truncated }
         let contents = bytes[offset..<(offset + size)]
         switch bytes[offset + size] {
         case 0: return Array(contents)
@@ -419,8 +386,6 @@ enum LevelDB {
         }
     }
 
-    /// A block's entries: each shares the start of the key before it. The restart points at its end aren't needed
-    /// to read it from the start.
     private static func entries(_ block: [UInt8], _ body: ([UInt8], [UInt8]) throws -> Void) throws {
         guard block.count >= 4 else { throw IndexedDBBytes.Failure.truncated }
         var tail = IndexedDBBytes(Array(block.suffix(4)))
@@ -441,7 +406,6 @@ enum LevelDB {
     }
 }
 
-/// CRC-32C, masked as LevelDB stores it.
 enum CRC32C {
     private static let table: [UInt32] = (0..<256).map { index in
         var crc = UInt32(index)
@@ -457,12 +421,11 @@ enum CRC32C {
     }
 }
 
-/// Snappy's raw format: the uncompressed length, then literals and copies of what came before.
 enum Snappy {
     static func decompress(_ input: ArraySlice<UInt8>) throws -> [UInt8] {
         var reader = IndexedDBBytes(Array(input))
         let length = try reader.varint()
-        // Snappy compresses at most about 1:21; a length beyond that is a lie.
+        // Snappy compresses at most about 1:21. A length beyond that is a lie.
         guard length <= max(input.count, 1) * 32 else { throw IndexedDBBytes.Failure.malformed }
         var output: [UInt8] = []
         output.reserveCapacity(length)
@@ -498,9 +461,6 @@ enum Snappy {
 
 // MARK: V8
 
-/// A value as V8's ValueSerializer wrote it, inside Blink's envelope: Blink's version (with, from 21, the offset of a
-/// trailer), then V8's, then the value. Only what JSON has is read; other kinds (maps, typed arrays, regular
-/// expressions…) fail, and the value is left out.
 enum V8Value {
     static func read(_ bytes: [UInt8]) throws -> JSValue {
         var parser = Parser(reader: IndexedDBBytes(bytes))
@@ -509,17 +469,16 @@ enum V8Value {
 
     private struct Parser {
         var reader: IndexedDBBytes
-        /// Objects by the ID a later reference gives them, in the order they were begun; nil while one is being read.
         var objects: [JSValue?] = []
 
         mutating func value(depth: Int) throws -> JSValue {
-            guard depth < 256 else { throw IndexedDBBytes.Failure.malformed }
+            guard depth < 64 else { throw IndexedDBBytes.Failure.malformed }
             while true {
                 let tag = try reader.byte()
                 switch tag {
-                case 0xFF: _ = try reader.varint()  // a version
-                case 0xFE: _ = try reader.take(12)  // Blink's trailer offset and size
-                case 0x00: continue  // padding
+                case 0xFF: _ = try reader.varint()
+                case 0xFE: _ = try reader.take(12)
+                case 0x00: continue
                 case UInt8(ascii: "_"), UInt8(ascii: "0"): return .null
                 case UInt8(ascii: "T"): return .bool(true)
                 case UInt8(ascii: "F"): return .bool(false)
@@ -528,7 +487,7 @@ enum V8Value {
                     return .number(Double((zigzag >> 1) ^ -(zigzag & 1)))
                 case UInt8(ascii: "U"): return .number(Double(try reader.varint()))
                 case UInt8(ascii: "N"): return .number(try double())
-                case UInt8(ascii: "\""): // Latin-1: each byte is the scalar of that number.
+                case UInt8(ascii: "\""):
                     return .string(String(String.UnicodeScalarView(try reader.take(try reader.varint()).map { Unicode.Scalar($0) })))
                 case UInt8(ascii: "S"): return .string(String(decoding: try reader.take(try reader.varint()), as: UTF8.self))
                 case UInt8(ascii: "c"):
@@ -556,7 +515,6 @@ enum V8Value {
                     guard count <= reader.bytes.count - reader.offset else { throw IndexedDBBytes.Failure.malformed }
                     var items: [JSValue] = []
                     for _ in 0..<count {
-                        // "-" is a hole.
                         if try reader.peek() == UInt8(ascii: "-") {
                             reader.offset += 1
                             items.append(.null)
@@ -569,10 +527,10 @@ enum V8Value {
                     return end(id, .array(items))
                 case UInt8(ascii: "a"):
                     let id = begin()
-                    let count = try reader.varint()
+                    let count = min(try reader.varint(), reader.bytes.count)
                     let properties = try self.properties(until: UInt8(ascii: "@"), depth: depth)
                     _ = try reader.varint(); _ = try reader.varint()
-                    var items = [JSValue](repeating: .null, count: min(count, properties.count == 0 ? 0 : count))
+                    var items = [JSValue](repeating: .null, count: properties.isEmpty ? 0 : count)
                     for (key, item) in properties {
                         if let index = Int(key), index >= 0, index < items.count { items[index] = item }
                     }
@@ -583,7 +541,6 @@ enum V8Value {
             }
         }
 
-        /// Key and value pairs up to `terminator`; keys that are numbers are written as text.
         private mutating func properties(until terminator: UInt8, depth: Int) throws -> [(key: String, value: JSValue)] {
             var properties: [(key: String, value: JSValue)] = []
             while true {

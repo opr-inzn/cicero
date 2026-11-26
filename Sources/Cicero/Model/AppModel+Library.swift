@@ -9,14 +9,12 @@ enum SidebarSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        // `folders` and `sets` are keys in the user's sidebar data (`SidebarPreferences.order`), so the cases can't follow
-        // the titles.
+        // `folders` and `sets` are keys in the user's sidebar data (`SidebarPreferences.order`), so the cases can't follow the titles.
         case .folders: "Locations"
         case .sets: "Folders"
         case .tags: "Tags"
         case .foundries: "Foundries"
         case .classifications: "Classifications"
-        // As in Settings: which fonts have every character of a set.
         case .characterSets: "Coverage"
         }
     }
@@ -33,37 +31,28 @@ enum SidebarSection: String, CaseIterable, Identifiable {
     }
 }
 
-/// A family in Compare, in a style and a colour.
 struct CompareEntry: Identifiable, Equatable {
     let id = UUID()
     let familyID: String
-    /// nil: the one nearest the preview weight.
     var style: FaceID?
-    /// Its place among the tints, the first free one at first or one chosen, kept while it stays, so moving or
-    /// removing the others doesn't change its colour.
     var tint: Int
 }
 
 struct SidebarRow: Identifiable, Hashable {
-    /// Visibility key, see `SidebarPreferences.hidden`.
     var key: String
     var title: String
     var icon: String
     var item: SidebarItem
     var badge = 0
-    /// A tag's colour, drawn as a dot instead of the icon; nil for one without and every other row.
     var color: TagColor?
 
     var id: String { key }
 
-    /// All Fonts, Active and Inactive: the library itself, always in the sidebar.
     static let alwaysShown: Set<String> = ["library.all", "library.active", "library.inactive"]
 
-    /// Whether the row can be hidden from the sidebar: every row but All Fonts, Active and Inactive.
     var canHide: Bool { !Self.alwaysShown.contains(key) }
 }
 
-/// What a cached `visibleFamilies` was computed from.
 struct VisibleKey: Equatable {
     var fingerprint: Int
     var selection: Set<SidebarItem>
@@ -73,17 +62,16 @@ struct VisibleKey: Equatable {
     var coverageRevision: Int
     var guessRevision: Int
     var similar: String?
+    var similarStyle: FaceID?
     var document: DocumentList?
-    /// 0 unless the browser shows similar fonts, so measurements arriving don't make other lists again.
+    var externalSimilar: DocumentList?
     var measurementRevision: Int
 }
 
-/// What the cached rows of the font list were made from.
 struct FontRowsKey: Equatable {
     var visible: VisibleKey
     var order: [KeyPathComparator<FontRow>]
     var columns: [FontListColumn]
-    /// Coverage as it was, for rows sorted by a character set column; 0 otherwise.
     var coverageRevision: Int
 }
 
@@ -104,32 +92,60 @@ extension Classification {
 extension AppModel {
     // MARK: Families
 
-    func family(_ id: String) -> Family? { library.family(id) }
+    func family(_ id: String) -> Family? { library.family(id).map(shown) }
+
+    var shownLocation: UUID? {
+        guard documentList == nil, similarFamilyID == nil, externalSimilar == nil, selectedItems.count == 1, case .folder(let id) = selectedItems.first else { return nil }
+        return id
+    }
+
+    func shown(_ family: Family) -> Family {
+        guard let location = shownLocation else { return family }
+        return onlyIn(location)[family.id] ?? family
+    }
+
+    func onlyIn(_ location: UUID) -> [String: Family] {
+        if let cached = locationOnlyCache, cached.fingerprint == library.fingerprint, cached.location == location { return cached.families }
+        var families: [String: Family] = [:]
+        for family in library.families where family.folderIDs.contains(location) {
+            if let only = family.only(inLocation: location), only != family { families[family.id] = only }
+        }
+        locationOnlyCache = (library.fingerprint, location, families)
+        return families
+    }
 
     var openFamily: Family? { openFamilyID.flatMap(family) }
 
-    /// The selection in the browser, or the open family on a font page.
+    var shownSelection: Set<String> {
+        guard !selectedIDs.isEmpty else { return [] }
+        _ = visibleFamilies
+        let shown = visibleCache?.ids ?? []
+        return selectedIDs.filter(shown.contains)
+    }
+
     var selectedFamilies: [Family] {
         if let open = openFamily { return [open] }
-        return inLibraryOrder(selectedIDs)
+        return inLibraryOrder(shownSelection)
     }
 
-    /// Right-click targets: the whole selection when the clicked family is part of it.
     func targets(for family: Family) -> [Family] {
-        guard selectedIDs.contains(family.id), selectedIDs.count > 1 else { return [family] }
-        return inLibraryOrder(selectedIDs)
+        let shown = shownSelection
+        guard shown.contains(family.id), shown.count > 1 else { return [family] }
+        return inLibraryOrder(shown)
     }
 
-    /// The library's families with these IDs, in its order. Found by its index, not by a pass over every family,
-    /// which took about 30 ms at 20,000 families each time the menus asked for the selection.
     private func inLibraryOrder(_ ids: Set<String>) -> [Family] {
-        ids.compactMap { library.position(of: $0) }.sorted().map { library.families[$0] }
+        let library = library, only = shownLocation.map(onlyIn)
+        return ids.compactMap { library.position(of: $0) }.sorted().map { index in
+            let family = library.families[index]
+            return only?[family.id] ?? family
+        }
     }
 
-    /// The family the Info panel describes.
     var inspectedFamily: Family? {
         if let open = openFamily { return open }
-        guard selectedIDs.count == 1, let id = selectedIDs.first else { return nil }
+        let shown = shownSelection
+        guard shown.count == 1, let id = shown.first else { return nil }
         return family(id)
     }
 
@@ -137,45 +153,45 @@ extension AppModel {
         foundryNamer()(family)
     }
 
-    /// `foundryName(of:)` for many families: the user's names are read once, not for every family.
     func foundryNamer() -> (Family) -> String? { data.foundryNamer() }
 
-    /// The OpenType features chosen for the family in the Info panel, and those for the figures the search's tokens ask
-    /// for where the panel doesn't set the same (see `searchFeatures`).
     func features(for family: Family) -> [FeatureSetting] {
         let chosen = familyFeatures[family.id] ?? []
         return chosen + searchFeatures.filter { feature in !chosen.contains { $0.type == feature.type } }
     }
 
-    /// The features the browser's previews turn on for the figures the search's tokens ask for.
     var searchFeatures: [FeatureSetting] { SearchToken.features(of: searchTokens) }
 
-    /// Where the Info panel put the family's axes, by tag, for the style that stands for it unless another is given;
-    /// none for a style they weren't moved on.
     func variations(for family: Family, face: FaceID? = nil) -> [String: Double] {
         guard let adjusted = familyAxes[family.id], adjusted.face == face ?? family.regular.id else { return [:] }
         return adjusted.values
     }
 
-    /// The style the family's previews show, and its weight: the one chosen on its open font page, else the one the
-    /// search's tokens and words name, as "italic" names the italics (see `Family.previewStyle(for:tokens:weight:)`),
-    /// else the one for the preview weight, at that weight.
-    func previewStyle(of family: Family, weight: Double) -> (face: LibraryFace, weight: Double) {
+    func previewStyle(of family: Family) -> (face: LibraryFace, weight: Double) {
         if openFamilyID == family.id, let id = pageStyleID, let chosen = family.faces.first(where: { $0.id == id }) {
             return (chosen, chosen.face.styleWeight)
         }
-        return family.previewStyle(for: SearchQuery(appliedSearch), tokens: searchTokens, weight: weight)
+        return unchosenStyle(of: family)
     }
 
-    /// The tokens the search field suggests for what's typed, but for those it has (see `SearchToken.suggestions`).
+    func unchosenStyle(of family: Family) -> (face: LibraryFace, weight: Double) {
+        if let style = similarStyle, let source = similarFamilyID.flatMap(library.family), appliedSearch.isEmpty, searchTokens.isEmpty {
+            if family.id == source.id { return (style, style.face.styleWeight) }
+            return (family.face(for: source.kind(of: style), weight: style.face.styleWeight), style.face.styleWeight)
+        }
+        return automaticStyle(of: family)
+    }
+
+    func automaticStyle(of family: Family) -> (face: LibraryFace, weight: Double) {
+        family.previewStyle(for: SearchQuery(appliedSearch), tokens: searchTokens)
+    }
+
     func tokenSuggestions(for typed: String) -> [SearchToken] {
         SearchToken.suggestions(for: typed, besides: searchTokens).map(\.token)
     }
 
     // MARK: The list
 
-    /// The families the browser shows for the sidebar selection and search. Cached; recomputed only
-    /// when the library, selection, search, user data or coverage change.
     var visibleFamilies: [Family] {
         let key = visibleKey
         if let cached = visibleCache, cached.key == key { return cached.families }
@@ -184,12 +200,10 @@ extension AppModel {
         #else
         let families = computeVisibleFamilies()
         #endif
-        visibleCache = (key, families)
+        visibleCache = (key, families, Set(families.map(\.id)))
         return families
     }
 
-    /// How many of `visibleFamilies` are active, and the apps of those on in one app only, for the browser's subtitle:
-    /// worked out once per list, not with each update of the browser, a pass over every family it lists.
     var visibleCounts: (active: Int, appOnly: [String]) {
         let key = visibleKey
         if let cached = visibleCountsCache, cached.key == key { return (cached.active, cached.appOnly) }
@@ -204,14 +218,11 @@ extension AppModel {
         VisibleKey(
             fingerprint: library.fingerprint, selection: selectedItems, search: appliedSearch, tokens: searchTokens,
             dataRevision: dataRevision, coverageRevision: listDependsOnCoverage ? coverageRevision : 0, guessRevision: guessRevision,
-            similar: similarFamilyID, document: documentList, measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
+            similar: similarFamilyID, similarStyle: similarStyleID, document: documentList, externalSimilar: externalSimilar,
+            measurementRevision: similarFamilyID == nil ? 0 : measurementRevision
         )
     }
 
-    /// Whether the selected items' families can change as coverage is worked out: a character set, or a smart folder with
-    /// a language or character set rule. Other lists aren't made again as coverage comes in, every 200 faces while it's
-    /// worked out after a scan: at 20,000 families, each time took about 20 ms, and the grid was drawn again too. The
-    /// font list's character set columns follow coverage by themselves (`coverageCell`).
     var listDependsOnCoverage: Bool {
         selectedItems.contains { item in
             switch item {
@@ -223,17 +234,11 @@ extension AppModel {
         }
     }
 
-    /// The font list's rows for `visibleFamilies`, sorted, each with its position, and their families in that order.
-    /// Cached: making and sorting thousands of rows takes tens of milliseconds, and the table asks again on every
-    /// update, a click included. A row says what a character set column does only for `coverageColumns`, the one the
-    /// list is sorted by, if any: worked out for every family, the columns were most of the time it took to make the
-    /// rows (0.3 s of 0.4 at 20,000 families). The rows on screen ask for the others as they draw (`coverageCell`).
     func fontRows(sortedBy order: [KeyPathComparator<FontRow>], coverageColumns: [FontListColumn]) -> (rows: [FontRow], families: [Family]) {
         let key = FontRowsKey(visible: visibleKey, order: order, columns: coverageColumns,
                               coverageRevision: coverageColumns.isEmpty ? 0 : coverageRevision)
         if let cached = fontRowsCache, cached.key == key { return (cached.rows, cached.families) }
         let sources = coverageColumns.compactMap { column in coverageSource(of: column).map { (column, $0) } }
-        // No order keeps the families' own, as for similar fonts, the closest first.
         #if CICERO_MEASURE
         let measuring = Measurements.begin("fontRows")
         defer { measuring.end(detail: "\(visibleFamilies.count) rows") }
@@ -250,116 +255,120 @@ extension AppModel {
     private func computeVisibleFamilies() -> [Family] {
         let query = SearchQuery(appliedSearch)
         var found = listedFamilies(where: searchMatcher(query, tokens: searchTokens))
-        // Nothing with a word that begins with what's typed: a piece of a longer word, then, like "vetica".
         if found.isEmpty, !query.isEmpty { found = listedFamilies(where: searchMatcher(query.anywhereInNames, tokens: searchTokens)) }
-        // A new list's first screens, read ahead before its tiles ask (see `ReadAhead`).
         FontLoader.shared.prefetch(found.prefix(Self.readAheadNewList).map(\.regular.face))
         return found
     }
 
-    /// How many of the browser's first families a scan reads ahead, and a new list (a search, a sidebar item).
     static let readAheadFirst = 200
     static let readAheadNewList = 60
 
-    /// The families the sidebar selection lists, or Show Similar Fonts, or Show in Library, that `matches`.
     private func listedFamilies(where matches: (Family) -> Bool) -> [Family] {
         if let list = documentList {
             return list.families.compactMap { library.family($0) }.filter { data.lists($0) && matches($0) }
         }
+        if let list = externalSimilar {
+            return list.families.compactMap { library.family($0) }.filter { data.lists($0) && matches($0) }
+        }
         if let id = similarFamilyID {
             guard let family = library.family(id), data.lists(family) else { return [] }
-            return ([family] + similarFamilies(to: family, limit: Self.similarListed)).filter(matches)
+            let kind = similarStyle.map(family.kind(of:))
+            return ([family] + similarFamilies(to: family, kind: kind, limit: SimilarFonts.longestList)).filter(matches)
         }
         let tests = (selectedItems.isEmpty ? [.all] : selectedItems).map(filter(for:))
-        let listed = library.families.filter { family in
-            guard data.lists(family) else { return false }
-            return tests.contains { $0(family) } && matches(family)
+        let data = data, families = library.families
+        func keeps(_ family: Family) -> Bool { data.lists(family) && tests.contains { $0(family) } && matches(family) }
+        var kept: [Int] = []
+        for index in families.indices where keeps(families[index]) { kept.append(index) }
+        let listed = kept.count == families.count ? families : kept.map { families[$0] }
+        if let location = shownLocation {
+            let only = onlyIn(location)
+            return listed.map { only[$0.id] ?? $0 }
         }
         return selectedItems == [.recent] ? Family.latestFirst(listed) : listed
     }
 
-    /// How many days a family stays in Recents.
-    static let recentDays = FamilyFilters.recentDays
+    var hasOwnOrder: Bool { similarFamilyID != nil || externalSimilar != nil || selectedItems == [.recent] }
 
-    /// Whether the browser lists its families in an order of its own, which the list keeps until a column's header is
-    /// clicked: similar fonts, the closest first, and Recents, the latest first.
-    var hasOwnOrder: Bool { similarFamilyID != nil || selectedItems == [.recent] }
-
-    /// What the search field suggests for what's typed: up to eight of the families the browser would list whose names
-    /// begin with it, or have a word that does, those that begin with it first, each alphabetically.
     func searchSuggestions(for typed: String) -> [Family] {
         let query = SearchQuery(typed)
         guard !query.isEmpty else { return [] }
-        var ranks: [String: Int] = [:]
-        let found = listedFamilies { family in
-            guard let rank = query.suggestionRank(of: family.name.lowercased()) else { return false }
-            ranks[family.id] = rank
-            return true
+        let candidates = listedFamilies(where: { _ in true })
+        if !hasOwnOrder && documentList == nil {
+            var prefix: [Family] = []
+            var other: [Family] = []
+            for family in candidates {
+                guard let rank = query.suggestionRank(of: family.name.lowercased()) else { continue }
+                if rank == 0 {
+                    prefix.append(family)
+                    if prefix.count >= 8 { return prefix }
+                } else if other.count < 8 {
+                    other.append(family)
+                }
+            }
+            return Array((prefix + other).prefix(8))
         }
-        let sorted = found.sorted { a, b in
-            let ranked = (ranks[a.id] ?? 1, ranks[b.id] ?? 1)
-            return ranked.0 != ranked.1 ? ranked.0 < ranked.1 : a.name.localizedStandardCompare(b.name) == .orderedAscending
+        var found: [(family: Family, rank: Int)] = []
+        for family in candidates {
+            guard let rank = query.suggestionRank(of: family.name.lowercased()) else { continue }
+            found.append((family, rank))
         }
-        return Array(sorted.prefix(8))
+        found.sort { a, b in
+            a.rank != b.rank ? a.rank < b.rank : a.family.name.localizedStandardCompare(b.family.name) == .orderedAscending
+        }
+        return found.prefix(8).map(\.family)
     }
 
-    /// The families Compare's Add Families lists for what's typed: of every family the library lists, whatever the
-    /// sidebar shows, those the main window's search would find, names that begin with it first, then names with a
-    /// word that does, then the rest, each in the library's order. All of them while nothing's typed.
     func compareCandidates(for typed: String) -> [Family] {
         let query = SearchQuery(typed)
         let listed = library.families.filter(data.lists)
         guard !query.isEmpty else { return listed }
         var found = listed.filter(searchMatcher(query))
-        // Nothing with a word that begins with what's typed: a piece of a longer word, then, like "vetica".
         if found.isEmpty { found = listed.filter(searchMatcher(query.anywhereInNames)) }
         let ranks = found.map { query.suggestionRank(of: $0.name.lowercased()) ?? 2 }
         return (0...2).flatMap { rank in zip(found, ranks).filter { $0.1 == rank }.map(\.0) }
     }
 
-    /// The rules of the search, the sidebar items and smart folders, from the core (see `FamilyFilters`), with the
-    /// guessed classifications and the coverage the app remembers.
     var familyFilters: FamilyFilters {
         let guess = classificationGuess()
+        let snapshot = coverage.snapshot()
+        let revision = coverageRevision
         return FamilyFilters(
             library: library, data: data, classificationGuess: { guess($0)?.classification },
             coverage: CoverageAnswers(
                 characterSet: { [unowned self] in self.characterSet($0) },
-                missingCount: { [unowned self] in self.missingCount($0, $1) },
-                supports: { [unowned self] in self.supports($0, language: $1) }
+                missingCount: { [unowned self] set, family in
+                    self.characterSetLookup.missingCount(set, face: family.regular.id, revision: revision) {
+                        snapshot.coverage(of: family.regular.id)?.scalars
+                    }
+                },
+                supports: { family, id in snapshot.coverage(of: family.regular.id).map { $0.support(for: id) != nil } }
             )
         )
     }
 
-    /// A test for whether families match a search (see `FamilyFilters.searchMatcher`).
     private func searchMatcher(_ search: SearchQuery, tokens: [SearchToken] = []) -> (Family) -> Bool {
         familyFilters.searchMatcher(search, tokens: tokens)
     }
 
-    /// A test for one sidebar item, with anything expensive looked up once.
     func filter(for item: SidebarItem) -> (Family) -> Bool {
         familyFilters.filter(for: item)
     }
 
-    /// A test for many families at once: set and folder rules resolve their members once.
     func matcher(for smartSet: SmartSet) -> (Family) -> Bool {
         familyFilters.matcher(for: smartSet)
     }
 
     // MARK: Coverage
 
-    /// nil while the family's characters are still being checked.
     func supports(_ family: Family, language id: String) -> Bool? {
         coverage.coverage(of: family.regular.id).map { $0.support(for: id) != nil }
     }
 
-    /// Built-in character sets, then the user's.
     var characterSets: [CharacterSetDefinition] {
         characterSetCatalog.builtIn + customCharacterSets
     }
 
-    /// Cached: reading a set's characters from what the user typed takes a while for a long one, and the
-    /// sidebar and the lists ask on every update.
     var customCharacterSets: [CharacterSetDefinition] {
         let sets = data.customCharacterSets
         if let cached = customSetsCache, cached.sets == sets { return cached.definitions }
@@ -372,18 +381,12 @@ extension AppModel {
         id.hasPrefix("custom.") ? customCharacterSets.first { $0.id == id } : characterSetCatalog.builtIn.first { $0.id == id }
     }
 
-    /// Whether the family's regular face has every character of the set; nil while still being checked.
-    func has(_ set: CharacterSetDefinition, _ family: Family) -> Bool? {
-        missingCount(set, family).map { $0 == 0 }
-    }
-
     func missingCount(_ set: CharacterSetDefinition, _ family: Family) -> Int? {
         characterSetLookup.missingCount(set, face: family.regular.id, revision: coverageRevision) { [coverage] in
             coverage.coverage(of: family.regular.id)?.scalars
         }
     }
 
-    /// A set's name, without reading the characters of a custom one.
     func characterSetName(_ id: String) -> String? {
         id.hasPrefix("custom.") ? data.customCharacterSets.first { $0.setID == id }?.name : characterSetCatalog.definition(id)?.name
     }
@@ -392,8 +395,6 @@ extension AppModel {
         characterSetCatalog.series.first { $0.id == id }
     }
 
-    /// The largest set of a series (Latin S–XL, Adobe Latin, GF Latin…) the family has.
-    /// What a character set column reads its rows from; nil for other columns, or a set that's gone.
     func coverageSource(of column: FontListColumn) -> CoverageSource? {
         switch column {
         case .series(let id): characterSetSeries(id).map(CoverageSource.series)
@@ -402,9 +403,6 @@ extension AppModel {
         }
     }
 
-    /// What a character set column says about a family, as its row draws: from the row when the list is sorted by the
-    /// column, else worked out now (and kept, see `CharacterSetLookup`). Reads `coverageRevision`, so the row draws
-    /// again as coverage changes.
     func coverageCell(_ column: FontListColumn, of row: FontRow) -> CoverageCell? {
         if let cell = row.coverage[column] { return cell }
         return coverageSource(of: column).flatMap { FontRow.cell($0, for: row.family, model: self) }
@@ -417,7 +415,6 @@ extension AppModel {
     }
 }
 
-/// Memo for character set checks: the font list asks for every family on every render.
 final class CharacterSetLookup {
     private struct Key: Hashable {
         var set: String

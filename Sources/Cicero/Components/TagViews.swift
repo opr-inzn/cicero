@@ -16,7 +16,6 @@ extension TagColor {
         }
     }
 
-    /// A light brown between the Finder's colours, Licensed's toned down, that Licensed + Non-Commercial started in.
     private static let sand = Color(nsColor: NSColor(name: "sand") { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(srgbRed: 0.82, green: 0.75, blue: 0.62, alpha: 1)
@@ -25,17 +24,17 @@ extension TagColor {
 
     var title: String { rawValue.capitalized }
 
-    /// A dot for menus (see `NSImage.menuDot`).
-    var menuImage: NSImage { .menuDot(NSColor(color)) }
+    private static let menuImages: [TagColor: NSImage] = Dictionary(uniqueKeysWithValues: allCases.map { ($0, .menuDot(NSColor($0.color))) })
+
+    var menuImage: NSImage { Self.menuImages[self] ?? .menuDot(NSColor(color)) }
 }
 
 extension NSImage {
-    /// A dot for menus, which draw SF Symbols as templates, in one colour. Its label needs `.titleAndIcon`: built
-    /// with the macOS 27 SDK, menus hide every other image.
-    static func menuDot(_ color: NSColor, size: CGFloat = 12, inset: CGFloat = 1) -> NSImage {
-        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+    // Not an SF Symbol, which menus draw as a template in one colour. Its label needs .titleAndIcon: built with the macOS 27 SDK, menus hide every other image.
+    static func menuDot(_ color: NSColor) -> NSImage {
+        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
             color.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: inset, dy: inset)).fill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
             return true
         }
         image.isTemplate = false
@@ -43,33 +42,95 @@ extension NSImage {
     }
 }
 
-/// A family's tags as small dots in their colours, side by side.
+nonisolated struct TagDot: Hashable, Sendable {
+    let name: String
+    let color: TagColor?
+}
+
 struct TagDots: View {
-    let colors: [TagColor]
+    let dots: [TagDot]
+
+    private static let size: CGFloat = 8
+    private static let step: CGFloat = 6
+    private static let iconStep: CGFloat = 6
+    private static let dotToIconStep: CGFloat = 3.5
+    private static let iconSize = CGSize(width: 12, height: 11)
+    private static let gap: CGFloat = 1.25
 
     var body: some View {
-        if !colors.isEmpty {
-            HStack(spacing: 2) {
-                ForEach(Array(colors.enumerated()), id: \.offset) { _, color in
-                    Circle()
-                        .fill(color.color)
-                        .frame(width: 8, height: 8)
+        if !dots.isEmpty {
+            let colors = dots.compactMap(\.color)
+            let marks: [TagColor?] = colors + Array(repeating: nil, count: dots.count - colors.count)
+            let starts = marks.indices.map { index in
+                (0..<index).reduce(CGFloat(0)) { x, previous in
+                    x + (marks[previous + 1] != nil ? Self.step : marks[previous] != nil ? Self.dotToIconStep : Self.iconStep)
                 }
             }
+            ZStack(alignment: .leading) {
+                ForEach(marks.indices.reversed(), id: \.self) { index in
+                    Self.mark(marks[index])
+                        .mask { cutout(index, marks: marks, starts: starts) }
+                        .offset(x: starts[index])
+                }
+            }
+            .frame(width: starts[starts.count - 1] + Self.width(marks[marks.count - 1]),
+                   height: marks.contains(nil) ? Self.iconSize.height : Self.size, alignment: .leading)
             .accessibilityElement()
-            .accessibilityLabel(colors.map(\.title).listed())
+            .accessibilityLabel("Tags: \(dots.map(\.name).listed())")
+        }
+    }
+
+    private static func width(_ mark: TagColor?) -> CGFloat { mark == nil ? iconSize.width : size }
+
+    @ViewBuilder
+    private static func mark(_ color: TagColor?) -> some View {
+        if let color {
+            Circle().fill(color.color).frame(width: size, height: size)
+        } else {
+            Image(systemName: SidebarSection.tags.icon)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .frame(width: iconSize.width, height: iconSize.height)
+        }
+    }
+
+    @ViewBuilder
+    private func cutout(_ index: Int, marks: [TagColor?], starts: [CGFloat]) -> some View {
+        if index == 0 {
+            Rectangle()
+        } else {
+            let above = index - 1
+            let shift = starts[above] + Self.width(marks[above]) / 2 - starts[index] - Self.width(marks[index]) / 2
+            Rectangle()
+                .overlay {
+                    Group {
+                        if marks[above] == nil {
+                            ZStack {
+                                ForEach(0..<8, id: \.self) { step in
+                                    let angle = Double(step) * .pi / 4
+                                    Image(systemName: SidebarSection.tags.icon + ".fill")
+                                        .font(.system(size: 9))
+                                        .offset(x: cos(angle) * Self.gap, y: sin(angle) * Self.gap)
+                                }
+                            }
+                        } else {
+                            Circle().frame(width: Self.size + 2 * Self.gap, height: Self.size + 2 * Self.gap)
+                        }
+                    }
+                    .offset(x: shift)
+                    .blendMode(.destinationOut)
+                }
+                .compositingGroup()
         }
     }
 }
 
-/// The Tags submenu of a family's menu and the Info panel: the tags, checked when every family has it, Remove All
-/// Tags, and New Tag…. Choosing a tag gives it to the families, or takes it off them; they keep their other tags.
 struct TagMenuItems: View {
     let families: [Family]
     let model: AppModel
 
     var body: some View {
-        ForEach(model.data.tags, id: \.self) { tag in
+        ForEach(model.data.orderedTags, id: \.self) { tag in
             Toggle(isOn: Binding(
                 get: { families.allSatisfy { model.hasTag(tag, $0) } },
                 set: { model.setTag(tag, $0, for: families) }
@@ -78,12 +139,13 @@ struct TagMenuItems: View {
                     Label { Text(tag) } icon: { Image(nsImage: color.menuImage) }
                         .labelStyle(.titleAndIcon)
                 } else {
-                    Text(tag)
+                    Label(tag, systemImage: SidebarSection.tags.icon)
+                        .labelStyle(.titleAndIcon)
                 }
             }
         }
         Divider()
-        Button("Remove All Tags", systemImage: "tag.slash") { model.removeTags(from: families) }
+        Button("Remove All", systemImage: "tag.slash") { model.removeTags(from: families) }
             .disabled(families.allSatisfy { model.data.tags(of: $0.id).isEmpty })
         Button("New Tag", systemImage: "plus") { model.newTag(for: families) }
     }

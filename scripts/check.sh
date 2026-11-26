@@ -5,7 +5,7 @@
 #   scripts/check.sh --quick    tests only
 #   scripts/check.sh --save     also saves the probes' times as the new baseline (after a change you accept)
 #   scripts/check.sh --app      also the app performance run on the small library (Tests/E2E/app-perf, a few minutes)
-# Exit 0: all well. 1: a test failed. 2: a probe is slower than the baseline (median over 25 % and 2 ms more); run it
+# Exit 0: all well. 1: a test failed. 2: a probe is slower than the baseline (median over 25 % and 2 ms more). Run it
 # again before believing it, the Mac may have been busy.
 set -uo pipefail
 cd "$(dirname "$0")/.."

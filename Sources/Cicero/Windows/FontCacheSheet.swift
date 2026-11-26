@@ -4,7 +4,6 @@ import CiceroCore
 import SwiftUI
 
 extension View {
-    /// Presents the Clear Font Caches sheet, and offers a restart afterwards when macOS’s caches were cleared.
     func fontCacheSheet(isPresented: Binding<Bool>) -> some View {
         modifier(FontCacheSheetModifier(isPresented: isPresented))
     }
@@ -19,34 +18,30 @@ private struct FontCacheSheetModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $isPresented) {
-                // The alert waits for the sheet to go away.
                 guard clearedSystemCaches else { return }
                 clearedSystemCaches = false
                 isOfferingRestart = true
             } content: {
-                FontCacheSheet { clearedSystemCaches = $0 }
+                FontCacheSheet { cleared in
+                    if isPresented { clearedSystemCaches = cleared } else if cleared { isOfferingRestart = true }
+                }
             }
             .alert("Font Caches Cleared", isPresented: $isOfferingRestart) {
                 Button("Restart Now") {
-                    if !Self.restart() { model.showToast("Couldn’t restart. Choose Apple menu → Restart") }
+                    Task {
+                        if await AppleScript.run("tell application \"loginwindow\" to «event aevtrrst»") != nil {
+                            model.showToast("Couldn’t restart. Choose Apple menu\u{00A0}→\u{00A0}Restart")
+                        }
+                    }
                 }
                 Button("Later", role: .cancel) {}
             } message: {
                 Text("Apps that are open keep using the old caches until you restart your Mac.")
             }
     }
-
-    /// Asks loginwindow to restart, which asks apps to quit first; false when macOS refused.
-    private static func restart() -> Bool {
-        var error: NSDictionary?
-        _ = NSAppleScript(source: "tell application \"loginwindow\" to «event aevtrrst»")?.executeAndReturnError(&error)
-        return error == nil
-    }
 }
 
-/// Which font caches to clear: macOS’s for this account or every user, Adobe’s and Office’s.
 struct FontCacheSheet: View {
-    /// Called before the sheet closes with whether macOS’s caches were cleared.
     let onCleared: (Bool) -> Void
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -54,7 +49,6 @@ struct FontCacheSheet: View {
     @State private var allUsers = false
     @State private var apps: Set<AppFontCaches.App> = []
     @State private var adobeCaches: AppFontCaches.Found?
-    /// The name of a running app that reads each cache, while one is running.
     @State private var runningApps: [AppFontCaches.App: String] = [:]
     @State private var isClearing = false
 
@@ -62,7 +56,7 @@ struct FontCacheSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Clear Font Caches").font(.title2.bold())
-                Text("macOS and some apps keep lists of fonts that can go stale after fonts change. Clearing them makes the lists get rebuilt. You may need to restart your Mac afterwards.")
+                Text("macOS and some apps cache font lists that can become stale after fonts change. Clearing them forces the lists to rebuild. You may need to restart your Mac afterward.")
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 10) {
@@ -78,14 +72,14 @@ struct FontCacheSheet: View {
             HStack {
                 if isClearing {
                     ProgressView().controlSize(.small)
-                    Text("Clearing").foregroundStyle(.secondary)
+                    Text("Clearing…").foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .disabled(isClearing)
                 Button("Clear") { clear() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(isClearing || (!currentUser && !allUsers && apps.isEmpty))
+                    .disabled(isClearing || (!currentUser && !allUsers && eligibleApps.isEmpty))
             }
         }
         .padding(20)
@@ -108,7 +102,7 @@ struct FontCacheSheet: View {
 
     private var adobeDetail: String {
         if let name = runningApps[.adobe] { return "Quit \(name) first." }
-        guard let found = adobeCaches else { return "Looking for caches" }
+        guard let found = adobeCaches else { return "Looking for caches…" }
         if found.isEmpty { return "No caches found." }
         return "Moves \(found.size.formatted(.byteCount(style: .file))) of cache files to the Trash."
     }
@@ -118,12 +112,18 @@ struct FontCacheSheet: View {
         return "macOS asks for permission before Cicero looks inside Office’s folders."
     }
 
+    private var eligibleApps: [AppFontCaches.App] {
+        AppFontCaches.App.allCases.filter { app in
+            apps.contains(app) && runningApps[app] == nil && (app != .adobe || adobeCaches?.isEmpty != true)
+        }
+    }
+
     private func clear() {
         isClearing = true
         var scopes: [SystemFontCaches.Scope] = []
         if currentUser { scopes.append(.currentUser) }
         if allUsers { scopes.append(.allUsers) }
-        let chosen = AppFontCaches.App.allCases.filter { apps.contains($0) && runningApps[$0] == nil }
+        let chosen = eligibleApps
         Task {
             let cleared = await model.clearCaches(scopes: scopes, apps: chosen)
             onCleared(cleared)

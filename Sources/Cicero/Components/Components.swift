@@ -3,46 +3,40 @@ import CiceroCore
 import SwiftUI
 
 extension Color {
-    /// The background behind specimens: the text background, light or dark with the appearance.
     static let canvas = Color(nsColor: .textBackgroundColor)
-    /// Specimen text on it: the text colour, full black or white, as in the type tester, rather than the labels' grey.
     static let ink = Color(nsColor: .textColor)
-    /// The Variable tag's: green, which no status tag uses (teal was too close to Temporary's blue), darker than the
-    /// system green in light mode, which is too light for small text on its own tint.
+    static let sidebarSelection = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? .white.withAlphaComponent(0.067)
+            : .black.withAlphaComponent(0.046)
+    })
+    static let selectionSeparator = Color(nsColor: NSColor(name: nil) { appearance in
+        .black.withAlphaComponent(appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 0.25 : 0.06)
+    })
     static let variable = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemGreen : NSColor(srgbRed: 0.16, green: 0.55, blue: 0.24, alpha: 1)
     })
-    /// The App Folder tag's: graphite, a blue-grey, so it doesn't look like Temporary's blue or System's grey.
     static let appSet = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             ? NSColor(srgbRed: 0.72, green: 0.77, blue: 0.85, alpha: 1)
             : NSColor(srgbRed: 0.27, green: 0.31, blue: 0.38, alpha: 1)
     })
-    /// Solar, the sidebar's Organize row's: an orange, HSL 22° 100% 52%, the same in light and dark mode.
     static let solar = Color(nsColor: NSColor(srgbRed: 1, green: 0.392, blue: 0.04, alpha: 1))
 }
 
-/// Text set in a font face, straight from its file (so it works for fonts that aren't active). A file on a server, or one
-/// a cloud service keeps online only, is read off the main thread first, with room kept for the text: a server that's slow
-/// to answer, or stopped answering, never holds up the window.
 struct FontText: View {
     let text: String
     let face: FontFace
     let size: Double
     var weight: Double = 400
-    /// Axes moved in the Info panel, by tag.
     var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
     var lineLimit: Int? = 1
-    /// For text that runs over several lines, the distance from one line's baseline to the next in points; nil for the
-    /// font's own line spacing.
     var lineHeight: Double?
-    /// What to multiply the size by, for the font at the size: the grid draws fonts too wide for its tiles smaller.
     var scale: ((CTFont) -> CGFloat)?
-    /// False makes the font without keeping it, for text whose size changes smoothly, as Quick Look's does while its
-    /// panel is resized: kept, every size would push fonts on screen out of the cache, which keeps sizes to half a point
-    /// and so would hand back a font a little bigger or smaller.
     var cached = true
+    var onCaps = false
+    var showsPlaceholder = false
     @State private var readPath: String?
 
     var body: some View {
@@ -51,17 +45,22 @@ struct FontText: View {
             let scale = scale?(atSize) ?? 1
             let font = scale == 1 ? atSize : FontLoader.shared.font(face, size: size * scale, weight: weight, variations: variations,
                                                                     features: features, cached: cached)
-            Text(text.isEmpty ? " " : text)
+            Text(text.isEmpty ? " " : text, notdefIn: font)
                 .font(Font(font))
                 .lineLimit(lineLimit)
                 .lineHeight(lineHeight, natural: font.naturalLineHeight)
                 .textRenderer(UnclippedText(font: font))
+                .onCaps(onCaps ? font : nil)
         } else {
             Text(text.isEmpty ? " " : text)
                 .font(.system(size: size))
                 .lineLimit(lineLimit)
                 .lineHeight(lineHeight, natural: (NSFont.systemFont(ofSize: size) as CTFont).naturalLineHeight)
+                .onCaps(onCaps ? NSFont.systemFont(ofSize: size) as CTFont : nil)
                 .hidden()
+                .overlay {
+                    if showsPlaceholder { SamplePlaceholder(size: size) }
+                }
                 .task(id: face.path) {
                     await FontLoader.shared.read(face.path)
                     readPath = face.path
@@ -70,12 +69,20 @@ struct FontText: View {
     }
 }
 
-/// One line of text in a font face, drawn with CoreText, for the font list's previews: as `FontText` sets it with a line
-/// limit of one, a "…" where it doesn't fit, but without SwiftUI's text layout, which for each row went through TextKit
-/// to size the text and again to draw it. Typing in Preview Options with the list showing took about 30 % less, and a
-/// switch to the list 25–40 ms less (measured in a VM, 2026-11-01). As tall as `height` for layout, with room above
-/// and below for glyphs reaching past the font's ascent and descent, as `UnclippedText` gives; the baseline where
-/// `Text`'s is (see `line`). A file on a server is read off the main thread first, as for `FontText`.
+private extension View {
+    @ViewBuilder func onCaps(_ font: CTFont?) -> some View {
+        if let font {
+            let size = CTFontGetSize(font)
+            let cap = CTFontGetCapHeight(font) > 0 ? CTFontGetCapHeight(font) : size * 0.7
+            let baseline = (size * 0.1 + cap).rounded()
+            alignmentGuide(.top) { $0[.firstTextBaseline] - baseline }
+                .frame(height: baseline + (size * 0.15).rounded(), alignment: .topLeading)
+        } else {
+            self
+        }
+    }
+}
+
 struct FontLine: View {
     let text: String
     let face: FontFace
@@ -84,8 +91,8 @@ struct FontLine: View {
     var variations: [String: Double] = [:]
     var features: [FeatureSetting] = []
     let height: CGFloat
+    var showsPlaceholder = false
     @State private var readPath: String?
-    /// Read so the line draws again in the other appearance, in its colour.
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
 
@@ -96,12 +103,10 @@ struct FontLine: View {
             let scheme = colorScheme
             let scale = displayScale
             let line = Self.line(of: font, in: height, scale: scale)
-            // From the line's top, less the room above it, to its bottom and the room below, and at least the row: a
-            // line can be much taller than the row (Zapfino's is 57.5 pt in a row of 22), and its swashes reach further.
+            // A line can be much taller than the row (Zapfino's is 57.5 pt in a row of 22), and its swashes reach further.
             let room = UnclippedText(font: font).room
             let top = min(0, line.top - room.top), bottom = max(height, line.top + line.height + room.bottom)
-            // At the sides too, where Text doesn't cut glyphs off either, as Zapfino's Z reaching left of the line's start:
-            // as far as the font's glyphs reach. Only for drawing: the line is cut to the column's width.
+            // At the sides too, where Text doesn't cut glyphs off either, as Zapfino's Z reaching left of the line's start.
             let box = CTFontGetBoundingBox(font)
             let left = max(0, -box.minX).rounded(.up), right = max(0, box.maxX).rounded(.up)
             Canvas { context, size in
@@ -118,6 +123,15 @@ struct FontLine: View {
         } else {
             Color.clear
                 .frame(height: height)
+                .overlay(alignment: .leading) {
+                    if showsPlaceholder {
+                        Text(text.isEmpty ? " " : text)
+                            .font(.system(size: size))
+                            .lineLimit(1)
+                            .hidden()
+                            .overlay { SamplePlaceholder(size: size) }
+                    }
+                }
                 .task(id: face.path) {
                     await FontLoader.shared.read(face.path)
                     readPath = face.path
@@ -125,10 +139,6 @@ struct FontLine: View {
         }
     }
 
-    /// Where `Text` puts its line in a frame of `height`, from the frame's top: the ascent rounded to a whole point, the
-    /// line as tall as that and the descent, down to a whole pixel, centred, its top down to a whole pixel, the leading
-    /// split above and below so it doesn't count. Measured: SwiftUI's baseline in a 22 pt frame for each of the 703
-    /// font families on a Mac with macOS 26, at 2x, every one as this says (a probe of Text in an NSHostingView).
     private static func line(of font: CTFont, in height: CGFloat, scale: CGFloat) -> (top: CGFloat, height: CGFloat, baseline: CGFloat) {
         let pixel = { (value: CGFloat) in (value * scale).rounded(.down) / scale }
         let ascent = CTFontGetAscent(font).rounded()
@@ -138,9 +148,12 @@ struct FontLine: View {
     }
 
     private static func draw(_ text: String, font: CTFont, in context: inout GraphicsContext, x: CGFloat, width: CGFloat, baseline: CGFloat) {
+        guard width > 0 else { return }
         let color = Color.ink.resolve(in: context.environment).cgColor
         let attributes: [NSAttributedString.Key: Any] = [.font: font, NSAttributedString.Key(kCTForegroundColorAttributeName as String): color]
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
+        let shown = NSMutableAttributedString(string: text, attributes: attributes)
+        shown.showMissingAsNotdef(in: font)
+        let line = CTLineCreateWithAttributedString(shown)
         let ellipsis = CTLineCreateWithAttributedString(NSAttributedString(string: "…", attributes: attributes))
         let drawn = CTLineCreateTruncatedLine(line, Double(width), .end, ellipsis) ?? line
         context.withCGContext { cg in
@@ -153,10 +166,24 @@ struct FontLine: View {
     }
 }
 
-/// Its content once the font files it draws from have been read, so making their fonts never reads a file on the main
-/// thread: at once when they're on the Mac's own disks or were read before, as almost all are; for files on a server,
-/// or online only, once they've been read in the background, with empty room in its place meanwhile (see
-/// `FontLoader.wouldWait`).
+struct SamplePlaceholder: View {
+    let size: Double
+    @State private var isShown = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.15)
+            .fill(.quaternary)
+            .frame(height: size * 0.6)
+            .opacity(isShown ? 1 : 0)
+            .animation(.easeIn(duration: 0.2), value: isShown)
+            .accessibilityHidden(true)
+            .task {
+                try? await Task.sleep(for: .milliseconds(250))
+                isShown = true
+            }
+    }
+}
+
 struct ReadingFonts<Content: View>: View {
     let paths: [String]
     @ViewBuilder let content: () -> Content
@@ -176,16 +203,13 @@ struct ReadingFonts<Content: View>: View {
     }
 }
 
-/// Draws text as usual, but with room above and below its lines for glyphs reaching past the font's ascent
-/// and descent, like a descender lower than the font says or a swash, which SwiftUI otherwise cuts off: as far
-/// as any of the font's glyphs reach, and at least half the size, for the fonts that stand in for missing
-/// characters. None at the sides, where text isn't cut off, and room there puts a "…" out of place.
 nonisolated struct UnclippedText: TextRenderer {
     let room: EdgeInsets
 
     init(font: CTFont) {
         let box = CTFontGetBoundingBox(font)
         let half = CTFontGetSize(font) / 2
+        // None at the sides, where text isn't cut off: room there puts a "…" out of place.
         room = EdgeInsets(top: max(box.maxY - CTFontGetAscent(font), half), leading: 0,
                           bottom: max(-box.minY - CTFontGetDescent(font), half), trailing: 0)
     }
@@ -197,8 +221,6 @@ nonisolated struct UnclippedText: TextRenderer {
     }
 }
 
-/// A small switch drawn in SwiftUI. Lists show one per family, and a native switch per row made
-/// building a list much slower. The middle position (on in one app only) puts the knob halfway.
 struct MiniSwitch: View {
     let position: SwitchPosition
     let isEnabled: Bool
@@ -237,8 +259,6 @@ struct MiniSwitch: View {
     }
 }
 
-/// On/off for a whole family. Gets the model passed in rather than from the environment: AppKit
-/// builds table cells outside SwiftUI's update, where the environment isn't there yet.
 struct ActivationSwitch: View {
     let family: Family
     let model: AppModel
@@ -256,12 +276,12 @@ struct ActivationSwitch: View {
 
     private var help: String {
         if family.state == .system { return "Installed with macOS" }
-        if family.isAdobeFonts { return "From Adobe Fonts, which Creative Cloud turns on and off" }
+        if family.isAdobeFonts { return "From Adobe Fonts, managed in Creative Cloud" }
         guard let app = family.app.map(FaceState.appDescription) else { return family.hasActive ? "Deactivate" : "Activate" }
         return switch model.position(of: family) {
-        case .app: "On in \(app) only. Click to turn on in every app."
-        case .on: "On in every app. Click to turn off, \(app) included."
-        case .off: "Off. Click to turn on in \(app) only."
+        case .app: "Active in \(app) only. Click to activate in all apps."
+        case .on: "Active in all apps. Click to deactivate everywhere, including \(app)."
+        case .off: "Inactive. Click to activate in \(app) only."
         }
     }
 
@@ -274,81 +294,31 @@ struct ActivationSwitch: View {
     }
 }
 
-/// A small tinted capsule with a word or two, never shortened: a name next to it gives way instead. (A list
-/// cell lays its row out again at the row's own width, where a stack offers each text half of what's left,
-/// so beside a name about as wide as itself, "Adobe" got less than it needs.)
 struct Tag: View {
     let text: String
     let tint: Color
-    /// A symbol before the text.
     var systemImage: String?
 
     var body: some View {
-        HStack(spacing: 2.5) {
+        HStack(alignment: .firstTextBaseline, spacing: 2.5) {
             if let systemImage {
-                // Its drawing on the middle of the capitals, with no height of its own, so tags with a symbol are as
-                // tall as those without.
-                Image(systemName: systemImage)
-                    .offset(y: Self.capitalsDrop - Self.inkDrop(of: systemImage))
-                    .frame(height: 0)
+                Text(Image(systemName: systemImage))
                     .accessibilityHidden(true)
             }
             Text(text)
         }
         .font(Self.font)
         .padding(.horizontal, 5)
-        // The capitals in the middle of the capsule, measured at 1x and 2x. They sit on whole pixels, so the capsule is
-        // 14.5 pt high: at 2x that leaves 16 pixels around the 13 of the capitals, 8 above and 8 below, and at 1x it's 15
-        // pixels, within an eighth of one. At 14 pt they were half a pixel high at 2x and a third at 1x. Any top from 1.5
-        // to 1.7 pt does it; 1.6 keeps away from both ends.
-        .padding(.top, 1.6)
-        .padding(.bottom, 1.9)
+        // A whole number of points tall: centred in a row, a fractional height drew the capsule half a pixel off its text, which snaps to pixels.
+        .frame(height: 14)
         .background(tint.opacity(0.14), in: .capsule)
         .foregroundStyle(tint.opacity(0.9))
         .fixedSize()
     }
 
-    private static let font = Font.system(size: 9, weight: .semibold)
-
-    /// How far the middle of the capitals sits below the middle of the text's line: SwiftUI puts the line's height and
-    /// baseline on whole points, as NSLayoutManager does, which leaves them a third of a point low.
-    private static let capitalsDrop: CGFloat = {
-        let font = NSFont.systemFont(ofSize: 9, weight: .semibold)
-        let layout = NSLayoutManager()
-        return layout.defaultBaselineOffset(for: font) - font.capHeight / 2 - layout.defaultLineHeight(for: font) / 2
-    }()
-
-    private static var inkDrops: [String: CGFloat] = [:]
-
-    /// How far the middle of a symbol's drawing sits below the middle of its frame, measured once per symbol: some
-    /// frames leave room the drawing doesn't use, like app.badge.checkmark's, which drew it 0.35 pt high.
-    private static func inkDrop(of symbol: String) -> CGFloat {
-        if let drop = inkDrops[symbol] { return drop }
-        let scale = 20
-        let renderer = ImageRenderer(content: Image(systemName: symbol).font(font))
-        renderer.scale = CGFloat(scale)
-        var drop: CGFloat = 0
-        if let image = renderer.cgImage,
-           let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
-                                   bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
-           let pixels = context.data?.assumingMemoryBound(to: UInt8.self) {
-            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-            // The rows with ink, from the top.
-            let inked = (0..<image.height).filter { row in
-                (0..<image.width).contains { pixels[(row * image.width + $0) * 4 + 3] > 127 }
-            }
-            if let top = inked.first, let bottom = inked.last {
-                drop = CGFloat(top + bottom + 1 - image.height) / 2 / CGFloat(scale)
-            }
-        }
-        inkDrops[symbol] = drop
-        return drop
-    }
+    private static let font = Font.system(size: 10, weight: .semibold)
 }
 
-/// Marks a variable family wherever it's listed, apart from the kinds of file, with the symbol of its axes and, on
-/// hover, their names.
 struct VariableTag: View {
     let family: Family
 
@@ -359,7 +329,6 @@ struct VariableTag: View {
         }
     }
 
-    /// "Variable: Weight, Width, Optical Size", the axes of all its styles in the font's order.
     private var help: String {
         var axes: [VariationAxis] = []
         for face in family.faces {
@@ -369,7 +338,6 @@ struct VariableTag: View {
     }
 }
 
-/// A small capsule for families that aren't simply on or off.
 struct StatusTag: View {
     let family: Family
 
@@ -380,10 +348,8 @@ struct StatusTag: View {
     }
 
     private var content: (String, Color, String?)? {
-        // With the symbols of New App Folder and Activate Temporarily.
         if family.temporaryScope == .whileAppsRun { return ("App Folder", .appSet, "app.badge.checkmark") }
         if family.temporaryScope != nil { return ("Temporary", .blue, "clock") }
-        // Creative Cloud's, apart from the fonts type designers put in Adobe's folders to test them, tagged Proofing.
         if family.isAdobeFonts { return ("Adobe Fonts", .purple, nil) }
         switch family.state {
         case .system: return ("System", .secondary, nil)
@@ -396,19 +362,16 @@ struct StatusTag: View {
     private var help: String {
         switch (family.temporaryScope, family.state) {
         case (.untilQuit, _): "Active until Cicero quits"
-        case (.whileAppsRun, _): "Active while its app is open"
+        case (.whileAppsRun, _): "Active while its apps are open"
         case (nil, .appOnly) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud. Active in Adobe apps only."
         case (nil, _) where family.isAdobeFonts: "From Adobe Fonts, managed in Creative Cloud"
-        case (nil, .appOnly("Adobe")): "Active in Adobe apps only, from a folder they load fonts from by themselves"
-        case (nil, .appOnly(let app)): "Active in \(app) only, from a folder it loads fonts from by itself"
+        case (nil, .appOnly("Adobe")): "Active in Adobe apps only, from a folder they load automatically"
+        case (nil, .appOnly(let app)): "Active in \(app) only, from a folder it loads automatically"
         case (nil, _): ""
         }
     }
 }
 
-/// ContentUnavailableView with its symbol nearer the title: macOS leaves 22 pt between them, so they looked like two
-/// separate things. The same symbol and title otherwise, to the pixel on macOS 26, in light and dark. The description
-/// is 4 pt nearer the title, and the buttons 6 pt further from it.
 struct EmptyState<Actions: View>: View {
     let title: LocalizedStringKey
     let systemImage: String
@@ -427,8 +390,6 @@ struct EmptyState<Actions: View>: View {
         ContentUnavailableView {
             Label(title, systemImage: systemImage).labelStyle(EmptyStateLabelStyle())
         } description: {
-            // Nearer the title, and the buttons further from it, so the text reads as the title's and the buttons
-            // as a step of their own.
             description?.padding(.top, -4)
         } actions: {
             actions.padding(.top, 6)
@@ -441,14 +402,12 @@ extension EmptyState where Actions == EmptyView {
         self.init(title, systemImage: systemImage, description: description) {}
     }
 
-    /// The system's search one: no families match what's typed or the filter tokens.
     static func search(text: String = "") -> Self {
         EmptyState(text.isEmpty ? "No Results" : "No Results for “\(text)”", systemImage: "magnifyingglass",
                    description: Text("Check the spelling or try a new search."))
     }
 }
 
-/// ContentUnavailableView's own label, which can't be given a spacing (or a style from outside the view).
 private struct EmptyStateLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         VStack(spacing: 8) {
@@ -458,9 +417,6 @@ private struct EmptyStateLabelStyle: LabelStyle {
     }
 }
 
-/// The system slider on macOS 27, which draws it itself, and one drawn by Cicero before that: macOS 26's slider's
-/// glass knob disappears in toolbar popovers. Continuous, rounded to the step: a stepped system slider can
-/// show a tick for every step.
 struct ValueSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -471,6 +427,7 @@ struct ValueSlider: View {
 
     var body: some View {
         if #available(macOS 27, *) {
+            // Rounded here rather than given the step: a stepped system slider can show a tick for every step.
             Slider(value: Binding(get: { value }, set: { value = rounded($0) }), in: range)
         } else {
             drawn
@@ -480,7 +437,8 @@ struct ValueSlider: View {
     private var drawn: some View {
         GeometryReader { geometry in
             let travel = max(geometry.size.width - knob, 1)
-            let fraction = (min(max(value, range.lowerBound), range.upperBound) - range.lowerBound) / (range.upperBound - range.lowerBound)
+            let span = range.upperBound - range.lowerBound
+            let fraction = span > 0 ? (min(max(value, range.lowerBound), range.upperBound) - range.lowerBound) / span : 0
             ZStack(alignment: .leading) {
                 Capsule().fill(.quaternary).frame(height: 4)
                 Capsule().fill(isEnabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
@@ -512,31 +470,29 @@ struct ValueSlider: View {
     }
 }
 
-/// The number beside a slider, which takes one typed in as well: on Return, or when it loses focus, it's kept to
-/// the slider's range and rounded to its step. ↑ and ↓ step it, ten steps with ⇧.
 struct ValueField: View {
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
     var step: Double = 1
-    /// After the number: " pt", "%".
     var unit = ""
-    /// Where the number sits in the field's width: trailing lines values up in a column, 52 pt wide; leading keeps it
-    /// as close to the slider as a label is on the other side, in a field as wide as the widest value the range allows.
     var alignment = HorizontalAlignment.trailing
+    var scope: AnyHashable? = nil
     @State private var text = ""
+    @State private var edited = false
+    @State private var owner: (binding: Binding<Double>, range: ClosedRange<Double>, step: Double)?
     @FocusState private var isFocused: Bool
 
-    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "", alignment: HorizontalAlignment = .trailing) {
+    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double = 1, unit: String = "",
+         alignment: HorizontalAlignment = .trailing, scope: AnyHashable? = nil) {
         self.title = title
         _value = value
         self.range = range
         self.step = step
         self.unit = unit
         self.alignment = alignment
-        // The number from the start, not once it appears: a field measured before it's on screen, as the font page's
-        // controls measure theirs to choose a layout (see `TesterControls`), would measure as wide as its title, which it
-        // shows while empty.
+        self.scope = scope
+        // The number from the start, not once it appears: a field measured before it's on screen, as `TesterControls` does, would measure as wide as its title, which it shows while empty.
         _text = State(initialValue: Self.formatted(value.wrappedValue, step: step))
     }
 
@@ -548,7 +504,6 @@ struct ValueField: View {
         }
         Group {
             if alignment == .leading {
-                // Nothing after it moves as the value changes, and a row's last value ends where the row does.
                 ZStack(alignment: .leading) {
                     Text(formatted(range.lowerBound) + unit).hidden()
                     Text(formatted(range.upperBound) + unit).hidden()
@@ -559,15 +514,38 @@ struct ValueField: View {
             }
         }
         .monospacedDigit()
-        .onAppear { text = formatted(value) }
-        // The slider moved; typing leaves the value alone until it's committed.
-        .onChange(of: value) { text = formatted($1) }
-        .onChange(of: isFocused) { if !$1 { commit() } }
+        .onAppear {
+            edited = false
+            text = formatted(value)
+        }
+        .onChange(of: scope) { _, _ in
+            if edited { commit() }
+            owner = isFocused ? ($value, range, step) : nil
+            edited = false
+            text = formatted(value)
+        }
+        .onChange(of: value) { _, new in
+            edited = false
+            text = formatted(new)
+        }
+        .onChange(of: isFocused) {
+            if $1 {
+                owner = ($value, range, step)
+            } else {
+                if edited { commit() }
+                owner = nil
+                edited = false
+                text = formatted(value)
+            }
+        }
     }
 
     @ViewBuilder
     private var number: some View {
-        let field = TextField(title, text: $text)
+        let field = TextField(title, text: Binding(get: { text }, set: {
+            if $0 != text { edited = true }
+            text = $0
+        }))
             .labelsHidden()
             .textFieldStyle(.plain)
             .focused($isFocused)
@@ -578,25 +556,31 @@ struct ValueField: View {
                 return .handled
             }
         if alignment == .leading {
-            // As wide as the number, growing as it's typed, so the unit follows it; the field keeps 4 pt for
-            // the caret after the number, which the unit takes back to sit as close as after a right-aligned one.
             field.fixedSize().padding(.trailing, -4)
         } else {
             field.multilineTextAlignment(.trailing)
         }
     }
 
-    /// What's typed, with a decimal comma or point.
     private var typed: Double? {
-        Double(text.trimmingCharacters(in: .whitespaces).replacing(",", with: "."))
+        let text = text.trimmingCharacters(in: .whitespaces)
+        // A parse in the Mac's format stops at the other decimal mark, taking 12.5 for 12 in German.
+        return Double(text.replacing(",", with: ".")) ?? (try? Double(text, format: .number.grouping(.never)))
     }
 
     private func commit() {
-        if let typed { set(typed) } else { text = formatted(value) }
+        let target = owner ?? ($value, range, step)
+        edited = false
+        guard text != Self.formatted(target.binding.wrappedValue, step: target.step) else { return }
+        if let typed { set(typed, on: target) } else { text = formatted(value) }
     }
 
-    private func set(_ new: Double) {
-        value = min(max((new / step).rounded() * step, range.lowerBound), range.upperBound)
+    private func set(_ new: Double, on target: (binding: Binding<Double>, range: ClosedRange<Double>, step: Double)? = nil) {
+        let target = target ?? owner ?? ($value, range, step)
+        edited = false
+        let clamped = min(max((new / target.step).rounded() * target.step, target.range.lowerBound), target.range.upperBound)
+        // Within a thousandth of a step: rounding to the step can leave the same number a hair apart.
+        if abs(clamped - target.binding.wrappedValue) > target.step / 1000 { target.binding.wrappedValue = clamped }
         text = formatted(value)
     }
 
@@ -605,11 +589,11 @@ struct ValueField: View {
     }
 
     private static func formatted(_ value: Double, step: Double) -> String {
-        String(format: step < 0.1 ? "%.2f" : step < 1 ? "%.1f" : "%.0f", value)
+        let decimals = step < 0.1 ? 2 : step < 1 ? 1 : 0
+        return value.formatted(.number.grouping(.never).precision(.fractionLength(0...max(decimals, 1))))
     }
 }
 
-/// A checkbox with a line under its title that says what it does, as the backup, restore and font cache sheets have.
 struct DetailToggle: View {
     let title: String
     let detail: String
@@ -632,15 +616,12 @@ struct DetailToggle: View {
     }
 }
 
-/// A button that's just its label, the same while it's held down: a plain one darkens it as it's clicked.
 struct StillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.contentShape(.rect)
     }
 }
 
-/// A push button the same as the default one, to the pixel on macOS 26, in light and dark, that stays the same while
-/// it's held down rather than darkening. Greyed out within a point or two of the default one.
 struct StillPushButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         StillPushButton(label: configuration.label)
@@ -661,8 +642,6 @@ struct StillPushButtonStyle: ButtonStyle {
     }
 }
 
-/// A borderless + or − under a list, as in System Settings. The default button style gives each
-/// a glass capsule on macOS 26, narrower when disabled.
 struct ListEditButton: View {
     let title: String
     let systemImage: String
@@ -685,7 +664,6 @@ struct ListEditButton: View {
     }
 }
 
-/// A + or − under a list in a card (see `inCard`).
 struct CardListButton {
     let title: String
     let help: String
@@ -693,8 +671,6 @@ struct CardListButton {
 }
 
 extension View {
-    /// A list in a card with + and − along its bottom, like the lists in System Settings: Settings → Locations,
-    /// and the apps of an application set. Its rows take `cardRow`.
     func inCard(add: CardListButton, remove: CardListButton, canRemove: Bool) -> some View {
         VStack(spacing: 0) {
             listStyle(.plain)
@@ -713,26 +689,21 @@ extension View {
             .padding(.horizontal, 4)
             .padding(.vertical, 3)
         }
-        // The fill and corners of the grouped forms' cards.
         .background(.fill.quaternary, in: .rect(cornerRadius: 12, style: .continuous))
         .clipShape(.rect(cornerRadius: 12, style: .continuous))
     }
 
-    /// Every other row tinted, without separators. A list's own stripes are opaque and would hide the card.
     func cardRow(_ index: Int) -> some View {
         listRowBackground(index.isMultiple(of: 2) ? Color.clear : Color.primary.opacity(0.04))
             .listRowSeparator(.hidden)
     }
 }
 
-/// What a folder's fonts are, in its row in Settings → Locations and its menu in the sidebar: Inactive, Active
-/// (Cicero keeps them on), or active in an app that loads the folder by itself. `askForApp` asks for that app's name.
 struct FolderActivationPicker: View {
     let folder: WatchedFolder
     let askForApp: () -> Void
     @Environment(AppModel.self) private var model
 
-    /// Tags that aren't app names.
     private static let active = "\u{0}active", specificApp = "\u{0}app"
 
     var body: some View {
@@ -742,14 +713,13 @@ struct FolderActivationPicker: View {
                 switch choice {
                 case Self.specificApp: askForApp()
                 case Self.active: model.setActivation(ofFolder: folder.id, active: true, app: nil)
-                default: model.setActivation(ofFolder: folder.id, active: false, app: choice)
+                default: model.setActivation(ofFolder: folder.id, active: false, app: choice.isEmpty ? nil : choice)
                 }
             }
         )) {
             Text("Inactive").tag("")
             Text("Active").tag(Self.active)
             Text("Active in Adobe Apps").tag("Adobe")
-            // One typed in, or InDesign from before there was Active in Specific App.
             if let app = folder.appName, app != "Adobe" {
                 Text("Active in \(FaceState.appDescription(app))").tag(app)
             }
@@ -761,13 +731,9 @@ struct FolderActivationPicker: View {
     }
 }
 
-/// A pop-up menu that always shows its background. In grouped forms on macOS 26, a SwiftUI Picker
-/// (and a plain NSPopUpButton) is only its text and a chevron until the pointer is over it.
 struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
     let options: [(title: String, value: Value)]
     @Binding var selection: Value
-    /// The name VoiceOver reads, since the label beside it in a form isn't linked to it.
-    var accessibilityLabel: String?
 
     func makeNSView(context: Context) -> NSPopUpButton {
         let button = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -781,14 +747,17 @@ struct PopUpPicker<Value: Hashable>: NSViewRepresentable {
         let titles = options.map(\.title)
         if button.itemTitles != titles {
             button.removeAllItems()
-            button.addItems(withTitles: titles)
+            for title in titles {
+                button.menu?.addItem(NSMenuItem(title: title, action: nil, keyEquivalent: ""))
+            }
         }
         button.selectItem(at: options.firstIndex { $0.value == selection } ?? -1)
-        button.setAccessibilityLabel(accessibilityLabel)
-        context.coordinator.onChoose = { index in selection = options[index].value }
+        context.coordinator.onChoose = { index in
+            guard options.indices.contains(index) else { return }
+            selection = options[index].value
+        }
     }
 
-    /// As wide as its widest choice, whichever is chosen.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
         nsView.intrinsicContentSize
     }
@@ -804,10 +773,6 @@ final class PopUpTarget: NSObject {
     }
 }
 
-/// Icons side by side, one of them chosen, always the same width. A SwiftUI segmented picker (and an NSSegmentedControl
-/// sizing its own segments) measures 77 pt before it's in a window and 74 pt once it is, so a font page drew it wider
-/// at first, then narrower the next time the page was laid out: it, and the size beside it, moved as the page filled
-/// in. Segments of a set width measure the same either way.
 struct IconSegments<Value: Hashable>: NSViewRepresentable {
     let title: String
     let options: [(title: String, systemImage: String, value: Value)]
@@ -818,6 +783,7 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
         let images = options.map { NSImage(systemSymbolName: $0.systemImage, accessibilityDescription: $0.title) ?? NSImage() }
         let control = NSSegmentedControl(images: images, trackingMode: .selectOne, target: context.coordinator,
                                          action: #selector(SegmentTarget.choose(_:)))
+        // A set width: segments that size themselves measure 77 pt before the control is in a window and 74 pt once it is.
         for index in options.indices {
             control.setWidth(segmentWidth, forSegment: index)
         }
@@ -827,7 +793,10 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
 
     func updateNSView(_ control: NSSegmentedControl, context: Context) {
         control.selectedSegment = options.firstIndex { $0.value == selection } ?? -1
-        context.coordinator.onChoose = { index in selection = options[index].value }
+        context.coordinator.onChoose = { index in
+            guard options.indices.contains(index) else { return }
+            selection = options[index].value
+        }
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSSegmentedControl, context: Context) -> CGSize? {
@@ -837,8 +806,6 @@ struct IconSegments<Value: Hashable>: NSViewRepresentable {
     func makeCoordinator() -> SegmentTarget { SegmentTarget() }
 }
 
-/// Capitals, each word capitalised, or lowercase: a change to the text itself, as Convert Case makes it, not to how it's
-/// shown, so a text changed so can be saved as a preset, and what's typed after it is typed as it is.
 enum CaseConversion: CaseIterable {
     case upper, title, lower
 
@@ -858,10 +825,9 @@ enum CaseConversion: CaseIterable {
         }
     }
 
-    /// Without the Mac's language, which would put a Turkish user's i in capitals as İ. In capitals, ß is SS, unless
-    /// `capitalSharpS`, for a font that has the capital ẞ.
     func apply(to text: String, capitalSharpS: Bool = false) -> String {
         switch self {
+        // Not in the Mac's language, which would put a Turkish user's i in capitals as İ.
         case .upper: (capitalSharpS ? text.replacingOccurrences(of: "ß", with: "ẞ") : text).uppercased()
         case .title: text.capitalized
         case .lower: text.lowercased()
@@ -869,7 +835,6 @@ enum CaseConversion: CaseIterable {
     }
 }
 
-/// A case conversion asked for, numbered so that asking for the same one again is a change too.
 struct CaseChange: Equatable {
     let conversion: CaseConversion
     let number: Int
@@ -879,12 +844,8 @@ struct CaseChange: Equatable {
     }
 }
 
-/// AA, Aa and aa side by side, as one control, each a button rather than a choice that stays chosen. Segments of a set
-/// width, as in `IconSegments`, from the widest label: macOS 26 cuts AA to "…" below its width plus 12 pt (macOS 15 fits
-/// it in less), and its own measure leaves more room than that, wider than the alignment's segments look beside it.
 struct CaseButtons: NSViewRepresentable {
     let convert: (CaseConversion) -> Void
-    /// Room beside the widest label: 2 pt more than macOS 26 needs.
     private let labelPadding: CGFloat = 14
 
     func makeNSView(context: Context) -> NSSegmentedControl {
@@ -924,59 +885,24 @@ final class SegmentTarget: NSObject {
 }
 
 extension View {
-    /// A bar over the top of the scroll view in this view, on the window's background, which what scrolls under it
-    /// fades into just below it, as under the main window's title, rather than meeting at an edge. The system's soft
-    /// edge fades less far than a tall bar reaches, so rows showed behind its lower half. macOS 15 has no edge effect to
-    /// hide, and an inset that what scrolls goes under does the same there.
-    @ViewBuilder func fadingTopBar(@ViewBuilder _ bar: () -> some View) -> some View {
-        let fade: CGFloat = 18
-        let fadingBar = bar()
-            .background(.background)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(.background)
-                    .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
-                    .frame(height: fade)
-                    .offset(y: fade)
-                    .allowsHitTesting(false)
-            }
-        if #available(macOS 26, *) {
-            scrollEdgeEffectHidden(true, for: .top)
-                .contentMargins(.top, fade, for: .scrollContent)
-                .safeAreaBar(edge: .top, spacing: 0) { fadingBar }
-        } else {
-            contentMargins(.top, fade, for: .scrollContent)
-                .safeAreaInset(edge: .top, spacing: 0) { fadingBar }
-        }
-    }
-
-    /// For a section footer in a grouped form: moves it closer to its card than the default gap.
     func formFooter() -> some View {
         padding(.top, -4)
     }
 
-    /// For a grouped-form row with a button, pop-up or segmented picker: macOS 26 sets those 2 pt
-    /// above the middle of the row (6 pt above, 10 below), and the label with them.
     func formRowCentered() -> some View {
         offset(y: 2)
     }
 }
 
-/// Lays children out left to right, wrapping onto new lines, each line's children on its first text's baseline: a
-/// family's styles, each set in itself, would otherwise sit as high as each face's ascent puts it.
 struct FlowLayout: Layout {
     var spacing: CGFloat
     var lineSpacing: CGFloat
 
-    /// A child's size and how far down its first text's baseline is.
     struct Child {
         var size: CGSize
         var baseline: CGFloat
     }
 
-    /// The children measured once per update rather than for every proposal and again to place them: specimens are
-    /// a lazy stack's rows, which it measures over and over while scrolling, and each child is text in a face of its
-    /// own.
     func makeCache(subviews: Subviews) -> [Child] {
         subviews.map { subview in
             let dimensions = subview.dimensions(in: .unspecified)
@@ -990,18 +916,20 @@ struct FlowLayout: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout [Child]) -> CGSize {
         let width = proposal.width ?? .infinity
-        let lines = lines(of: cache, width: width)
+        let fitted = fittedChildren(cache, subviews: subviews, width: width)
+        let lines = lines(of: fitted, width: width)
         let widest = lines.map(\.width).max() ?? 0
         let height = lines.map(\.height).reduce(0, +) + lineSpacing * CGFloat(max(lines.count - 1, 0))
         return CGSize(width: min(widest, width), height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout [Child]) {
+        let fitted = fittedChildren(cache, subviews: subviews, width: bounds.width)
         var y = bounds.minY
-        for line in lines(of: cache, width: bounds.width) {
+        for line in lines(of: fitted, width: bounds.width) {
             var x = bounds.minX
             for index in line.children {
-                let child = cache[index]
+                let child = fitted[index]
                 subviews[index].place(at: CGPoint(x: x, y: y + line.baseline - child.baseline), proposal: ProposedViewSize(child.size))
                 x += child.size.width + spacing
             }
@@ -1009,8 +937,15 @@ struct FlowLayout: Layout {
         }
     }
 
-    /// The children on a line, its width, its baseline, as far down as the lowest of theirs, and its height, down to
-    /// the lowest of their bottoms below that.
+    private func fittedChildren(_ cache: [Child], subviews: Subviews, width: CGFloat) -> [Child] {
+        guard width.isFinite, width > 0 else { return cache }
+        return cache.enumerated().map { index, child in
+            guard child.size.width > width else { return child }
+            let dimensions = subviews[index].dimensions(in: ProposedViewSize(width: width, height: nil))
+            return Child(size: CGSize(width: min(dimensions.width, width), height: dimensions.height), baseline: dimensions[.firstTextBaseline])
+        }
+    }
+
     private struct Line {
         var children: [Int] = []
         var width: CGFloat = 0
@@ -1037,18 +972,13 @@ struct FlowLayout: Layout {
     }
 }
 
-/// A text and size of a window's own, as Compare has, in place of the previews', so the window leaves the previews
-/// as they are.
 struct OwnPreviewOptions {
     var text: Binding<String>
-    /// What the window shows while the text is empty.
     var placeholder: String
     var size: Binding<Double>
     var sizeRange: ClosedRange<Double>
 }
 
-/// The toolbar button with sample text and size. No Leading: the list, grid and specimens set each sample on one line,
-/// and Quick Look sets its sample with the font's own line spacing.
 struct PreviewOptionsButton: View {
     var own: OwnPreviewOptions?
     @State private var isPresented = false
@@ -1059,7 +989,7 @@ struct PreviewOptionsButton: View {
         } label: {
             Label("Preview Options", systemImage: "textformat.size")
         }
-        .toolbarButtonStyle()
+        .toolbarButtonStyle(isOn: isPresented)
         .help("Preview text and size")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) { PreviewOptions(own: own) }
     }
@@ -1074,12 +1004,11 @@ private struct PreviewOptions: View {
         let text = own?.text ?? $preview.sampleText
         Form {
             Section {
-                TextField("Preview Text", text: text, prompt: Text(own?.placeholder ?? "Preview Text"))
+                TextField("Preview Text", text: text, prompt: Text(own?.placeholder ?? "Preview text"))
                     .labelsHidden()
+                    .noAutoFill()
                 HStack {
-                    // A hair space after the word: the button's own chevron a point further from it, 5 pt rather than 4.
                     Menu("Presets\u{200A}") {
-                        // Yours first, in the order saved, then Cicero's.
                         ForEach(preview.savedPresets, id: \.self) { sample in
                             Button(Self.title(of: sample)) { text.wrappedValue = sample }
                         }
@@ -1094,18 +1023,16 @@ private struct PreviewOptions: View {
                     .buttonStyle(.borderless)
                     .fixedSize()
                     Spacer()
-                    // Once the text is one of yours, the button takes it out again.
                     if preview.isSavedPreset(text.wrappedValue) {
                         Button("Remove Preset") { preview.savedPresets.removeAll { $0 == text.wrappedValue } }
-                            .help("Takes the preview text out of Presets")
+                            .help("Remove the current preview text from Presets")
                     } else {
                         Button("Save as Preset") { preview.savedPresets.append(text.wrappedValue) }
                             .disabled(!preview.canSavePreset(text.wrappedValue))
-                            .help("Adds the preview text to Presets")
+                            .help("Save the current preview text as a preset")
                     }
                 }
-                // The text in another case, which Save as Preset then saves as it is. ß in capitals is SS, as the text is
-                // set in every font, not all of which have ẞ.
+                // ß in capitals is SS, as the text is set in every font, not all of which have ẞ.
                 LabeledContent("Case") {
                     CaseButtons { text.wrappedValue = $0.apply(to: text.wrappedValue) }
                 }
@@ -1114,7 +1041,6 @@ private struct PreviewOptions: View {
                 if let own {
                     row("Size", own.size, range: own.sizeRange, unit: " pt")
                 } else if let factor = GridScale.shared.factor {
-                    // The size the grid draws at while the sidebar is hidden or the Info panel open (see `GridScale`).
                     row("Size", Binding {
                         GridScale.drawn(preview.size, factor: factor)
                     } set: {
@@ -1132,7 +1058,6 @@ private struct PreviewOptions: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// A preset as its menu item shows it: a long one cut short, so the menu isn't as wide as the text.
     private static func title(of preset: String) -> String {
         preset.count > 48 ? String(preset.prefix(47)) + "…" : preset
     }
@@ -1148,27 +1073,47 @@ private struct PreviewOptions: View {
 }
 
 extension View {
-    /// A grouped form's margins in a popover as macOS 26 has them, 10 pt: macOS 15 leaves 20 pt around the sections,
-    /// too much for a popover. Its content margins add to those rather than replace them.
+    // Unmarked, a field is one AppKit's AutoFill guesses could take a name or an address: on its first use after launch, AutoFill's empty suggestions window flashed over the rest of the field's popover.
+    func noAutoFill() -> some View {
+        textContentType(NSTextContentType(rawValue: "none"))
+    }
+
     @ViewBuilder func popoverFormMargins() -> some View {
         if #available(macOS 26, *) {
             self
         } else {
+            // Not contentMargins, which add to the 20 pt macOS 15 leaves around a popover's sections rather than replace them.
             padding(-10)
         }
     }
 }
 
-/// The Info panel toggle, highlighted while the panel is open, like the view picker's choice; toolbars
-/// give it a capsule of its own.
+struct WindowTitleTint: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        if colorScheme == .dark {
+            content.foregroundStyle(Color.ink.opacity(0.92))
+        } else {
+            content.foregroundStyle(.primary.opacity(0.83))
+        }
+    }
+}
+
+struct WindowSubtitleTint: ViewModifier {
+    func body(content: Content) -> some View {
+        content.foregroundStyle(.secondary)
+    }
+}
+
 struct InfoButton: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Toggle(isOn: Binding(get: { model.isInfoPresented }, set: { model.isInfoPresented = $0 })) {
+        Toggle(isOn: Binding(get: { model.isInfoShown }, set: { model.isInfoShown = $0 })) {
             Label("Info", systemImage: "info.circle")
         }
         .toggleStyle(.toolbar)
-        .help("Info")
+        .help(model.isInfoShown ? "Hide Info" : "Show Info")
     }
 }

@@ -1,9 +1,10 @@
 import CiceroCore
 import SwiftUI
 
-/// The Conflicts page: problems grouped by kind, each with an explanation, its files and what to do about them.
 struct ProblemsView: View {
     @Environment(AppModel.self) private var model
+    @State private var width: CGFloat = 0
+    @State private var marks: [String: Bool] = [:]
 
     var body: some View {
         let groups = ProblemKind.allCases.compactMap { kind -> (kind: ProblemKind, problems: [Problem])? in
@@ -12,19 +13,20 @@ struct ProblemsView: View {
         }
         Group {
             if groups.isEmpty {
-                // Like the other empty states: what shows up here, not a verdict on the fonts.
                 if model.hasScanned {
                     EmptyState("No Conflicts", systemImage: "checkmark.circle",
-                               description: Text("Fonts installed twice, duplicates, and missing or damaged files show up here."))
+                               description: Text("Fonts installed twice, duplicates, and missing\nor damaged files show up here."))
                 } else {
-                    EmptyState("Checking Fonts", systemImage: "checkmark.circle",
-                               description: Text("Fonts installed twice, duplicates, and missing or damaged files will show up here."))
+                    EmptyState("Checking Fonts…", systemImage: "checkmark.circle",
+                               description: Text("Fonts installed twice, duplicates, and missing\nor damaged files will show up here."))
                 }
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 32) {
                         ForEach(groups, id: \.kind) { group in
-                            if group.kind.isMinor {
+                            if group.kind == .duplicates {
+                                DuplicatesSection(problems: group.problems, marks: $marks)
+                            } else if group.kind.isMinor {
                                 MinorProblemGroup(kind: group.kind, problems: group.problems)
                             } else {
                                 ProblemGroup(kind: group.kind, problems: group.problems)
@@ -33,13 +35,20 @@ struct ProblemsView: View {
                     }
                     .frame(maxWidth: 760, alignment: .leading)
                     .padding(24)
-                    // The scroll view is only as wide as its content; fill the window so it scrolls anywhere and its
-                    // bar sits at the edge.
-                    .frame(maxWidth: .infinity)
+                    // Centred by the width outside the scroll view: inside it, a scroll bar that takes room moves the centre whenever the list starts to scroll.
+                    .padding(.leading, max(0, (width - 808) / 2))
+                    // The scroll view is only as wide as its content. Fill the window so it scrolls anywhere and its bar sits at the edge.
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if let duplicates = groups.first(where: { $0.kind == .duplicates }) {
+                        DuplicatesBar(problems: duplicates.problems, marks: $marks)
+                    }
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background(Color.canvas)
         .navigationTitle("Conflicts")
         .navigationSubtitle(subtitle)
@@ -49,7 +58,7 @@ struct ProblemsView: View {
         switch model.problems.count(where: { !$0.kind.isMinor }) {
         case 0: ""
         case 1: "1 conflict"
-        case let count: "\(count) conflicts"
+        case let count: "\(count.plain) conflicts"
         }
     }
 }
@@ -61,25 +70,22 @@ private struct ProblemGroup: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Centred, not on the baseline: there the buttons sat low beside the large title.
             HStack(spacing: 12) {
                 Text(kind.title).font(.title2.bold())
                 Spacer(minLength: 0)
-                // One problem's extra copies have their own buttons.
                 let extras = problems.filter { !$0.extraCopies.isEmpty }
                 if extras.count > 1 {
-                    Button(kind == .installedTwice ? "Remove All Extra Copies" : "Move All Extra Copies to Trash", role: .destructive) {
+                    Button("Move All Extra Copies to Trash", role: .destructive) {
                         model.trashExtraCopies(of: extras)
                     }
                     .help(kind == .installedTwice
-                        ? "Keeps the newest copy of each font and moves the others to the Trash."
-                        : "Keeps the newest copy of each font in each folder and moves the others to the Trash.")
+                        ? "Keep the newest copy of each font and move the others to the Trash"
+                        : "Keep the newest copy of each font in each folder and move the others to the Trash")
                 }
-                // Not fonts missing from folders: Remove from Folder is a different thing to do.
                 let forgettable = problems.filter { $0.fixes.contains(where: \.isForget) }
                 if kind == .missing && forgettable.count > 1 {
                     Button("Forget All") { model.forgetAll(of: forgettable) }
-                        .help("Cicero stops looking for these files and forgets them.")
+                        .help("Stop looking for these missing files and remove them from your library")
                 }
             }
             Text(kind.explanation).foregroundStyle(.secondary)
@@ -88,14 +94,182 @@ private struct ProblemGroup: View {
     }
 }
 
-/// Minor problems, at the bottom, open at first and closed with the arrow beside their title.
+private enum DuplicateSelection {
+    static func marked(in problems: [Problem], overrides: [String: Bool]) -> Set<String> {
+        let trashable = problems.reduce(into: Set<String>()) { $0.formUnion($1.trashable) }
+        let defaults = problems.reduce(into: Set<String>()) { $0.formUnion($1.extraCopies) }
+        var result = Set<String>()
+        for problem in problems {
+            for file in problem.files where trashable.contains(file.path) {
+                if overrides[file.path] ?? defaults.contains(file.path) {
+                    result.insert(file.path)
+                }
+            }
+        }
+        for group in problems.flatMap(\.copyGroups) where !group.isEmpty && group.allSatisfy(result.contains) {
+            let keep = group.first { !defaults.contains($0) } ?? group[0]
+            result.remove(keep)
+        }
+        return result
+    }
+}
+
+private enum DuplicateColumn {
+    static let folder: CGFloat = 180
+    static let version: CGFloat = 64
+    static let modified: CGFloat = 96
+}
+
+private struct DuplicatesSection: View {
+    let problems: [Problem]
+    @Binding var marks: [String: Bool]
+
+    var body: some View {
+        let marked = DuplicateSelection.marked(in: problems, overrides: marks)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(ProblemKind.duplicates.title).font(.title2.bold())
+            Text(ProblemKind.duplicates.explanation).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 0) {
+                    Text("Name").frame(maxWidth: .infinity, alignment: .leading)
+                    separator
+                    Text("Folder").frame(width: DuplicateColumn.folder, alignment: .leading)
+                    separator
+                    Text("Version").frame(width: DuplicateColumn.version, alignment: .leading)
+                    separator
+                    Text("Modified").frame(width: DuplicateColumn.modified, alignment: .leading)
+                }
+                .lineLimit(1)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .frame(height: 28)
+                .overlay(alignment: .bottom) { Divider() }
+                ForEach(problems) { problem in
+                    HStack(spacing: 6) {
+                        Text(problem.title).fontWeight(.semibold)
+                        Text(problem.files.count == 1 ? "1 file" : "\(problem.files.count.plain) files").foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.top, 14)
+                    .padding(.bottom, 5)
+                    ForEach(Array(problem.files.enumerated()), id: \.element.path) { index, file in
+                        DuplicateRow(file: file, problem: problem, problems: problems, marked: marked, isStriped: !index.isMultiple(of: 2), marks: $marks)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private extension DuplicatesSection {
+    var separator: some View {
+        Rectangle().fill(.separator).frame(width: 1, height: 16).frame(width: 12)
+    }
+}
+
+private struct DuplicateRow: View {
+    @Environment(AppModel.self) private var model
+    let file: ProblemFile
+    let problem: Problem
+    let problems: [Problem]
+    let marked: Set<String>
+    let isStriped: Bool
+    @Binding var marks: [String: Bool]
+
+    var body: some View {
+        let isMarked = marked.contains(file.path)
+        let blocker = isMarked ? nil : blocker
+        HStack(spacing: 12) {
+            Toggle(isOn: Binding(get: { isMarked }, set: { toggle($0) })) {
+                Text((file.path as NSString).lastPathComponent)
+                    .strikethrough(isMarked)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .toggleStyle(.checkbox)
+            .disabled(blocker != nil)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(((file.path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(width: DuplicateColumn.folder, alignment: .leading)
+            Text(file.version.map(FontFace.displayVersion) ?? "")
+                .frame(width: DuplicateColumn.version, alignment: .leading)
+            Text(file.modified?.formatted(date: .abbreviated, time: .omitted) ?? "")
+                .frame(width: DuplicateColumn.modified, alignment: .leading)
+        }
+        .foregroundStyle(isMarked ? .secondary : .primary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(isStriped ? Color.primary.opacity(0.035) : .clear, in: .rect(cornerRadius: 5))
+        .help(blocker ?? "")
+        .contextMenu {
+            Button("Show in Finder") { model.apply(.reveal([file.path]), family: problem.family) }
+        }
+    }
+
+    private var blocker: String? {
+        problem.trashable.contains(file.path) ? nil : "This file also holds a font that has no other copy."
+    }
+
+    private func toggle(_ isOn: Bool) {
+        guard isOn else {
+            marks[file.path] = false
+            return
+        }
+        var set = marked
+        set.insert(file.path)
+        marks[file.path] = true
+        for group in problems.flatMap(\.copyGroups) where group.contains(file.path) && group.allSatisfy(set.contains) {
+            if let other = group.first(where: { $0 != file.path }) {
+                set.remove(other)
+                marks[other] = false
+            }
+        }
+    }
+}
+
+private struct DuplicatesBar: View {
+    @Environment(AppModel.self) private var model
+    let problems: [Problem]
+    @Binding var marks: [String: Bool]
+
+    var body: some View {
+        let marked = DuplicateSelection.marked(in: problems, overrides: marks)
+        let paths = marked.sorted()
+        HStack(spacing: 12) {
+            Text(paths.isEmpty ? "No duplicates selected."
+                : paths.count == 1 ? "1 duplicate file will go to the Trash." : "\(paths.count.plain) duplicate files will go to the Trash.")
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if !paths.isEmpty {
+                Button("Deselect All") {
+                    marks = Dictionary(problems.flatMap(\.files).map { ($0.path, false) }, uniquingKeysWith: { first, _ in first })
+                }
+            } else if problems.contains(where: { !$0.extraCopies.isEmpty }) {
+                Button("Select Extra Copies") { marks = [:] }
+            }
+            Button(paths.isEmpty ? "Move to Trash" : paths.count == 1 ? "Move 1 File to Trash" : "Move \(paths.count.plain) Files to Trash") {
+                model.trashExtraCopies(of: problems.filter { $0.files.contains { marked.contains($0.path) } }, paths: paths)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(paths.isEmpty)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
+    }
+}
+
 private struct MinorProblemGroup: View {
     let kind: ProblemKind
     let problems: [Problem]
     @State private var isExpanded = true
 
     var body: some View {
-        // DisclosureGroup animates opening but not closing; open instantly too.
+        // DisclosureGroup animates opening but not closing. Open instantly too.
         DisclosureGroup(isExpanded: Binding(get: { isExpanded }, set: { newValue in
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
@@ -109,7 +283,7 @@ private struct MinorProblemGroup: View {
         } label: {
             HStack(spacing: 6) {
                 Text(kind.title).font(.title3.weight(.semibold))
-                Text("\(problems.count)").foregroundStyle(.secondary).monospacedDigit()
+                Text(problems.count.plain).foregroundStyle(.secondary).monospacedDigit()
             }
         }
     }
@@ -166,15 +340,15 @@ private struct FileRow: View {
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(file.title ?? (file.path as NSString).lastPathComponent).lineLimit(1)
+                    Text(file.title ?? (file.path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle)
                     if isNewest { NewestTag() }
                     if !file.preferredFor.isEmpty && file.preferredStyles == nil { PreferredTag(names: file.preferredFor) }
                 }
-                // Under a title, the whole path says which file it is.
                 Text(((file.title == nil ? (file.path as NSString).deletingLastPathComponent : file.path) as NSString).abbreviatingWithTildeInPath)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
                     .truncationMode(.middle)
                 Text(Self.facts(of: file)).font(.caption).foregroundStyle(.secondary)
                 if let styles = file.preferredStyles {
@@ -198,8 +372,6 @@ private struct FileRow: View {
     }
 }
 
-/// Several files in one folder, usually one copy of a whole family: one row for all of them, with the files
-/// themselves under a disclosure.
 private struct FolderRow: View {
     let folder: ProblemFolder
     let fixes: [ProblemFix]
@@ -221,6 +393,7 @@ private struct FolderRow: View {
                         Text((folder.path as NSString).abbreviatingWithTildeInPath)
                             .lineLimit(1)
                             .truncationMode(.middle)
+                            .truncationMode(.middle)
                         if isNewest { NewestTag() }
                     }
                     Text(facts).font(.caption).foregroundStyle(.secondary)
@@ -231,7 +404,7 @@ private struct FolderRow: View {
                             Image(systemName: "chevron.right")
                                 .font(.caption2.weight(.semibold))
                                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            Text("\(folder.files.count) files")
+                            Text("\(folder.files.count.plain) files")
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -239,17 +412,18 @@ private struct FolderRow: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 2)
-                    .accessibilityLabel(isExpanded ? "Hide Files" : "Show \(folder.files.count) Files")
+                    .accessibilityLabel(isExpanded ? "Hide Files" : "Show \(folder.files.count.plain) Files")
                 }
                 Spacer(minLength: 0)
                 FixButtons(fixes: fixes, kind: kind, family: family).controlSize(.small)
             }
             if isExpanded {
+                let filesDiffer = self.filesDiffer
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(folder.files, id: \.path) { file in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text((file.path as NSString).lastPathComponent).lineLimit(1)
+                                Text((file.path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle)
                                 if filesDiffer {
                                     Text(FileRow.facts(of: file)).font(.caption).foregroundStyle(.secondary)
                                 }
@@ -264,7 +438,6 @@ private struct FolderRow: View {
         }
     }
 
-    /// What the files have in common, or the range when they don't.
     private var facts: String {
         var parts: [String] = []
         let versions = unique(folder.files.compactMap { $0.version.map(FontFace.displayVersion) })
@@ -272,7 +445,7 @@ private struct FolderRow: View {
         case 0: break
         case 1: parts.append("Version \(versions[0])")
         case 2: parts.append("Versions \(versions[0]) and \(versions[1])")
-        default: parts.append("\(versions.count) versions")
+        default: parts.append("\(versions.count.plain) versions")
         }
         let dates = folder.files.compactMap(\.modified)
         if let first = dates.min(), let last = dates.max() {
@@ -284,7 +457,6 @@ private struct FolderRow: View {
         return parts.joined(separator: " · ")
     }
 
-    /// Whether each file needs its own version, date and place.
     private var filesDiffer: Bool {
         Set(folder.files.map(FileRow.facts)).count > 1
     }
@@ -317,7 +489,6 @@ private struct FixButtons: View {
     @Environment(AppModel.self) private var model
     let fixes: [ProblemFix]
     let kind: ProblemKind
-    /// The family the problem is about, if any.
     let family: String?
 
     var body: some View {
@@ -329,15 +500,14 @@ private struct FixButtons: View {
         }
     }
 
-    /// Only in Installed Twice is a trashed file a spare copy of the same font.
     private func title(_ fix: ProblemFix) -> String {
-        if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Remove Copy" : "Remove Copies" }
+        if kind == .installedTwice, case .trash(let paths) = fix { return paths.count == 1 ? "Move Copy to Trash" : "Move Copies to Trash" }
         return fix.title
     }
 
     private func help(_ fix: ProblemFix) -> String {
         guard case .removeFromAdobeFonts = fix else { return "" }
-        return "Opens the family’s page on Adobe Fonts, where you remove it. Creative Cloud then takes its copy away."
+        return "Open this family’s page on Adobe Fonts to remove it; Creative Cloud will then remove its copy"
     }
 
     private func isDestructive(_ fix: ProblemFix) -> Bool {

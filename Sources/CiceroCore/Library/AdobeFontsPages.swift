@@ -1,18 +1,12 @@
 import Foundation
 
-/// The pages on Adobe Fonts' website of the fonts Creative Cloud keeps, from the list it keeps of them
-/// (`Locations.adobeFontsList`). Each font's file is named after its number there (".139.otf" is font 139), and its
-/// entry links to its family's page, where the family is turned on and off. Only ever read: the list is Creative
-/// Cloud's, and written over at each sync.
 public struct AdobeFontsPages: Sendable, Equatable {
-    /// Each font's family page, by its number.
     public var pages: [String: URL]
 
     public init(pages: [String: URL] = [:]) {
         self.pages = pages
     }
 
-    /// Creative Cloud's list; empty when there's none or it can't be read, as when Creative Cloud writes it differently.
     public init(contentsOf url: URL) {
         self.init(data: (try? Data(contentsOf: url)) ?? Data())
     }
@@ -25,13 +19,11 @@ public struct AdobeFontsPages: Sendable, Equatable {
         self.init(pages: reader.pages)
     }
 
-    /// The family page of a file from Adobe Fonts, by the number in its name.
     public func page(forPath path: String) -> URL? {
         guard ActiveSource.isAdobeFonts(path), let number = Self.number(ofPath: path) else { return nil }
         return pages[number]
     }
 
-    /// The family page most of the files from Adobe Fonts among these have.
     public func page(forPaths paths: some Sequence<String>) -> URL? {
         var counts: [URL: Int] = [:]
         for path in paths {
@@ -40,19 +32,18 @@ public struct AdobeFontsPages: Sendable, Equatable {
         return counts.max { a, b in a.value != b.value ? a.value < b.value : a.key.absoluteString > b.key.absoluteString }?.key
     }
 
-    /// ".139.otf" → "139".
     static func number(ofPath path: String) -> String? {
         var name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+        // Creative Cloud names each font's file after its number on Adobe Fonts, hidden: ".139.otf" is font 139.
         if name.hasPrefix(".") { name.removeFirst() }
         return !name.isEmpty && name.allSatisfy(\.isASCII) && name.allSatisfy(\.isNumber) ? name : nil
     }
 
-    /// Pages on Adobe Fonts' own website only, whatever the list says.
     static func isAdobeFontsPage(_ url: URL) -> Bool {
+        // Only Adobe Fonts' own website, whatever the list says: the list is another app's file, and the app opens its links.
         url.scheme == "https" && url.host == "fonts.adobe.com"
     }
 
-    /// `<font><id>139</id>…<properties>…<familyURL>https://fonts.adobe.com/fonts/…</familyURL>` for each font.
     private final class ListReader: NSObject, XMLParserDelegate {
         var pages: [String: URL] = [:]
         private var elements: [String] = []

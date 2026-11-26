@@ -131,19 +131,9 @@ Click the switch next to a family. It’s on in every app as soon as the switch 
 
 Cicero follows macOS. To choose for Cicero alone, open **Cicero → Preferences** (⌘,), click **General** and pick **System**, **Light** or **Dark** next to **Appearance**.
 
-## Cicero in the menu bar
+## Close Cicero’s windows
 
-Cicero has an icon in the menu bar, the cube of its app icon. Click it to open Cicero’s window. Drop font files on it to add them, or a PDF, InDesign, Illustrator or Photoshop file to see the fonts it uses. Right-click it, or click it with two fingers, for a menu with:
-
-- The fonts that are on for open apps, because of their [app folders](activating.md#turn-fonts-on-with-an-app) or a document open in an Adobe app, and the ones on [until Cicero quits](activating.md#turn-a-font-on-just-for-now)
-- Your folders, as the sidebar lists them. A checkmark means all of a folder’s fonts are on, a dash that some are. Choose a folder to turn its fonts on, or off when it has a checkmark
-- **Add Fonts**, as in the File menu, and **Find Fonts in Current Document**, which shows the fonts of the document you have open in the app you’re in: a PDF in Preview or Acrobat, or a file in InDesign, Illustrator or Photoshop. The first time, macOS asks whether Cicero may control that app. With no document Cicero can read there, you pick a file instead. Cicero’s window opens too, so you see what they bring
-- **Preferences** and **Quit Cicero**
-
-Closing Cicero’s windows doesn’t quit it, so app folders keep working.
-
-- To do without the icon, open **Preferences → General** and turn off **Show Cicero in the menu bar**
-- With the icon there, you can turn off **Show Cicero in the Dock**. Cicero is then in the Dock and the app switcher only while one of its windows is open
+Closing Cicero’s windows doesn’t quit it, so app folders keep working. Click Cicero in the Dock to open its window again.
 
 ## Keep Cicero up to date
 
@@ -151,10 +141,8 @@ Cicero checks for new versions each time it opens and once a day while it stays 
 
 - To check now, choose **Cicero → Check for Updates**
 - To stop checking by itself, open **Preferences → General** and, under **Updates**, turn off **Check for updates automatically**. It’s on at first. With it off, Cicero only checks when you choose **Check for Updates**
-- **Preferences → General → Updates** shows your version and whether it’s up to date. **Check Now** checks at once, and **Update** installs a version it found
-- To try new features sooner, set **Update track** to **Beta**. Betas can have more bugs, so back up your library first (**Preferences → General → Back Up**). A beta is called **Cicero (Beta)** and has a blue icon. Cicero keeps the track you’re on when it updates, so a beta stays on Beta after its stable version comes out. Set it back to **Stable** to leave the beta: you get the next stable version when there is one. If there isn’t one yet, Cicero offers to go back to the latest stable version. It saves your setup to its Backups folder first, replaces the beta, and opens again
 
-Updates come from Cicero’s [releases page on GitHub](https://github.com/opr-inzn/cicero/releases). **Help → Release Notes** opens it, so you can see what changed in each version.
+Updates come from Cicero’s [releases page on GitHub](https://github.com/opr-inzn/cicero/releases). After an update, Cicero shows what’s new, and **Help → Version History** opens [what changed in each version](version-history.md).
 
 ## Get help
 

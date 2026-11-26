@@ -13,24 +13,25 @@ T=~/Downloads/cicero-training
 git clone --depth 1 https://github.com/google/fonts "$T/google-fonts"
 python3 -m venv "$T/venv" && "$T/venv/bin/pip" install torch numpy coremltools
 
-# The families and styles to draw, then the letters, drawn with Cicero's own LetterImages.swift.
-"$T/venv/bin/python" -I scripts/embedding/prepare.py "$T/google-fonts" "$T/work"
+# The families and styles to draw (optionally adding extra verified OFL/Apache/MIT repos with --extra), then the letters drawn with Cicero's own LetterImages.swift.
+swiftc -O -parse-as-library scripts/embedding/inspect-fonts.swift -o /tmp/inspect-fonts
+"$T/venv/bin/python" -I scripts/embedding/prepare.py "$T/google-fonts" "$T/work" --extra "$T/extra-fonts"
 swiftc -O -parse-as-library scripts/embedding/render-letters.swift Sources/CiceroCore/Similarity/LetterImages.swift -o /tmp/render-letters
 /tmp/render-letters "$T/work/manifest.json" "$T/work/letters"
 
 # Optionally each style's letter measurements, for the model to learn to tell them: the tests' EmbeddingEvaluation
 # writes them to measurements.tsv (CICERO_EMBEDDING_WORK="$T/work" swift test --filter EmbeddingEvaluation).
 
-# The model in Resources: designs of a kind alike (--soft), learned for 60 epochs with the first tenth held out.
+# The model in Resources: ResNet + cross-letter attention (--arch resnet), 19 letters, measurement-aware soft targets (--soft 2), learned from every family (--fold -1).
 "$T/venv/bin/python" -I scripts/embedding/train.py train "$T/work" --measurements "$T/work/measurements.tsv" \
-    --epochs 60 --fold 0 --soft 2 --instance 0.3
+    --arch resnet --epochs 60 --fold -1 --soft 2 --instance 0.3
 "$T/venv/bin/python" -I scripts/embedding/train.py classify "$T/work"
 "$T/venv/bin/python" -I scripts/embedding/train.py export "$T/work" Resources/LetterEmbedding.mlpackage
 ```
 
 `classify` fits a small classifier on the embedding as it is, for Cicero's guesses of classifications: serif, sans
 serif, script or ornamental, from Google's category, stroke and tags (see `label` in train.py). It says how often it's
-right on the held-out families, and how often when it's sure, which `AppModel.letterGuessLikelihood` goes by.
+right on the held-out families, and how often when it's sure, which `ClassificationGuesses.letterLikelihood` goes by.
 
 It learns designs: a family's uprights at one width and optical size (the normal one, and condensed and expanded, small
 and large ones of a variable font with those axes) or its italics, each a design of its own, that the others of the
@@ -50,7 +51,8 @@ large (`--details`, from letters-details.u8), which a model then needs in the ap
 for a model with a `strips` or `details` input.
 
 Training takes about a quarter of an hour on an M1 Pro. Every tenth epoch it prints how it does on the designs of the
-tenth of the families it doesn't learn from (`--fold`, 0 to 9; one tenth's scores vary more than a change makes them,
+tenth of the families it doesn't learn from (`--fold`, 0 to 9, or -1 to learn from them all, with none left to judge it
+on; one tenth's scores vary more than a change makes them,
 so compare several): how often a style's nearest other style is its own design's; how much
 the ten nearest upright designs share an upright one's Google tags and category; how many of the ten nearest are
 upright, for an upright design, and italic, for an italic one; and how far apart in width the ten nearest are, in

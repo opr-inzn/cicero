@@ -12,32 +12,34 @@ enum ToolboxTab: String, CaseIterable {
     }
 }
 
-/// Which fonts have every character of a text, and which support a language.
 struct ToolboxWindow: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
     @AppStorage("toolbox.tab") private var tab: ToolboxTab = .text
+    @State private var opened: Set<ToolboxTab> = []
 
     var body: some View {
-        Group {
-            switch tab {
-            case .text: TextTab()
-            case .languages: LanguagesTab()
-            }
+        ZStack {
+            if opened.contains(.text) || tab == .text { shown(TextTab(), for: .text) }
+            if opened.contains(.languages) || tab == .languages { shown(LanguagesTab(), for: .languages) }
         }
+        .onChange(of: tab, initial: true) { opened.insert(tab) }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 ToolbarPicker("View", values: ToolboxTab.allCases, selection: $tab, title: \.title)
             }
         }
-        // Turning fonts on or off from a font's menu here can ask first, which the Library window does: it comes forward.
-        .onChange(of: model.manyActivationPrompt?.id) { _, id in if id != nil { openWindow(id: WindowID.main) } }
-        .onChange(of: model.movingOutPrompt?.id) { _, id in if id != nil { openWindow(id: WindowID.main) } }
+    }
+
+    private func shown(_ content: some View, for tab: ToolboxTab) -> some View {
+        let isShown = self.tab == tab
+        return content
+            .opacity(isShown ? 1 : 0)
+            .allowsHitTesting(isShown)
+            .disabled(!isShown)
+            .accessibilityHidden(!isShown)
     }
 }
 
 extension LanguageCatalog {
-    /// The user's language when the catalog knows it, else English.
     var preferredLanguageID: String {
         let code = Locale.current.language.languageCode?.identifier(.alpha3) ?? "eng"
         return language(code) != nil ? code : "eng"
@@ -49,8 +51,6 @@ extension LanguageCatalog {
 private struct TextTab: View {
     @Environment(AppModel.self) private var model
     @Environment(PreviewSettings.self) private var preview
-    @Environment(\.openWindow) private var openWindow
-    /// Saved soon, not with each letter.
     @Bindable private var savedText = SavedSoon.toolboxText
     private var text: String { savedText.value }
     @AppStorage("toolbox.maxMissing") private var maxMissing = 0
@@ -77,26 +77,29 @@ private struct TextTab: View {
     }
 
     var body: some View {
-        // The rows stay, empty, under the messages rather than make way for them: the bar is rebuilt when the
-        // scroll view under it comes or goes, and the text field in it lost focus with the first letter typed.
+        // The rows stay, empty, under the messages: the bar is rebuilt when the scroll view under it comes or goes, and the text field in it lost focus with the first letter typed.
         ZStack {
             table
             if query.text.isEmpty {
-                EmptyState("Find Fonts for a Text", systemImage: "character.cursor.ibeam",
+                EmptyState("Find Fonts for Text", systemImage: "character.cursor.ibeam",
                            description: Text("Type or paste text, and Cicero lists the fonts that have every character in it."))
             } else if matches.isEmpty && !isSearching {
-                EmptyState("No Fonts Have Every Character", systemImage: "character.textbox",
-                           description: Text(unindexed > 0 ? "Some fonts are still being checked." : "Allow a few missing characters to see the closest fonts."))
+                EmptyState(maxMissing == 0 ? "No Fonts Have Every Character" : "No Matching Fonts", systemImage: "character.textbox",
+                           description: Text(unindexed > 0 ? "Some fonts are still being checked."
+                               : maxMissing == 0 ? "Allow a few missing characters to see the closest fonts."
+                               : maxMissing < 20 ? "Allow more missing characters to see closer matches."
+                               : "No fonts in your library match this text."))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // The fonts scroll under the controls and column titles.
-        .fadingTopBar {
+        .topBar {
             VStack(spacing: 0) {
                 controls
                 if !query.text.isEmpty && !(matches.isEmpty && !isSearching) { columnTitles }
             }
+            .topBarTint()
         }
+        .hardTopScrollEdge()
         .task(id: query) { await search(query) }
     }
 
@@ -104,47 +107,48 @@ private struct TextTab: View {
         HStack(spacing: 16) {
             TextField("Text", text: $savedText.value, prompt: Text("Type or paste text"))
                 .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 400)
+                .noAutoFill()
+                .frame(minWidth: 160, maxWidth: 400)
             Stepper(value: $maxMissing, in: 0...20) {
-                Text("Missing characters allowed: \(maxMissing)")
+                Text("Missing characters allowed: \(maxMissing.plain)")
             }
+            .fixedSize()
             Toggle("Active only", isOn: $activatedOnly)
-            Spacer()
-            Text(summary).foregroundStyle(.secondary).monospacedDigit()
+                .fixedSize()
+            Spacer(minLength: 0)
+            Text(summary).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
         }
-        .padding(12)
+        .padding([.horizontal, .top], 12)
+        .padding(.bottom, 6)
     }
 
     private var summary: String {
         guard !query.text.isEmpty else { return "" }
-        let count = matches.count == 1 ? "1 family" : "\(matches.count.formatted()) families"
+        let count = matches.count == 1 ? "1 Family" : "\(matches.count.plain) Families"
         if let progress = model.coverageProgress {
-            return "\(count) · checking characters, \(progress.done.formatted()) of \(progress.total.formatted())"
+            return "\(count) · checking characters, \(progress.done.plain) of \(progress.total.plain)…"
         }
         return count
     }
 
     private var table: some View {
         let model = self.model
-        let preview = self.preview
         let sample = query.text
-        // Clearing the text leaves the last matches until the search catches up.
         let matches = sample.isEmpty ? [] : self.matches
         let missing = Dictionary(matches.map { ($0.family.id, $0.missing) }) { first, _ in first }
-        return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection, open: open) { family in
+        return FamilyRowList(sections: [FamilyRowSection(id: "matches", families: matches.map(\.family))], selection: $selection) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
-                        Text(family.name).lineLimit(1)
+                        Text(family.name).lineLimit(1).truncationMode(.middle)
                         StatusTag(family: family)
                     }
                     .frame(width: 220, alignment: .leading)
                     FontText(
-                        text: sample, face: family.face(nearestWeight: preview.weight).face, size: 17, weight: preview.weight,
+                        text: sample, face: family.regular.face, size: 17,
                         variations: model.variations(for: family)
                     )
                     .foregroundStyle(Color.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    // Glyphs taller than the row run over its edges rather than be cut off.
                     .frame(height: 22)
                     Text(Self.characters(missing[family.id] ?? [])).foregroundStyle(.secondary).lineLimit(1)
                         .frame(width: 160, alignment: .leading)
@@ -153,34 +157,33 @@ private struct TextTab: View {
     }
 
     private var columnTitles: some View {
-        HStack(spacing: 12) {
+        let divider = Rectangle().fill(.separator).frame(width: 1, height: 16).frame(width: 12)
+        return HStack(spacing: 0) {
             Text("Name").frame(width: 220, alignment: .leading)
-            Text("Sample").frame(maxWidth: .infinity, alignment: .leading)
+            divider
+            Text("Preview").frame(maxWidth: .infinity, alignment: .leading)
+            divider
             Text("Missing").frame(width: 160, alignment: .leading)
         }
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, ListRowBackground.contentInset)
         .frame(height: 28)
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     private static func characters(_ scalars: [UInt32]) -> String {
         scalars.compactMap { Unicode.Scalar($0) }.map { String(Character($0)) }.joined(separator: " ")
     }
 
-    private func open(_ id: String) {
-        model.openFamilyID = id
-        openWindow(id: WindowID.main)
-    }
-
     private func search(_ query: Query) async {
         guard !query.text.isEmpty else {
+            isSearching = false
             matches = []
             unindexed = 0
             return
         }
         isSearching = true
-        // Wait for a pause in typing before walking a big library.
         try? await Task.sleep(for: .milliseconds(200))
         guard !Task.isCancelled else { return }
         let data = model.data
@@ -190,9 +193,10 @@ private struct TextTab: View {
         let index = model.coverage
         let text = query.text
         let maxMissing = query.maxMissing
-        let result = await Task.detached(priority: .userInitiated) {
+        let work = Task.detached(priority: .userInitiated) {
             CoverageSearch.families(having: text, in: families, maxMissing: maxMissing, index: index)
-        }.value
+        }
+        let result = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
         guard !Task.isCancelled else { return }
         matches = result.matches
         unindexed = result.unindexed
@@ -204,14 +208,20 @@ private struct TextTab: View {
 
 private struct LanguagesTab: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
     @AppStorage("toolbox.languageSort") private var sortByName = false
     @AppStorage("toolbox.language") private var languageID = ""
     @State private var search = ""
     @State private var support = LanguageSupport()
     @State private var selection: Set<String> = []
+    @State private var languageCache = LanguageListCache()
+
+    private final class LanguageListCache {
+        var key: (search: String, sortByName: Bool, count: Int)?
+        var languages: [Language] = []
+    }
 
     private struct LanguageSupport {
+        var languageID = ""
         var full: [Family] = []
         var base: [Family] = []
         var unindexed = 0
@@ -240,15 +250,21 @@ private struct LanguagesTab: View {
     private var languages: [Language] {
         let query = search.trimmingCharacters(in: .whitespaces)
         let all = model.languages.languages
+        if let cached = languageCache.key, cached.search == query, cached.sortByName == sortByName, cached.count == all.count {
+            return languageCache.languages
+        }
         let found = query.isEmpty ? all : all.filter { language in
             language.name.localizedCaseInsensitiveContains(query)
                 || (language.autonym?.localizedCaseInsensitiveContains(query) ?? false)
                 || language.scripts.contains { $0.localizedCaseInsensitiveContains(query) }
         }
-        return found.sorted { a, b in
+        let sorted = found.sorted { a, b in
             if sortByName || a.speakers == b.speakers { return a.name.localizedStandardCompare(b.name) == .orderedAscending }
             return a.speakers > b.speakers
         }
+        languageCache.key = (query, sortByName, all.count)
+        languageCache.languages = sorted
+        return sorted
     }
 
     private var list: some View {
@@ -264,22 +280,24 @@ private struct LanguagesTab: View {
                     .monospacedDigit()
             }
         }
-        // The languages scroll under the search field.
-        .fadingTopBar {
+        .topBar {
             HStack(spacing: 8) {
-                // Short enough for the field beside the sort menu at the list's narrowest.
                 TextField("Search", text: $search, prompt: Text("Language or script"))
                     .textFieldStyle(.roundedBorder)
+                    .noAutoFill()
                 Picker("Sort", selection: $sortByName) {
-                    Text("Speakers").tag(false)
                     Text("Name").tag(true)
+                    Text("Speakers").tag(false)
                 }
                 .labelsHidden()
                 .fixedSize()
-                .help("Sort by speakers or by name")
+                .help("Sort by name or by speakers")
             }
             .padding(10)
+            .overlay(alignment: .bottom) { Divider() }
+            .topBarTint()
         }
+        .hardTopScrollEdge()
     }
 
     private static func subtitle(_ language: Language) -> String {
@@ -296,13 +314,14 @@ private struct LanguagesTab: View {
         if let language = model.languages.language(languageID) {
             let query = Query(id: language.id, showSystem: model.data.showSystemFonts, showCreativeCloud: model.data.showCreativeCloudFonts,
                               fingerprint: model.library.fingerprint, coverageRevision: model.coverageRevision)
+            let shown = support.languageID == language.id ? support : LanguageSupport(languageID: language.id)
             FamilyRowList(sections: [
-                FamilyRowSection(id: "full", title: "Fully Supported (\(support.full.count.formatted()))", families: support.full, emptyText: "None"),
-                FamilyRowSection(id: "base", title: "Base Characters Only (\(support.base.count.formatted()))", families: support.base, emptyText: "None"),
-            ], selection: $selection, open: open) { family in
+                FamilyRowSection(id: "full", title: "Fully Supported (\(shown.full.count.plain))", families: shown.full, emptyText: "None"),
+                FamilyRowSection(id: "base", title: "Base Characters Only (\(shown.base.count.plain))", families: shown.base, emptyText: "None"),
+            ], selection: $selection) { family in
                 HStack(spacing: 12) {
                     HStack(spacing: 6) {
-                        Text(family.name).lineLimit(1)
+                        Text(family.name).lineLimit(1).truncationMode(.middle)
                         StatusTag(family: family)
                     }
                     .frame(width: 220, alignment: .leading)
@@ -312,8 +331,7 @@ private struct LanguagesTab: View {
                         .frame(height: 22)
                 }
             }
-            // The fonts scroll under the language.
-            .fadingTopBar {
+            .topBar {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(language.name).font(.title2.bold())
@@ -332,7 +350,9 @@ private struct LanguagesTab: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 10)
+                .topBarTint()
             }
+            .hardTopScrollEdge()
             .task(id: query) { await load(query) }
         } else {
             EmptyState("No Language Selected", systemImage: "globe",
@@ -343,14 +363,9 @@ private struct LanguagesTab: View {
     private func facts(_ language: Language) -> String {
         var parts = ["\(language.scripts.joined(separator: ", ")) · \(language.speakers.formatted(.number.notation(.compactName))) speakers"]
         if let progress = model.coverageProgress, support.unindexed > 0 {
-            parts.append("checking characters, \(progress.done.formatted()) of \(progress.total.formatted())")
+            parts.append("checking characters, \(progress.done.plain) of \(progress.total.plain)…")
         }
         return parts.joined(separator: " · ")
-    }
-
-    private func open(_ id: String) {
-        model.openFamilyID = id
-        openWindow(id: WindowID.main)
     }
 
     private func load(_ query: Query) async {
@@ -358,10 +373,11 @@ private struct LanguagesTab: View {
         let families = model.library.families.filter { data.lists($0) }
         let index = model.coverage
         let id = query.id
-        let result = await Task.detached(priority: .userInitiated) {
+        let work = Task.detached(priority: .userInitiated) {
             CoverageSearch.families(supporting: id, in: families, index: index)
-        }.value
+        }
+        let result = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
         guard !Task.isCancelled else { return }
-        support = LanguageSupport(full: result.full, base: result.base, unindexed: result.unindexed)
+        support = LanguageSupport(languageID: id, full: result.full, base: result.base, unindexed: result.unindexed)
     }
 }

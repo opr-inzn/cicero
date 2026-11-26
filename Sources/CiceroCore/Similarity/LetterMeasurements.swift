@@ -1,55 +1,32 @@
 import CoreText
 import Foundation
 
-/// What a face's letters look like, as numbers: how tall its lowercase is, how heavy and how contrasted its strokes,
-/// how wide, slanted and open its letters, and whether it has serifs and how big. Measured from the outlines of a
-/// few letters (H, I, O, a, c, d, e, g, l, n, o, p, x) and given against the cap height, so a face drawn small on its
-/// em measures as one drawn large. Similar fonts are the faces whose measurements are nearest (see `SimilarFonts`).
 public struct LetterMeasurements: Equatable, Sendable {
-    /// One value for each measure, in the order of `Measure.allCases`; NaN where the face hasn't the letters to say.
     public internal(set) var values: [Float]
 
     public enum Measure: Int, CaseIterable, Sendable {
-        /// The x's height against the H's.
         case xHeight
-        /// How far the l and d reach, against the H's height.
         case ascender
-        /// How far the p and q reach below the baseline, against the H's height.
         case descender
-        /// The H's and n's stems against the H's height.
         case weight
-        /// The thin strokes against the thick: the o's top and bottom against its sides, and the H's crossbar
-        /// against its stems. 1 for strokes all as thick.
         case contrast
-        /// How far the o's thinnest parts are turned from its top and bottom, as a pen held at an angle leaves
-        /// them, in units of 30°, and less the less its thickness changes going round: 0 for Bodoni's upright
-        /// stress and for strokes about as thick all round, about 0.5 for Garamond's.
         case stress
-        /// The lowercase's average advance against the x-height.
         case width
-        /// The capitals' average advance against the cap height.
         case capitalWidth
-        /// The o's width against its height.
         case roundWidth
-        /// The room either side of n, o, H and O, against the x-height.
         case spacing
-        /// How far the letters lean: along for each unit up.
         case slant
-        /// How far serifs reach past the stems of H and n (of I and l when neither can say), on each side, against
-        /// the H's height; 0 without. Not the I's and l's first, which sans serif monospaced faces give serifs.
         case serifLength
-        /// How thick serifs are at the stem, bracket and all, against the H's height; 0 without.
         case serifThickness
-        /// How open c and e are: the share of directions from inside them that leads out.
         case aperture
-        /// How much of its box the o fills: π/4 for an ellipse, more for a squarer one.
         case squareness
-        /// 1 when the a has a bowl and a hook over it, 0 when it's a bowl alone.
         case doubleStoryA
-        /// 1 when the g has two bowls, 0 when it has one and a tail.
         case doubleStoryG
-        /// 1 for a monospaced face.
         case monospaced
+        case rounded
+        case allCaps
+        case stencil
+        case outline
     }
 
     init(values: [Float]) {
@@ -58,23 +35,23 @@ public struct LetterMeasurements: Equatable, Sendable {
 
     public subscript(_ measure: Measure) -> Float { values[measure.rawValue] }
 
-    /// Fewer than this many measures, and the face hasn't enough of the Latin alphabet to compare.
     private static let fewest = 10
 
-    /// nil when the face hasn't enough Latin letters drawn as outlines to say, as for most fonts of other scripts,
-    /// symbols and bitmap emoji.
-    public static func measure(_ font: CTFont) -> LetterMeasurements? {
-        // In thousandths of an em.
+    public static func measure(_ font: CTFont, glyphMap: ((Character) -> CGGlyph?)? = nil) -> LetterMeasurements? {
         let font = LetterImages.inThousandths(font)
+        let lookup: (Character) -> CGGlyph? = glyphMap ?? { font.glyph(for: $0) }
         var letters: [Character: Letter] = [:]
         func letter(_ character: Character) -> Letter? {
             if let known = letters[character] { return known }
-            let letter = Letter(font, character)
+            let letter = Letter(font, character, lookup: lookup)
             letters[character] = letter
             return letter
         }
-        guard let capHeight = letter("H").map({ $0.box.maxY }) ?? positive(CTFontGetCapHeight(font)), capHeight > 50 else { return nil }
-        let xHeight = letter("x").map(\.box.maxY) ?? positive(CTFontGetXHeight(font)) ?? capHeight
+        guard let capHeight = letter("H").map({ $0.box.maxY }) ?? positive(CTFontGetCapHeight(font))
+            ?? letter("O").map({ $0.box.maxY }) ?? letter("A").map({ $0.box.maxY }) ?? letter("M").map({ $0.box.maxY }),
+            capHeight > 50 else { return nil }
+        let xHeight = letter("x").map(\.box.maxY) ?? letter("n").map(\.box.maxY) ?? letter("o").map(\.box.maxY)
+            ?? positive(CTFontGetXHeight(font)) ?? capHeight
         var values = [Float](repeating: .nan, count: Measure.allCases.count)
         func set(_ measure: Measure, _ value: CGFloat?) {
             if let value, value.isFinite { values[measure.rawValue] = Float(value) }
@@ -84,7 +61,6 @@ public struct LetterMeasurements: Equatable, Sendable {
         set(.ascender, mean(["l", "d"].compactMap { letter($0).map { $0.box.maxY / capHeight } }))
         set(.descender, mean(["p", "q"].compactMap { letter($0).map { -$0.box.minY / capHeight } }))
 
-        // Stems: the H's left one away from its crossbar, and the n's.
         var stems: [CGFloat] = []
         let h = letter("H")
         if let h, let stem = h.leftStem(at: [0.25, 0.75]) { stems.append(stem) }
@@ -107,7 +83,6 @@ public struct LetterMeasurements: Equatable, Sendable {
         }
         let contrast = mean(contrasts).map { min($0, 1.5) }
         set(.contrast, contrast)
-        // Strokes about as thick all round have no stress to speak of, whichever way they're thinnest.
         if let o, let axis = o.stressAxis() { set(.stress, min(max(axis.tilt, -40), 40) / 30 * min(axis.modulation / 0.5, 1)) }
 
         let lowercase = "abcdefghijklmnopqrstuvwxyz".compactMap { letter($0)?.advance }
@@ -123,11 +98,13 @@ public struct LetterMeasurements: Equatable, Sendable {
         let stemLetters = ["I", "l"].compactMap { letter($0).flatMap(\.straightStem) }
         let fontSlant = tan(-CTFontGetSlantAngle(font) * .pi / 180)
         let measuredSlant = mean(stemLetters.map(\.lean))
-        set(.slant, abs(fontSlant) > 0.01 ? fontSlant : measuredSlant ?? fontSlant)
+        let curvedSlant = abs(fontSlant) > 0.01 || measuredSlant != nil ? nil : Self.covarianceSlant(font, lookup: lookup)
+        set(.slant, abs(fontSlant) > 0.01 ? fontSlant : measuredSlant ?? curvedSlant ?? fontSlant)
 
         var serifs: [Letter.Foot] = []
         if let h, let foot = h.leftFoot(height: h.box.height, at: [0.25, 0.4]) { serifs.append(foot) }
         if let n, let foot = n.leftFoot(height: xHeight, at: [0.3, 0.45]) { serifs.append(foot) }
+        // I and l only when H and n can't say: sans serif monospaced faces give their I and l serifs.
         if serifs.isEmpty { serifs = stemLetters.map(\.foot) }
         set(.serifLength, mean(serifs.map(\.length)).map { $0 / capHeight })
         set(.serifThickness, mean(serifs.map(\.thickness)).map { $0 / capHeight })
@@ -140,10 +117,255 @@ public struct LetterMeasurements: Equatable, Sendable {
         set(.squareness, mean([o, letter("O")].compactMap { $0?.filledShare }))
         if let a = letter("a") { set(.doubleStoryA, a.mostCrossings(at: [0.45, 0.5, 0.55]) >= 3 ? 1 : 0) }
         if let g = letter("g") { set(.doubleStoryG, g.mostCrossings(at: [0.4, 0.5, 0.6]) >= 4 ? 1 : 0) }
-        set(.monospaced, LetterShapes.isMonospaced(font) ? 1 : 0)
+        if glyphMap == nil {
+            set(.monospaced, LetterShapes.isMonospaced(font) ? 1 : 0)
+        } else if let i = letter("i"), let m = letter("m"), let w = letter("W") {
+            set(.monospaced, abs(i.advance - m.advance) < 1 && abs(m.advance - w.advance) < 1 ? 1 : 0)
+        }
+        let reach = (stem ?? capHeight * 0.08) * 0.25
+        let ends = "HEILTlik".compactMap { letter($0) }
+        if ends.count >= 4 {
+            let dotted = "HOn".compactMap { letter($0) }.count { $0.contours >= 5 } >= 2
+            let corners = ends.map { $0.sharpCorners(within: reach) }
+            set(.rounded, !dotted && CGFloat(corners.reduce(0, +)) / CGFloat(corners.count) < 0.5 ? 1 : 0)
+        }
+        let ascenderOverX = mean(["l", "d"].compactMap { letter($0).map { $0.box.maxY / xHeight } })
+        set(.allCaps, Self.detectAllCaps(font, lookup: lookup, capitals: capitals.count, lowercase: lowercase.count, ascenderOverX: ascenderOverX))
+        let (stencil, outline) = Self.detectTopology(font, lookup: lookup)
+        set(.stencil, stencil)
+        set(.outline, outline)
 
         guard values.count(where: { !$0.isNaN }) >= fewest else { return nil }
         return LetterMeasurements(values: values)
+    }
+
+    // Symmetric letters have zero x-y covariance when upright, so cov(x,y)/var(y) equals tan(slant) even on curved scripts.
+    private static func covarianceSlant(_ font: CTFont, lookup: (Character) -> CGGlyph?) -> CGFloat? {
+        var leans: [CGFloat] = []
+        let size = 48
+        for character in ["o", "O", "H", "x", "X", "n"] as [Character] {
+            guard let glyph = lookup(character), let path = CTFontCreatePathForGlyph(font, glyph, nil),
+                  let pixels = renderAspect(path, size: size) else { continue }
+            var sx: CGFloat = 0, sy: CGFloat = 0, sw: CGFloat = 0
+            for y in 0..<size {
+                for x in 0..<size {
+                    let w = CGFloat(pixels[y * size + x]) / 255
+                    if w > 0 {
+                        sx += w * CGFloat(x)
+                        sy += w * CGFloat(size - 1 - y)
+                        sw += w
+                    }
+                }
+            }
+            guard sw > 10 else { continue }
+            let mx = sx / sw, my = sy / sw
+            var cov: CGFloat = 0, vary: CGFloat = 0
+            for y in 0..<size {
+                for x in 0..<size {
+                    let w = CGFloat(pixels[y * size + x]) / 255
+                    if w > 0 {
+                        let dx = CGFloat(x) - mx, dy = CGFloat(size - 1 - y) - my
+                        cov += w * dx * dy
+                        vary += w * dy * dy
+                    }
+                }
+            }
+            if vary > 1 { leans.append(cov / vary) }
+        }
+        guard !leans.isEmpty else { return nil }
+        leans.sort()
+        return leans[leans.count / 2]
+    }
+
+    // Heavy condensed bicameral fonts (like Impact) fill most of their box, so raw overlap misfires. Mean-centered correlation plus tall lowercase ascenders avoids them.
+    private static func detectAllCaps(_ font: CTFont, lookup: (Character) -> CGGlyph?, capitals: Int, lowercase: Int, ascenderOverX: CGFloat?) -> CGFloat? {
+        if capitals >= 13 && lowercase < 5 { return 1 }
+        if let ascenderOverX, ascenderOverX > 1.08 { return 0 }
+        let pairs: [(Character, Character)] = [("A", "a"), ("E", "e"), ("G", "g"), ("H", "h"), ("N", "n"), ("R", "r")]
+        var tested = 0, matched = 0
+        for (upper, lower) in pairs {
+            guard let gu = lookup(upper), let gl = lookup(lower) else { continue }
+            if gu == gl {
+                tested += 1
+                matched += 1
+                continue
+            }
+            guard let pu = CTFontCreatePathForGlyph(font, gu, nil), let pl = CTFontCreatePathForGlyph(font, gl, nil),
+                  let bu = renderFit(pu, size: 24), let bl = renderFit(pl, size: 24) else { continue }
+            tested += 1
+            if pearson(bu, bl) >= 0.72 { matched += 1 }
+        }
+        guard tested >= 3 else { return nil }
+        return CGFloat(matched) / CGFloat(tested) >= 0.66 ? 1 : 0
+    }
+
+    // Rasterized connected components merge variable fonts' overlapping contours while catching stencil gaps and hollow outline stems.
+    private static func detectTopology(_ font: CTFont, lookup: (Character) -> CGGlyph?) -> (stencil: CGFloat?, outline: CGFloat?) {
+        let size = 64
+        var rasters: [Character: [UInt8]] = [:]
+        func raster(_ character: Character) -> [UInt8]? {
+            if let known = rasters[character] { return known }
+            guard let glyph = lookup(character), let path = CTFontCreatePathForGlyph(font, glyph, nil),
+                  let pixels = renderAspect(path, size: size) else { return nil }
+            rasters[character] = pixels
+            return pixels
+        }
+
+        let stencilChars: [Character] = ["O", "D", "P", "B", "A", "H", "E", "R", "o", "e"]
+        let closedChars: Set<Character> = ["O", "D", "P", "B", "o"]
+        var split = 0, closedOpen = 0, stencilTested = 0, dotted = 0
+        for character in stencilChars {
+            guard let pixels = raster(character) else { continue }
+            // Low ink threshold keeps ultra-thin Didot/Bodoni hairlines connected so they never read as stencil cuts.
+            let info = topology(pixels, size: size, inkThreshold: 20)
+            stencilTested += 1
+            if info.majorBlobs >= 2 && info.majorBlobs <= 5 { split += 1 }
+            if info.majorBlobs >= 6 { dotted += 1 }
+            if closedChars.contains(character) && info.holes == 0 && info.majorBlobs >= 2 { closedOpen += 1 }
+        }
+        let stencil: CGFloat? = stencilTested >= 4 ? (dotted < 2 && split >= 3 && closedOpen >= 2 ? 1 : 0) : nil
+
+        let solidChars: [Character] = ["H", "E", "F", "I", "L", "T", "l", "n"]
+        let simpleChars: Set<Character> = ["I", "L", "T", "l", "n"]
+        var hollow = 0, simpleHollow = 0, solidTested = 0
+        for character in solidChars {
+            guard let pixels = raster(character) else { continue }
+            let info = topology(pixels, size: size, inkThreshold: 32)
+            solidTested += 1
+            if info.holes >= 1 {
+                hollow += 1
+                if simpleChars.contains(character) { simpleHollow += 1 }
+            }
+        }
+        let outline: CGFloat? = solidTested >= 4 ? (CGFloat(hollow) / CGFloat(solidTested) >= 0.6 && simpleHollow >= 2 ? 1 : 0) : nil
+        return (stencil, outline)
+    }
+
+    private static func renderFit(_ path: CGPath, size: Int) -> [UInt8]? {
+        let box = path.boundingBoxOfPath
+        guard box.width > 1, box.height > 1 else { return nil }
+        var pixels = [UInt8](repeating: 0, count: size * size)
+        guard let context = CGContext(data: &pixels, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size,
+                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return nil }
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        let margin: CGFloat = 2
+        let inner = CGFloat(size) - margin * 2
+        let sx = inner / box.width, sy = inner / box.height
+        var transform = CGAffineTransform(translationX: margin - box.minX * sx, y: margin - box.minY * sy).scaledBy(x: sx, y: sy)
+        guard let placed = path.copy(using: &transform) else { return nil }
+        context.setFillColor(gray: 1, alpha: 1)
+        context.addPath(placed)
+        context.fillPath()
+        return pixels
+    }
+
+    private static func renderAspect(_ path: CGPath, size: Int) -> [UInt8]? {
+        let box = path.boundingBoxOfPath
+        guard box.width > 1, box.height > 1 else { return nil }
+        var pixels = [UInt8](repeating: 0, count: size * size)
+        guard let context = CGContext(data: &pixels, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size,
+                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return nil }
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        let margin: CGFloat = 3
+        let inner = CGFloat(size) - margin * 2
+        let scale = min(inner / box.width, inner / box.height)
+        let dx = (CGFloat(size) - box.width * scale) / 2 - box.minX * scale
+        let dy = (CGFloat(size) - box.height * scale) / 2 - box.minY * scale
+        var transform = CGAffineTransform(translationX: dx, y: dy).scaledBy(x: scale, y: scale)
+        guard let placed = path.copy(using: &transform) else { return nil }
+        context.setFillColor(gray: 1, alpha: 1)
+        context.addPath(placed)
+        context.fillPath()
+        return pixels
+    }
+
+    private static func pearson(_ a: [UInt8], _ b: [UInt8]) -> CGFloat {
+        let n = CGFloat(a.count)
+        var sa: CGFloat = 0, sb: CGFloat = 0
+        for index in 0..<a.count {
+            sa += CGFloat(a[index])
+            sb += CGFloat(b[index])
+        }
+        let ma = sa / n, mb = sb / n
+        var num: CGFloat = 0, da: CGFloat = 0, db: CGFloat = 0
+        for index in 0..<a.count {
+            let xa = CGFloat(a[index]) - ma, xb = CGFloat(b[index]) - mb
+            num += xa * xb
+            da += xa * xa
+            db += xb * xb
+        }
+        let den = sqrt(da * db)
+        return den > 1e-6 ? num / den : 0
+    }
+
+    private static func topology(_ pixels: [UInt8], size: Int, inkThreshold: UInt8) -> (majorBlobs: Int, holes: Int) {
+        let count = size * size
+        var ink = [Bool](repeating: false, count: count)
+        var totalInk = 0
+        for index in 0..<count where pixels[index] >= inkThreshold {
+            ink[index] = true
+            totalInk += 1
+        }
+        guard totalInk > 0 else { return (0, 0) }
+        var visited = [Bool](repeating: false, count: count)
+        var blobSizes: [Int] = []
+        var queue: [Int] = []
+        queue.reserveCapacity(count)
+        for start in 0..<count where ink[start] && !visited[start] {
+            visited[start] = true
+            queue.removeAll(keepingCapacity: true)
+            queue.append(start)
+            var head = 0
+            while head < queue.count {
+                let current = queue[head]
+                head += 1
+                let x = current % size, y = current / size
+                for dy in -1...1 {
+                    let ny = y + dy
+                    guard ny >= 0, ny < size else { continue }
+                    for dx in -1...1 where dx != 0 || dy != 0 {
+                        let nx = x + dx
+                        guard nx >= 0, nx < size else { continue }
+                        let next = ny * size + nx
+                        if ink[next] && !visited[next] {
+                            visited[next] = true
+                            queue.append(next)
+                        }
+                    }
+                }
+            }
+            blobSizes.append(queue.count)
+        }
+        let minimumBlob = max(8, Int(Double(totalInk) * 0.10))
+        let majorBlobs = blobSizes.count { $0 >= minimumBlob }
+
+        visited = [Bool](repeating: false, count: count)
+        var holes = 0
+        for start in 0..<count where !ink[start] && !visited[start] {
+            visited[start] = true
+            queue.removeAll(keepingCapacity: true)
+            queue.append(start)
+            var head = 0, touchesBorder = false
+            while head < queue.count {
+                let current = queue[head]
+                head += 1
+                let x = current % size, y = current / size
+                if x == 0 || y == 0 || x == size - 1 || y == size - 1 { touchesBorder = true }
+                for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nx = x + dx, ny = y + dy
+                    guard nx >= 0, nx < size, ny >= 0, ny < size else { continue }
+                    let next = ny * size + nx
+                    if !ink[next] && !visited[next] {
+                        visited[next] = true
+                        queue.append(next)
+                    }
+                }
+            }
+            if !touchesBorder && queue.count >= 6 { holes += 1 }
+        }
+        return (majorBlobs, holes)
     }
 
     private static func positive(_ value: CGFloat) -> CGFloat? { value > 0 ? value : nil }
@@ -153,19 +375,17 @@ public struct LetterMeasurements: Equatable, Sendable {
     }
 }
 
-/// A letter's outline at 1,000 units to the em, to measure.
 private struct Letter {
     let box: CGRect
     let advance: CGFloat
-    /// The ink along horizontal lines.
     private let horizontal: LetterShapes.Outline
-    /// The ink along vertical lines: the outline with x and y swapped.
     private let vertical: LetterShapes.Outline
-    /// Every edge, to see what a line from inside the letter runs into.
     private let edges: [(CGPoint, CGPoint)]
+    private let path: CGPath
+    private let polygons: [[CGPoint]]
 
-    init?(_ font: CTFont, _ character: Character) {
-        guard let glyph = font.glyph(for: character), let path = CTFontCreatePathForGlyph(font, glyph, nil) else { return nil }
+    init?(_ font: CTFont, _ character: Character, lookup: (Character) -> CGGlyph?) {
+        guard let glyph = lookup(character), let path = CTFontCreatePathForGlyph(font, glyph, nil) else { return nil }
         let box = path.boundingBoxOfPath
         guard box.width > 1, box.height > 1 else { return nil }
         let flat = path.flattened(threshold: 1)
@@ -179,17 +399,18 @@ private struct Letter {
         horizontal = LetterShapes.Outline(flat)
         vertical = LetterShapes.Outline(swapped)
         edges = Self.edges(of: flat)
+        self.path = flat
+        polygons = Self.polygons(of: flat)
     }
 
-    /// The ink along y, left to right.
+    var contours: Int { horizontal.contours }
+
     func rows(at y: CGFloat) -> [ClosedRange<CGFloat>] { horizontal.runs(at: y) }
 
-    /// The ink along x, bottom to top.
     func columns(at x: CGFloat) -> [ClosedRange<CGFloat>] { vertical.runs(at: x) }
 
     private func y(_ fraction: CGFloat) -> CGFloat { box.minY + box.height * fraction }
 
-    /// The width of the leftmost of two stems at these heights, as in H and n; nil unless there are two there.
     func leftStem(at fractions: [CGFloat]) -> CGFloat? {
         let widths = fractions.compactMap { fraction -> CGFloat? in
             let runs = rows(at: y(fraction))
@@ -199,8 +420,6 @@ private struct Letter {
         return widths.reduce(0, +) / CGFloat(widths.count)
     }
 
-    /// A straight stem, as in I and l: one run of ink at 30, 50 and 70 per cent of the height, about as wide at
-    /// each, on a straight line. nil for anything else.
     var straightStem: Stem? {
         let stem = ([0.3, 0.5, 0.7] as [CGFloat]).compactMap { fraction -> ClosedRange<CGFloat>? in
             let runs = rows(at: y(fraction))
@@ -222,14 +441,10 @@ private struct Letter {
     }
 
     struct Foot {
-        /// How far the foot reaches past the stem, on average each side.
         var length: CGFloat
-        /// How far up the stem it's wider than the stem.
         var thickness: CGFloat
     }
 
-    /// The foot of the left of two stems, as in H and n, from the baseline up; `fractions` are two heights, of
-    /// `height`, where the stems are on their own.
     func leftFoot(height: CGFloat, at fractions: [CGFloat]) -> Foot? {
         let at = fractions.map { rows(at: box.minY + height * $0) }
         guard at.allSatisfy({ $0.count == 2 }), at[0][0].length > 0, abs(at[1][0].length / at[0][0].length - 1) < 0.3 else { return nil }
@@ -237,7 +452,6 @@ private struct Letter {
         return foot(of: at[0][0], lean: lean, from: box.minY, height: height, measuredAt: box.minY + height * fractions[0])
     }
 
-    /// The foot of a stem that runs along `stem` at the middle of the height (or at `measuredAt`), leaning by `lean`.
     private func foot(of stem: ClosedRange<CGFloat>, lean: CGFloat, from base: CGFloat, height: CGFloat, measuredAt: CGFloat? = nil) -> Foot {
         let middle = measuredAt ?? base + height / 2
         let width = stem.length
@@ -246,7 +460,6 @@ private struct Letter {
             let here = (stem.lowerBound + shift)...(stem.upperBound + shift)
             return rows(at: y).first { $0.overlaps(here) }
         }
-        // Up from the baseline, past a cupped foot's hollow, to where the ink is about as wide as the stem again.
         let step = max(1, height * 0.005)
         var widest = width, thickness: CGFloat = 0
         var y = base + step / 2
@@ -262,11 +475,6 @@ private struct Letter {
         return Foot(length: (widest - width) / 2, thickness: thickness)
     }
 
-    /// Which way the stroke of a round letter is thick and thin: the thickness of the ring along lines out from the
-    /// middle, every 6°, as one wave that peaks twice going round. `tilt` is how far in degrees its thin parts are
-    /// turned from the top and bottom, positive when turned to the left at the top, as a broad pen held at an angle
-    /// leaves them; `modulation` how much the thickness changes, against the average: 0 for strokes as thick all
-    /// round, about 1 for hairlines against thick sides.
     func stressAxis() -> (tilt: CGFloat, modulation: CGFloat)? {
         let center = CGPoint(x: box.midX, y: box.midY)
         guard !rows(at: center.y).contains(where: { $0.contains(center.x) }) else { return nil }
@@ -285,19 +493,14 @@ private struct Letter {
         }
         let mean = sum / CGFloat(directions)
         guard mean > 0 else { return nil }
-        // Thickest where the wave peaks; thinnest a quarter turn on, so the tilt from upright is the thickest
-        // direction's from level.
         let thickest = atan2(sines, cosines) / 2 * 180 / .pi
         return (thickest, hypot(cosines, sines) / CGFloat(directions / 2) / mean)
     }
 
-    /// The most runs of ink crossed going up at these places across the letter: 3 for a double-story a, 2 for a
-    /// single-story one.
     func mostCrossings(at fractions: [CGFloat]) -> Int {
         fractions.map { columns(at: box.minX + box.width * $0).count }.max() ?? 0
     }
 
-    /// How much of the box the letter fills, its counters filled in: π/4 for an ellipse.
     var filledShare: CGFloat? {
         let lines = 40
         var area: CGFloat = 0
@@ -309,8 +512,6 @@ private struct Letter {
         return share > 0 ? share : nil
     }
 
-    /// The share of directions in which a line from inside the letter, at the middle of its width and the first
-    /// of these heights that isn't in ink, leaves it without running into ink: how open a c or an e is.
     func openness(fromHeights fractions: [CGFloat]) -> CGFloat? {
         let x = box.midX
         guard let fraction = fractions.first(where: { fraction in !rows(at: y(fraction)).contains { $0.contains(x) } }) else { return nil }
@@ -324,6 +525,74 @@ private struct Letter {
             if !edges.contains(where: { Self.cross(origin, end, $0.0, $0.1) }) { open += 1 }
         }
         return CGFloat(open) / CGFloat(directions)
+    }
+
+    // Corners rounded off much less than the stem is thick still count: Adobe Caslon and Garamond Premier round every serif's corners by a few units.
+    func sharpCorners(within reach: CGFloat) -> Int {
+        var count = 0
+        for points in polygons {
+            let n = points.count
+            var area: CGFloat = 0
+            for index in 0..<n { area += points[index].x * points[(index + 1) % n].y - points[(index + 1) % n].x * points[index].y }
+            let outward: CGFloat = area > 0 ? 1 : -1
+            var turns: [CGFloat] = [], lengths: [CGFloat] = []
+            for index in 0..<n {
+                let a = points[(index + n - 1) % n], b = points[index], c = points[(index + 1) % n]
+                var turn = atan2(c.y - b.y, c.x - b.x) - atan2(b.y - a.y, b.x - a.x)
+                if turn > .pi { turn -= 2 * .pi } else if turn < -.pi { turn += 2 * .pi }
+                turns.append(turn * outward)
+                lengths.append(hypot(c.x - b.x, c.y - b.y))
+            }
+            var start = 0
+            while start < n {
+                var turned: CGFloat = 0, length: CGFloat = 0, end = start
+                while length <= reach, end < start + n {
+                    turned += turns[end % n]
+                    length += lengths[end % n]
+                    end += 1
+                }
+                if turned > .pi / 3, !isInside(points[start], by: max(reach * 0.2, 2)) {
+                    count += 1
+                    start = end
+                } else {
+                    start += 1
+                }
+            }
+        }
+        return count
+    }
+
+    // Variable fonts keep their contours overlapping, so a crossbar's corners can sit inside the stems.
+    private func isInside(_ point: CGPoint, by distance: CGFloat) -> Bool {
+        (0..<8).allSatisfy { step in
+            let angle = CGFloat(step) * .pi / 4
+            return path.contains(CGPoint(x: point.x + cos(angle) * distance, y: point.y + sin(angle) * distance), using: .winding)
+        }
+    }
+
+    private static func polygons(of path: CGPath) -> [[CGPoint]] {
+        var polygons: [[CGPoint]] = [], current: [CGPoint] = []
+        func finish() {
+            if current.count > 1, current.first == current.last { current.removeLast() }
+            if current.count > 2 { polygons.append(current) }
+            current = []
+        }
+        path.applyWithBlock { element in
+            let element = element.pointee
+            switch element.type {
+            case .moveToPoint:
+                finish()
+                current = [element.points[0]]
+            case .addLineToPoint:
+                if element.points[0] != current.last { current.append(element.points[0]) }
+            case .closeSubpath:
+                finish()
+            default:
+                break
+            }
+        }
+        finish()
+        return polygons
     }
 
     private static func edges(of path: CGPath) -> [(CGPoint, CGPoint)] {
@@ -356,7 +625,6 @@ private struct Letter {
         return edges
     }
 
-    /// How far along a–b, from 0 to 1, it crosses c–d; nil when they don't cross.
     private static func crossing(_ a: CGPoint, _ b: CGPoint, _ c: CGPoint, _ d: CGPoint) -> CGFloat? {
         let r = CGPoint(x: b.x - a.x, y: b.y - a.y), s = CGPoint(x: d.x - c.x, y: d.y - c.y)
         let denominator = r.x * s.y - r.y * s.x
@@ -366,7 +634,6 @@ private struct Letter {
         return (0...1).contains(t) && (0...1).contains(u) ? t : nil
     }
 
-    /// Whether the segments a–b and c–d cross.
     private static func cross(_ a: CGPoint, _ b: CGPoint, _ c: CGPoint, _ d: CGPoint) -> Bool {
         func side(_ p: CGPoint, _ q: CGPoint, _ r: CGPoint) -> CGFloat { (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x) }
         let d1 = side(c, d, a), d2 = side(c, d, b), d3 = side(a, b, c), d4 = side(a, b, d)

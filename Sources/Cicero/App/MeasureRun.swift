@@ -1,13 +1,8 @@
-// Only in the app performance runs' builds (`-D CICERO_MEASURE`, see Sources/CiceroCore/Measurements.swift).
 #if CICERO_MEASURE
 import AppKit
 import CiceroCore
 import CoreText
 
-/// The app performance runs' scenario (Tests/E2E/app-perf): with `CICERO_MEASURE=<file>` and `CICERO_MEASURE_RUN=1`,
-/// Cicero times its launch, then types, searches, picks sidebar items, opens font pages, scrolls and rates by itself,
-/// each step timed until the main thread is quiet again (`MainSettle`), writes every timing to the file and quits.
-/// It drives the model as the views' bindings do, not with key presses. It never turns a font on or off.
 enum MeasureRun {
     private static var task: Task<Void, Never>?
 
@@ -15,9 +10,6 @@ enum MeasureRun {
         ProcessInfo.processInfo.environment["CICERO_MEASURE_RUN"] == "1" && Measurements.isRecording
     }
 
-    /// Called as the main window appears. With `CICERO_MEASURE` alone, as in the VM end-to-end runs, it only watches the
-    /// main thread for stalls (and the app records list rebuilds and main-thread reads); with `CICERO_MEASURE_RUN=1`
-    /// too, it runs the scenario. Without either, nothing.
     static func startIfAsked(model: AppModel, preview: PreviewSettings) {
         Measurements.watchMainThread()
         guard isAsked, task == nil else { return }
@@ -33,7 +25,6 @@ enum MeasureRun {
     }
 
     private static func run(model: AppModel, preview: PreviewSettings) async {
-        // Launch: each as the time since the process started, until the main thread was quiet after it.
         await launchStep("launch.window")
         guard await until(minutes: 30, { model.hasScanned }) else { return Measurements.count("run.failed", detail: "no scan") }
         await launchStep("launch.firstScan", detail: "\(model.library.families.count) families")
@@ -47,12 +38,7 @@ enum MeasureRun {
         model.selection = .all
         _ = await MainSettle.wait()
 
-        // CICERO_MEASURE_ONLY=mode: only switching views, 10 rounds; mode-scrolled: each after scrolling 15 pages down
-        // and back, 5 rounds. For profiling one thing (Tests/E2E/app-perf/profile.sh).
         let only = ProcessInfo.processInfo.environment["CICERO_MEASURE_ONLY"]
-        // activate-kill, in a VM only (Tests/E2E/app-perf/guest-kill.sh): turns three families of the first location on,
-        // waits for the operation to end, and kills Cicero at once, so what it saved by then is what the user data has.
-        // The one scenario that turns fonts on.
         if only == "activate-kill" {
             guard let location = model.data.folders.first?.id else { return Measurements.count("run.failed", detail: "no location") }
             let families = Array(model.library.families.filter { $0.folderIDs.contains(location) && $0.position == .off }.prefix(3))
@@ -62,8 +48,6 @@ enum MeasureRun {
             Measurements.flush()
             kill(getpid(), SIGKILL)
         }
-        // quit-temp, in a VM only (Tests/E2E/app-perf/guest-quit.sh): turns CICERO_MEASURE_COUNT families of the first
-        // location on until Cicero quits, then quits, which times turning them off again (quit.endUntilQuit).
         if only == "quit-temp" {
             guard let location = model.data.folders.first?.id else { return Measurements.count("run.failed", detail: "no location") }
             let count = Int(ProcessInfo.processInfo.environment["CICERO_MEASURE_COUNT"] ?? "") ?? 3
@@ -74,28 +58,19 @@ enum MeasureRun {
             Measurements.count("onUntilQuit", detail: "\(on) of \(families.count) families on")
             return
         }
-        // fonts-folder, in a VM's own account only (Tests/E2E/app-perf/guest-fonts-folder.sh), with the families
-        // CICERO_MEASURE_FAMILIES names in its ~/Library/Fonts: turning off there and Undo, Move to Trash and Undo, and
-        // the third on until Cicero quits, which the script checks is off once Cicero has gone.
         if only == "fonts-folder" {
             await checkFontsFolder(model: model)
             return
         }
-        // warm-launch (Tests/E2E/warm-launch/run.sh): saved sample widths and the scans after a fonts-changed notice.
         if only == "warm-launch" {
             await checkWarmLaunch(model: model)
             return
         }
-        // undo, in a VM only (Tests/E2E/app-perf/guest-undo.sh): Undo after turning fonts on and off, and after Move to
-        // Trash, with the ways putting back can fail; a "check" line, PASS or FAIL, for each thing checked.
         if only == "undo" {
             await checkUndo(model: model)
             return
         }
-        // screens: the grid, then the first family's page, 3 s each, a "screen" line as each shows, for screenshots
-        // (Tests/E2E/app-perf/screens.sh).
         if only == "screens" {
-            // CICERO_MEASURE_MODE: the view to show (list, grid or specimens); CICERO_MEASURE_SEARCH: a search first.
             let environment = ProcessInfo.processInfo.environment
             if let mode = environment["CICERO_MEASURE_MODE"].flatMap(BrowserMode.init(rawValue:)) {
                 defaults.set(mode.rawValue, forKey: "browser.mode")
@@ -116,7 +91,6 @@ enum MeasureRun {
             model.openFamilyID = nil
             return
         }
-        // scroll: 15 pages down and back in each view, twice.
         if only == "scroll" {
             for _ in 0..<2 {
                 for mode in [BrowserMode.grid, .list, .specimens] {
@@ -135,8 +109,110 @@ enum MeasureRun {
             }
             return
         }
+        if only == "page" {
+            let mode = ProcessInfo.processInfo.environment["CICERO_MEASURE_MODE"].flatMap(BrowserMode.init(rawValue:)) ?? .specimens
+            await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+            _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(10))
+            let picks = pagePicks(model)
+            for _ in 0..<10 {
+                for family in picks {
+                    await step("page.open", detail: family.name) { model.openFamilyID = family.id }
+                    await step("page.close") { model.openFamilyID = nil }
+                }
+            }
+            return
+        }
 
-        // Sidebar items, each twice.
+        if only == "type" {
+            let widths = SampleWidths.shared
+            await step("mode", detail: "grid") { defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode") }
+            _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(10))
+            let text = "Sphinx of black quartz"
+            for end in text.indices.dropFirst() where text[text.index(before: end)] != " " {
+                let measured = widths.measuredLog.count, start = ContinuousClock.now
+                preview.sampleText = String(text[..<end])
+                let done = await until(seconds: 10) { widths.measuredLog.count > measured }
+                let ratio = widths.listRatio.map { "\($0)" } ?? "none"
+                Measurements.record("type.measured", ms: (ContinuousClock.now - start).milliseconds,
+                                    detail: done ? "\(widths.measuredLog.last?.all ?? 0) samples, ratio \(ratio)" : "not measured")
+                _ = await MainSettle.wait()
+            }
+            preview.sampleText = ""
+            return
+        }
+        if only == "select" {
+            for info in [false, true] {
+                model.isInfoPresented = info
+                _ = await MainSettle.wait(quiet: .milliseconds(500), limit: .seconds(10))
+                let tag = info ? ".info" : ""
+                for mode in [BrowserMode.grid, .list, .specimens] {
+                    await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
+                    _ = await MainSettle.wait(quiet: .milliseconds(500), limit: .seconds(10))
+                    for family in model.visibleFamilies.prefix(12) {
+                        await step("select.\(mode.rawValue)\(tag)", detail: family.name) { model.selectedIDs = [family.id] }
+                    }
+                    await step("select.none.\(mode.rawValue)\(tag)") { model.selectedIDs = [] }
+                    await step("select.all.\(mode.rawValue)\(tag)") { model.selectedIDs = Set(model.visibleFamilies.map(\.id)) }
+                    await scroll(mode: mode)
+                    await step("select.none.\(mode.rawValue)\(tag)") { model.selectedIDs = [] }
+                }
+            }
+            model.isInfoPresented = false
+            return
+        }
+        if only == "similar" {
+            let table = model.similarFonts
+            var asked = 0, differing: [String] = []
+            for family in model.library.families {
+                let kinds: [SearchQuery.Style?] = [nil] + family.kinds + family.faces.map(family.kind(of:))
+                    + [SearchQuery.Style(isItalic: true, width: nil), SearchQuery.Style(isItalic: false, width: 3)]
+                for kind in kinds {
+                    asked += 1
+                    let style = kind.flatMap { kind in family.faces.first { family.kind(of: $0) == kind } }
+                    guard kind == nil || style != nil else { continue }
+                    if table.contains(family.id, kind: kind) != model.canShowSimilar(family, style: style) { differing.append(family.name) }
+                }
+            }
+            check(differing.isEmpty, "the menu's answer is the table's for every family and kind (\(asked) asked, \(differing.count) differ: \(differing.prefix(5)))")
+            let picks = pagePicks(model)
+            for family in picks {
+                await step("select", detail: family.name) { model.selectedIDs = [family.id] }
+                await step("rate.selected", detail: family.name) { model.setRating(3, for: [family]) }
+                await step("similar.menu", detail: family.name) { _ = model.canShowSimilar(family, style: nil) }
+                await step("rate.selected", detail: family.name) { model.setRating(nil, for: [family]) }
+                await step("similar.table", detail: family.name) { _ = model.similarFonts.contains(family.id) }
+            }
+            model.selectedIDs = []
+            Measurements.count("key", detail: "\(LibraryFocus.shared.isKey)")
+            return
+        }
+
+        if only == "panels" {
+            await step("mode", detail: "grid") { defaults.set(BrowserMode.grid.rawValue, forKey: "browser.mode") }
+            _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(10))
+            let location = model.data.folders.first?.id
+            let families = model.library.families.filter { location == nil || $0.folderIDs.contains(location!) }
+            guard let family = families.max(by: { $0.faces.count < $1.faces.count }) else {
+                return Measurements.count("run.failed", detail: "no family")
+            }
+            for place in ["browser", "page"] {
+                if place == "page" {
+                    await step("page.open", detail: family.name) { model.openFamilyID = family.id }
+                    _ = await MainSettle.wait(quiet: .seconds(1), limit: .seconds(20))
+                }
+                for _ in 0..<10 {
+                    await step("info.open.\(place)", detail: family.name) { model.isInfoPresented = true }
+                    await step("info.close.\(place)", detail: family.name) { model.isInfoPresented = false }
+                }
+                for _ in 0..<10 {
+                    await step("sidebar.hide.\(place)", detail: family.name) { toggleSidebar() }
+                    await step("sidebar.show.\(place)", detail: family.name) { toggleSidebar() }
+                }
+            }
+            model.openFamilyID = nil
+            return
+        }
+
         let location = model.data.folders.first.map { SidebarItem.folder($0.id) }
         let items: [SidebarItem] = [.active, .inactive, .system] + (location.map { [$0] } ?? []) + [.all]
         for _ in 0..<2 {
@@ -145,7 +221,6 @@ enum MeasureRun {
             }
         }
 
-        // Search, from the applied search (after its pause).
         var applied: MainSettle?
         model.searchApplies = { applied = MainSettle.begin() }
         for query in ["ga", "sans", "bold", "mono", "hel", "variable", "perf 1", "zz"] {
@@ -160,22 +235,17 @@ enum MeasureRun {
         }
         model.searchApplies = nil
 
-        // Font pages: five families across the list.
-        let families = model.visibleFamilies
-        let picks = families.isEmpty ? [] : (0..<5).map { families[$0 * (families.count - 1) / 4] }
+        let picks = pagePicks(model)
         for family in picks {
             await step("page.open", detail: family.name) { model.openFamilyID = family.id }
             await step("page.close") { model.openFamilyID = nil }
         }
 
-        // Ratings: each change of user data makes the lists again.
         for family in picks {
             await step("rate", detail: family.name) { model.setRating(3, for: [family]) }
             await step("rate.clear") { model.setRating(nil, for: [family]) }
         }
 
-        // CoreText's fonts-changed notification, as another app (Font Book, Creative Cloud) turning fonts on or off sends
-        // it: Cicero scans everything again. Nothing changed, so the scan applies nothing; timed until it ends.
         for _ in 0..<3 {
             let ended = model.endedScans
             let start = ContinuousClock.now
@@ -185,18 +255,14 @@ enum MeasureRun {
             _ = await MainSettle.wait()
         }
 
-        // What one letter saved to the defaults costs the main window, as Compare and the Character Toolbox saved their
-        // text with each letter: SwiftUI draws every view with an @AppStorage again, whatever the key.
         for end in "Hamburgefonstiv".indices.dropFirst() {
             await step("defaults.write") { defaults.set(String("Hamburgefonstiv"[..<end]), forKey: "measure.scratch") }
         }
         defaults.removeObject(forKey: "measure.scratch")
 
-        // In each view: switch to it, type into Preview Options' text one letter at a time, scroll down.
         let text = "Sphinx of black quartz"
         for mode in [BrowserMode.grid, .list, .specimens] {
             await step("mode", detail: mode.rawValue) { defaults.set(mode.rawValue, forKey: "browser.mode") }
-            // A rating while this view shows: the list makes its rows again for each change of user data.
             for family in picks.prefix(3) {
                 await step("rate.\(mode.rawValue)", detail: family.name) { model.setRating(4, for: [family]) }
                 await step("rate.\(mode.rawValue)", detail: family.name) { model.setRating(nil, for: [family]) }
@@ -213,15 +279,10 @@ enum MeasureRun {
 
     // MARK: Warm launch
 
-    /// CICERO_MEASURE_PHASE 1, a first launch: the grid's sample widths are measured and saved. 2, the next launch: none
-    /// is measured; a fonts-changed notice replays every watched folder's walk; a font file added to the first location,
-    /// changed or removed shows, is measured alone, and its folder is walked again at the next notice. 3, with
-    /// CICERO_MEASURE_WALK_EVERY=0: a notice walks every folder. CICERO_MEASURE_EXTRA: a font file to add.
     private static func checkWarmLaunch(model: AppModel) async {
         let environment = ProcessInfo.processInfo.environment
         let phase = environment["CICERO_MEASURE_PHASE"] ?? "1"
         let widths = SampleWidths.shared
-        // The grid measures the samples of the library restored at launch, then of the first scan's.
         _ = await until(seconds: 60) { !widths.measuredLog.isEmpty }
         _ = await MainSettle.wait(quiet: .seconds(2), limit: .seconds(60))
         let log = widths.measuredLog
@@ -234,7 +295,6 @@ enum MeasureRun {
             _ = await MainSettle.wait(quiet: .milliseconds(500))
             return LibraryScanner.lastScanDetail.withLock { $0 }
         }
-        /// "fontd, 3 of 4 folders replayed" → (3, 4).
         func replayed(_ detail: String) -> (Int, Int)? {
             let words = detail.split(separator: " ")
             guard detail.hasPrefix("fontd,"), words.count >= 4, let done = Int(words[1]), let all = Int(words[3]) else { return nil }
@@ -250,8 +310,8 @@ enum MeasureRun {
             check(FileManager.default.fileExists(atPath: SampleWidths.savedURL.path), "the widths are saved")
         case "2":
             check(!log.isEmpty && log.allSatisfy { $0.new == 0 }, "a warm launch measures no sample (\(log.map(\.new)))")
-            let listed = model.library.families.filter(model.data.lists).count
-            check(log.last.map { $0.all == listed } ?? false, "it knows every family's sample (\(log.last?.all ?? 0) of \(listed))")
+            let listed = SampleWidths.measured(of: model.library.families.filter(model.data.lists)).count
+            check(log.last.map { $0.all == listed } ?? false, "it knows every measured family's sample (\(log.last?.all ?? 0) of \(listed))")
 
             let before = names()
             let first = await notice()
@@ -262,8 +322,7 @@ enum MeasureRun {
             guard let folder = model.data.folders.first?.path, let extra = environment["CICERO_MEASURE_EXTRA"] else {
                 return check(false, "a location and a file to add")
             }
-            // Into the location's own folder: a new folder would make FSEvents say only that something changed in it,
-            // which walks every folder again.
+            // Into the location's own folder: a new folder would make FSEvents say only that something changed in it, which walks every folder again.
             let added = folder + "/" + (extra as NSString).lastPathComponent
             var measured = widths.measuredLog.count
             try? FileManager.default.copyItem(atPath: extra, toPath: added)
@@ -277,7 +336,6 @@ enum MeasureRun {
             check(after.map { $0.0 == $0.1 - 1 } ?? false, "the next notice walks its folder again, replays the rest (\(second))")
             check(has(added), "the added file stays after it")
 
-            // A file saved again: its sample is measured again.
             measured = widths.measuredLog.count
             guard let existing = model.library.families.first(where: { family in
                 family.folderIDs.contains(model.data.folders[0].id) && !family.faces.contains { $0.face.path == added }
@@ -308,7 +366,6 @@ enum MeasureRun {
         Measurements.count("check", detail: "\(passed ? "PASS" : "FAIL")  \(what)")
     }
 
-    /// Waits for the queued operations, then for the scans they started to end and the window to be quiet.
     private static func settled(_ model: AppModel) async {
         await model.enqueued { _ in }
         let ended = model.endedScans
@@ -324,7 +381,6 @@ enum MeasureRun {
         guard off.count >= 6 else { return check(false, "six families off in the location (\(off.count))") }
         let (one, two, three, four, five, six) = (off[0].id, off[1].id, off[2].id, off[3].id, off[4].id, off[5].id)
 
-        // A. Turning on and off.
         model.activate([off[0]])
         await settled(model)
         check(position(model, one) == .on, "turning on \(one) turns it on")
@@ -342,7 +398,6 @@ enum MeasureRun {
         await settled(model)
         check(position(model, two) == .on, "Undo turns \(two) on again")
 
-        // B. Move to Trash: three on, with a tag, a rating, a note and a folder; four off, in the folder too.
         model.activate([off[2]])
         await settled(model)
         var data = model.data
@@ -367,8 +422,7 @@ enum MeasureRun {
         guard let undo = model.toastUndo else { return check(false, "Move to Trash's toast has an Undo") }
         check(true, "Move to Trash's toast has an Undo")
 
-        // The ways putting back can fail: five's file gone from the Trash, another file where six's was, four's folder gone.
-        // By the places Move to Trash recorded: listing the Trash takes Full Disk Access, which a test copy hasn't.
+        // Listing the Trash takes Full Disk Access, which a test copy hasn't.
         let trashed = fivePaths.compactMap { model.lastTrashed[$0] }
         for path in trashed { try? fm.removeItem(atPath: path) }
         check(!trashed.isEmpty && trashed.allSatisfy { !fm.fileExists(atPath: $0) }, "five's files taken out of the Trash (\(trashed.count))")
@@ -404,7 +458,6 @@ enum MeasureRun {
               "the three families are in ~/Library/Fonts, on")
         let paths = { (id: String) in model.family(id).map { $0.faces.map(\.face.path) } ?? [] }
 
-        // Turning off in the Fonts folder, where the file stays, and Undo.
         if let family = model.family(b) { model.deactivate([family]) }
         await settled(model)
         check(position(model, b) == .off && paths(b).allSatisfy { FileManager.default.fileExists(atPath: $0) },
@@ -413,7 +466,6 @@ enum MeasureRun {
         await settled(model)
         check(position(model, b) == .on, "Undo turns \(b) on again")
 
-        // Move to Trash with one on and one off in the Fonts folder, and Undo.
         if let family = model.family(b) { model.deactivate([family]) }
         await settled(model)
         check(position(model, b) == .off, "\(b) off again before the Trash")
@@ -434,8 +486,6 @@ enum MeasureRun {
         check(position(model, a) == .on, "\(a), on before, is on")
         check(position(model, b) == .off, "\(b), off before, is off again, though macOS turned it on as it came back")
 
-        // Again, with b's file in the Trash made into one macOS won't take: it must stay in the Trash, off, and the toast
-        // say so; a still comes back on.
         let again = [a, b].compactMap(model.family)
         guard let plan2 = model.engine.trashPlan(for: again.flatMap(\.faces), removing: again.map(\.id), in: model.library, title: "Test") else {
             return check(false, "a plan to move \(a) and \(b) to the Trash again")
@@ -454,13 +504,13 @@ enum MeasureRun {
         check(bPaths.allSatisfy { !FileManager.default.fileExists(atPath: $0) }, "\(b), which macOS won't take, isn't in the Fonts folder")
         check(!bTrash.isEmpty && bTrash.allSatisfy { FileManager.default.fileExists(atPath: $0) }, "\(b)'s file is still in the Trash, where it was")
         check(aPaths.allSatisfy { FileManager.default.fileExists(atPath: $0) } && position(model, a) == .on, "\(a) is back, on")
-        check(!FileManager.default.fileExists(atPath: model.locations.support.appendingPathComponent("turning-off.json").path), "no list of files turning off left behind")
+        let lists = ((try? FileManager.default.contentsOfDirectory(atPath: model.locations.support.path)) ?? []).filter { $0.hasPrefix("turning-off") && $0.hasSuffix(".json") }
+        check(lists.isEmpty, "no list of files turning off left behind: \(lists)")
         let message = model.toast ?? ""
-        check(message == "Put back 1 of 2 files: 1 couldn\u{2019}t be moved", "the toast: \(message)")
+        check(message == "Put back 1 of 2 files: 1 couldn\u{2019}t be moved.", "the toast: \(message)")
         check(took < 15_000, "Undo took \(Int(took)) ms")
         Measurements.count("refusedInTrash", detail: bTrash.joined(separator: "|"))
 
-        // On until Cicero quits, from off in the Fonts folder; the script looks once Cicero has gone.
         if let family = model.family(c) { model.deactivate([family]) }
         await settled(model)
         if let family = model.family(c) { model.activateTemporarily(family.faces, confirmed: true) }
@@ -469,11 +519,9 @@ enum MeasureRun {
         Measurements.count("quitting", detail: paths(c).joined(separator: "|"))
     }
 
-    /// Scrolls the browser down a page at a time, 15 pages unless CICERO_MEASURE_PAGES says, then back to the top.
     private static func scroll(mode: BrowserMode) async {
         guard let scrollView = browserScrollView() else { return Measurements.count("scroll.unavailable", detail: mode.rawValue) }
         let clip = scrollView.contentView
-        // CICERO_MEASURE_PAGES: how many pages, 15 unless it says.
         let pages = Int(ProcessInfo.processInfo.environment["CICERO_MEASURE_PAGES"] ?? "") ?? 15
         for page in 1...max(1, pages) {
             let height = clip.bounds.height
@@ -491,7 +539,6 @@ enum MeasureRun {
         }
     }
 
-    /// The main window's biggest scroll view that isn't the sidebar's outline: the browser's grid, list or specimens.
     private static func browserScrollView() -> NSScrollView? {
         guard let content = TextEditingKeys.mainWindow?.contentView else { return nil }
         var found: [NSScrollView] = []
@@ -503,9 +550,25 @@ enum MeasureRun {
         return found.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
     }
 
-    /// Does `change`, then records how long the main thread took to be quiet again.
+    private static func pagePicks(_ model: AppModel) -> [Family] {
+        let families = model.visibleFamilies
+        return families.isEmpty ? [] : (0..<5).map { families[$0 * (families.count - 1) / 4] }
+    }
+
+    private static func toggleSidebar() {
+        func controller(in view: NSView) -> NSSplitViewController? {
+            if let split = view as? NSSplitView, let controller = split.delegate as? NSSplitViewController,
+               controller.splitViewItems.contains(where: { $0.behavior == .sidebar }) { return controller }
+            for child in view.subviews { if let found = controller(in: child) { return found } }
+            return nil
+        }
+        guard let view = TextEditingKeys.mainWindow?.contentView, let split = controller(in: view) else {
+            return Measurements.count("run.failed", detail: "no sidebar")
+        }
+        split.toggleSidebar(nil)
+    }
+
     private static func step(_ name: String, detail: String = "", _ change: () -> Void) async {
-        // A signpost per step, so a profile's samples can be matched to it (`Step`, its name and detail in the message).
         let signpost = Measurements.signposter.beginInterval("Step", "\(name, privacy: .public) \(detail, privacy: .public)")
         let settle = MainSettle.begin()
         change()
@@ -514,9 +577,9 @@ enum MeasureRun {
         Measurements.record(name, ms: settled.ms, detail: settled.timedOut ? "\(detail) (limit)" : detail)
         Measurements.record("\(name).work", ms: settled.workMs, detail: detail)
         Measurements.record("\(name).longest", ms: settled.longestMs, detail: detail)
+        Measurements.record("\(name).slow", ms: Double(settled.slowTurns), detail: detail)
     }
 
-    /// Records the time since the process started, until the main thread is quiet.
     private static func launchStep(_ name: String, detail: String = "") async {
         let settled = await MainSettle.wait()
         let end = Measurements.sinceProcessStart - (ContinuousClock.now - settled.end).milliseconds
@@ -533,20 +596,14 @@ enum MeasureRun {
     }
 }
 
-/// Waits until the main thread has had no stretch of work over 1 ms for `quiet`: a run loop turn from waking to
-/// waiting again, as CFRunLoop's observers see it (Core Animation's commit included, which runs before waiting).
-/// Several turns, so work that comes a moment later, like a read finished in the background, counts too.
-/// `begin` starts watching at once, in the turn the change is made in, so that turn's work counts.
 final class MainSettle {
     struct Result {
-        /// From the start to the end of the last busy turn.
         var ms: Double
         var end: ContinuousClock.Instant
         var timedOut: Bool
-        /// The main thread's time in turns over 1 ms, and its longest turn: what an animation's many short turns add
-        /// up to, and the most a click or a key press would have waited meanwhile.
         var workMs: Double
         var longestMs: Double
+        var slowTurns: Int
     }
 
     private let start: ContinuousClock.Instant
@@ -555,6 +612,7 @@ final class MainSettle {
     private var sawTurn = false
     private var work: Duration = .zero
     private var longest: Duration = .zero
+    private var slowTurns = 0
     private var observer: CFRunLoopObserver?
 
     private init() {
@@ -562,7 +620,6 @@ final class MainSettle {
         lastBusyEnd = start
     }
 
-    /// Starts watching now; the turn this is called in counts as busy.
     static func begin() -> MainSettle {
         let settle = MainSettle()
         let activities = CFRunLoopActivity.afterWaiting.rawValue | CFRunLoopActivity.beforeWaiting.rawValue
@@ -584,12 +641,12 @@ final class MainSettle {
         if activity == .afterWaiting {
             wake = now
         } else {
-            // The turn watching began in has no wake of its own: it counts as busy, from the start.
             let turn = now - (wake ?? start)
             if wake == nil || turn > .milliseconds(1) {
                 lastBusyEnd = now
                 work += turn
                 longest = max(longest, turn)
+                if turn > .microseconds(16_700) { slowTurns += 1 }
             }
             wake = nil
             sawTurn = true
@@ -612,7 +669,7 @@ final class MainSettle {
             }
         }
         return Result(ms: (lastBusyEnd - start).milliseconds, end: lastBusyEnd, timedOut: timedOut,
-                      workMs: work.milliseconds, longestMs: longest.milliseconds)
+                      workMs: work.milliseconds, longestMs: longest.milliseconds, slowTurns: slowTurns)
     }
 }
 #endif

@@ -1,28 +1,24 @@
 import Foundation
 
-/// Why an export or a backup didn't replace the item the save panel said to replace.
 public struct KeptItemError: Error, Sendable {
-    /// The item's name, e.g. "Fonts".
     public var name: String
     public var isFolder: Bool
+    public var noTrash = false
 
     public var message: String {
-        "“\(name)” \(isFolder ? "holds fonts Cicero uses" : "is a font Cicero uses"), so it wasn’t replaced. Choose another name or place"
+        if noTrash {
+            return "“\(name)” \(isFolder ? "isn’t empty" : "is a font") and that disk has no Trash, so it wasn’t replaced. Choose another name or location."
+        }
+        return "“\(name)” \(isFolder ? "contains fonts Cicero uses" : "is a font Cicero uses"), so it wasn’t replaced. Choose another name or location."
     }
 }
 
-/// Where an export or a backup is written before it takes the place the save panel chose: a private
-/// folder on the same disk. The new item moves into place only once it's complete, so a cancelled or
-/// failed one leaves nothing behind and the item it replaces stays until then. That item goes to the
-/// Trash, never under the new one, and never when it is, or holds, something Cicero must keep.
 struct ItemReplacement {
     let destination: URL
-    /// Where to write the new item: in the private folder, with the destination's name.
     let staged: URL
     private let folder: URL
     private let kept: [String]
 
-    /// Fails before anything is written when the item at `destination` is, or holds, one of `kept`.
     init(for destination: URL, keeping kept: [String]) throws {
         try Self.check(destination, keeping: kept)
         let fm = FileManager.default
@@ -36,20 +32,55 @@ struct ItemReplacement {
         staged = folder.appendingPathComponent(destination.lastPathComponent, isDirectory: false)
     }
 
-    /// Moves the finished item into place, after moving the one it replaces to the Trash.
-    func commit(trash: (URL) throws -> Void) throws {
+    func commit(trash: (URL) throws -> URL?) throws {
+        // The replaced item goes to the Trash, never under the new one, and never when it is, or holds, something Cicero must keep.
         try Self.check(destination, keeping: kept)
-        if ActivationEngine.exists(destination.path) { try trash(destination) }
-        try FileManager.default.moveItem(at: staged, to: destination)
+        let fm = FileManager.default
+        var trashed: URL?
+        if ActivationEngine.exists(destination.path) {
+            do {
+                trashed = try trash(destination)
+            } catch let error where (error as? CocoaError)?.code == .featureUnsupported || !Self.hasTrash(for: destination) {
+                try replaceWithoutTrash()
+                return
+            }
+        }
+        do {
+            try fm.moveItem(at: staged, to: destination)
+        } catch {
+            if let trashed { try? fm.moveItem(at: trashed, to: destination) }
+            throw error
+        }
     }
 
-    /// Removes the private folder and whatever is still in it; call when done, whether or not it was committed.
+    private func replaceWithoutTrash() throws {
+        let fm = FileManager.default
+        var info = stat()
+        let isFolder = lstat(destination.path, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
+        let isLink = info.st_mode & S_IFMT == S_IFLNK
+        // Deleted for good with no Trash to take it, so never a font, nor a folder with anything in it.
+        let folderItems = isFolder ? ((try? fm.contentsOfDirectory(atPath: destination.path)) ?? [""]).filter { $0 != ".DS_Store" } : []
+        let holdsFonts = !isLink && (isFolder ? !folderItems.isEmpty : FontFormat.fileExtensions.contains(destination.pathExtension.lowercased()))
+        guard !holdsFonts else { throw KeptItemError(name: destination.lastPathComponent, isFolder: isFolder, noTrash: true) }
+        let aside = destination.deletingLastPathComponent().appendingPathComponent(ActivationEngine.movingPrefix + UUID().uuidString)
+        try fm.moveItem(at: destination, to: aside)
+        do {
+            try fm.moveItem(at: staged, to: destination)
+        } catch {
+            try? fm.moveItem(at: aside, to: destination)
+            throw error
+        }
+        try? fm.removeItem(at: aside)
+    }
+
+    private static func hasTrash(for url: URL) -> Bool {
+        (try? FileManager.default.url(for: .trashDirectory, in: .userDomainMask, appropriateFor: url, create: false)) != nil
+    }
+
     func discard() {
         try? FileManager.default.removeItem(at: folder)
     }
 
-    /// Throws when there's an item at `destination` that is one of `kept` or a folder holding one, by its path
-    /// or the path symbolic links lead to.
     static func check(_ destination: URL, keeping kept: [String]) throws {
         let path = destination.standardizedFileURL.path
         guard ActivationEngine.exists(path) else { return }

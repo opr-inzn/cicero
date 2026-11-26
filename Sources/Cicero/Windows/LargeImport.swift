@@ -1,21 +1,13 @@
 import CiceroCore
 import SwiftUI
 
-/// What the sheets that copy another app's fonts in show about how long it takes (see `CopyTimeEstimate`): copying into
-/// ~/Library/Fonts gets slower with each font, into Cicero's Library it takes minutes. Past `threshold` fonts going into the
-/// Fonts folder, Cicero's Library is offered; choosing it turns on the setting, as Settings → General does, and the box
-/// then says so and can undo it. Shown only before the copying starts.
 struct FontLibraryOffer: View {
-    /// Fonts into the Fonts folder past which Cicero's Library is offered.
     static let threshold = 2_000
 
-    /// The fonts the copying would put into the Fonts folder.
     let count: Int
-    /// Cicero's Library was chosen in this box, so it can be undone in it.
     @Binding var chose: Bool
     @Environment(AppModel.self) private var model
 
-    /// Whether there's anything to show, so a sheet leaves out the space around it otherwise.
     static func isShown(count: Int, chose: Bool, installsIntoFontLibrary: Bool) -> Bool {
         installsIntoFontLibrary ? chose : count > threshold
     }
@@ -36,7 +28,7 @@ struct FontLibraryOffer: View {
         } else {
             let fontsFolder = CopyTimeEstimate.onFastMac(count, intoFontsFolder: true)
             let busy = fontsFolder >= 600 ? "or hours on a busy Mac" : "or much longer on a busy Mac"
-            notice(icon: Image(systemName: "clock"), tint: .secondary, title: "Copying \(count.formatted()) font files can take a long time") {
+            notice(icon: Image(systemName: "clock"), tint: .secondary, title: "Copying \(count.plain) font files can take a long time") {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 2) {
                     GridRow {
                         Text("Into your Fonts folder").foregroundStyle(.secondary)
@@ -62,7 +54,6 @@ struct FontLibraryOffer: View {
         }
     }
 
-    /// The icon on the title's line, and everything else lined up under the title.
     private func notice<Content: View>(icon: Image, tint: some ShapeStyle, title: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             icon.foregroundStyle(tint)
@@ -77,15 +68,11 @@ struct FontLibraryOffer: View {
         .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 8))
     }
 
-    /// "Less than a minute", "About 40 minutes".
     private static func about(_ seconds: Double) -> String {
         seconds < 60 ? "Less than a minute" : "About " + CopyTimeEstimate.phrase(seconds)
     }
 }
 
-/// "Copying fonts, 6,000 of 31,209" and, once `estimate` can tell, "About 30 minutes left": beside it, or `stacked` under
-/// it where the sheet is too narrow for both on one line, with the line there from the start, so the sheet doesn't grow
-/// when the estimate comes.
 struct CopyingProgressLine: View {
     let done: Int
     let total: Int
@@ -93,7 +80,7 @@ struct CopyingProgressLine: View {
     var stacked = false
 
     var body: some View {
-        let count = Text("Copying fonts, \(done.formatted()) of \(total.formatted())").fixedSize()
+        let count = Text("Copying fonts, \(done.plain) of \(total.plain)…").fixedSize()
         let left = estimate.remaining(total: total).map { $0 < 60 ? "Less than a minute left" : "About \(CopyTimeEstimate.phrase($0)) left" }
         if stacked {
             VStack(alignment: .leading, spacing: 4) {
@@ -107,5 +94,39 @@ struct CopyingProgressLine: View {
                 if let left { Text(left).fixedSize() }
             }
         }
+    }
+}
+
+struct ImportProgress: View {
+    let stage: ImportStage
+    let starting: String
+    let estimate: CopyTimeEstimate
+    let stacked: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            switch stage {
+            case .copying(let done, let total):
+                ProgressView(value: Double(done), total: Double(max(total, 1)))
+                CopyingProgressLine(done: done, total: total, estimate: estimate, stacked: stacked)
+            case .reading(let done, let total):
+                ProgressView(value: Double(done), total: Double(max(total, 1)))
+                Text("Reading fonts, \(done.plain) of \(total.plain)…")
+            case .starting:
+                ProgressView()
+                Text(starting)
+            case .stopping:
+                ProgressView()
+                Text("Stopping…")
+            case .waiting:
+                ProgressView()
+                Text("Waiting for other changes to finish…")
+            }
+        }
+        .progressViewStyle(.linear)
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+        .frame(maxWidth: stacked ? 260 : 400, alignment: .leading)
     }
 }

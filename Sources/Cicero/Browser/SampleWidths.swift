@@ -3,49 +3,62 @@ import CoreText
 import Foundation
 import Synchronization
 
-/// How wide the families' grid samples are, per point of the size, and so how wide the tiles need to be for all but the
-/// library's widest fonts to be drawn at the size chosen (see `FontGrid`). One width for every list, so the tiles and the
-/// rows don't change from one sidebar item, or search, to the next. Each sample is measured once, off the main thread and
-/// several side by side, for its style, text and settings: its glyphs' outlines scale with the size, so dragging Size
-/// measures nothing. What the last measurement found is saved for the next launch (`Saved`), which then opens no file
-/// to measure: at 20,000 families that took 8 s of CPU on every core during each launch.
 @Observable
 final class SampleWidths {
     static let shared = SampleWidths()
 
-    /// Per point of the preview size, as wide as the samples of all but the widest twentieth of the families All Fonts
-    /// lists (of all of them, in a library of fewer than twenty): nil until they're measured. Kept for the next launch,
-    /// where the library most often needs the same, so the tiles don't change once it's measured again.
     private(set) var listRatio: CGFloat?
 
-    @ObservationIgnored private var measuredInputs: Int?
-    /// Each sample's width per point of the size, by `Sample.savedKey`: as the last measurement found them, saved for the
-    /// next launch. nil until read.
+    @ObservationIgnored private var lists: [List] = []
     @ObservationIgnored private var saved: [String: CGFloat]?
     @ObservationIgnored private var saving: Task<Void, Never>?
+    @ObservationIgnored private var clears = 0
     #if CICERO_MEASURE
-    /// Each finished measurement: how many samples it measured, and how many it knew or measured in all.
     @ObservationIgnored private(set) var measuredLog: [(new: Int, all: Int)] = []
     static var savedURL: URL { Saved.url }
     #endif
     private static let savedKey = "grid.sampleWidthRatio"
-    /// What each sample measured, per point of the size, by `Sample.key`.
-    nonisolated private static let ratios = Mutex<[String: CGFloat]>([:])
+    private static let savedTextKey = "grid.sampleWidthText"
+    nonisolated private static let ratios = Mutex(Ratios())
 
-    private init() {
-        listRatio = (UserDefaults.standard.object(forKey: Self.savedKey) as? Double).map { CGFloat($0) }
+    nonisolated private struct Ratios {
+        static let texts = 4
+        static let entries = 4000
+        var byText: [String: [String: CGFloat]] = [:]
+        var recent: [String] = []
+
+        func value(_ key: String, text: String) -> CGFloat? { byText[text]?[key] }
+
+        mutating func add(_ ratios: [String: CGFloat], text: String) {
+            recent.removeAll { $0 == text }
+            recent.append(text)
+            if (byText[text]?.count ?? 0) + ratios.count > Self.entries { byText[text] = [:] }
+            byText[text, default: [:]].merge(ratios) { first, _ in first }
+            while recent.count > Self.texts { byText[recent.removeFirst()] = nil }
+        }
     }
 
-    /// A family's sample as its tile draws it.
+    private struct List {
+        var inputs: Int?
+        var text: String
+        var ratio: CGFloat
+    }
+
+    private init() {
+        let defaults = UserDefaults.standard
+        listRatio = (defaults.object(forKey: Self.savedKey) as? Double).map { CGFloat($0) }
+        if let listRatio, let text = defaults.string(forKey: Self.savedTextKey) {
+            lists = [List(text: text, ratio: listRatio)]
+        }
+    }
+
     nonisolated struct Sample: Sendable {
         var face: FontFace
-        /// Before `ScriptSamples` gives a font without its letters text in its own script.
         var text: String
         var weight: Double
         var variations: [String: Double]
         var features: [FeatureSetting]
 
-        /// The weight only for a face with a weight axis, the only ones it changes.
         func key(text: String) -> String {
             var key = "\(face.id)|\(FontLoader.shared.generation(of: face.path))|"
             if face.weightAxis != nil { key += "w\(weight)" }
@@ -54,9 +67,6 @@ final class SampleWidths {
             return key + "|" + text
         }
 
-        /// The key its width is saved by for the next launch: the file as it is on disk now (path, face, modification
-        /// time and size, so a file saved again or replaced is measured again), the settings, and the text asked for,
-        /// before `ScriptSamples` puts it in the font's own script, so a saved width needs no font opened.
         func savedKey(_ file: stat) -> String {
             var key = "\(face.id.path)|\(face.id.index)|\(file.st_mtimespec.tv_sec).\(file.st_mtimespec.tv_nsec)|\(file.st_size)|"
             if face.weightAxis != nil { key += "w\(weight)" }
@@ -66,40 +76,70 @@ final class SampleWidths {
         }
     }
 
-    /// Measures the library's samples, unless `inputs` says they're those measured last, and returns `listRatio` for them:
-    /// as it was, should it be cancelled or have no sample to measure.
-    /// Whether `inputs` are those measured last, so there's nothing to make samples for.
-    func hasMeasured(_ inputs: Int) -> Bool { inputs == measuredInputs }
+    func ratio(for inputs: Int) -> CGFloat? {
+        lists.last { $0.inputs == inputs }?.ratio
+    }
 
-    func measure(_ inputs: Int, samples: [Sample], scriptSamples: ScriptSamples) async -> CGFloat? {
-        guard inputs != measuredInputs else { return listRatio }
-        if saved == nil { saved = await Saved.read() ?? [:] }
+    func ratio(forText text: String) -> CGFloat? {
+        lists.last { $0.text == text }?.ratio
+    }
+
+    private func remember(_ ratio: CGFloat, inputs: Int, text: String) {
+        lists.removeAll { $0.inputs == inputs || $0.text == text }
+        lists.append(List(inputs: inputs, text: text, ratio: ratio))
+        if lists.count > 8 { lists.removeFirst() }
+    }
+
+    nonisolated static let mostMeasured = 2000
+
+    nonisolated static func measured(of families: [Family]) -> [Family] {
+        guard families.count > mostMeasured else { return families }
+        let below = UInt64(mostMeasured) << 32 / UInt64(families.count)
+        return families.filter { family in
+            var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+            for byte in family.id.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100_0000_01b3 }
+            return hash >> 32 < below
+        }
+    }
+
+    func measure(_ inputs: Int, text: String, samples: [Sample], scriptSamples: ScriptSamples) async -> CGFloat? {
+        if let ratio = ratio(for: inputs) { return ratio }
+        let clearsBefore = clears
+        if saved == nil {
+            let read = await Saved.read() ?? [:]
+            if clears == clearsBefore { saved = read }
+        }
         let known = saved ?? [:]
-        guard let measured = await Self.listRatio(samples, known: known, scriptSamples: scriptSamples), !Task.isCancelled else { return listRatio }
+        guard let measured = await Self.listRatio(samples, known: known, scriptSamples: scriptSamples), !Task.isCancelled,
+              clears == clearsBefore else { return ratio(forText: text) ?? listRatio }
         #if CICERO_MEASURE
         Measurements.record("sampleWidths", ms: 0, detail: "\(measured.new) measured, \(measured.used.count) saved")
         measuredLog.append((measured.new, measured.used.count))
         #endif
-        // Only this measurement's samples are kept, so the file doesn't grow with every preview text tried.
         if measured.new > 0 || measured.used.count != known.count {
-            saved = measured.used
-            save(measured.used)
+            let defaultSuffix = "|\(PreviewSettings.tileSample)"
+            var kept = known.filter { $0.key.hasSuffix(defaultSuffix) }
+            kept.merge(measured.used) { _, new in new }
+            if kept != saved {
+                saved = kept
+                save(kept)
+            }
         }
-        guard let ratio = measured.ratio else { return listRatio }
-        measuredInputs = inputs
+        guard let ratio = measured.ratio else { return ratio(forText: text) ?? listRatio }
+        remember(ratio, inputs: inputs, text: text)
         if listRatio != ratio { listRatio = ratio }
         UserDefaults.standard.set(Double(ratio), forKey: Self.savedKey)
+        UserDefaults.standard.set(text, forKey: Self.savedTextKey)
         return ratio
     }
 
-    /// Forgets the saved widths, as Rebuild Library forgets what was read from the files.
     func clearSaved() {
+        clears += 1
         saved = [:]
-        measuredInputs = nil
+        for index in lists.indices { lists[index].inputs = nil }
         save([:])
     }
 
-    /// Writes the widths off the main thread, once they've stayed the same for 2 s, as while typing a preview text.
     private func save(_ ratios: [String: CGFloat]) {
         saving?.cancel()
         saving = Task.detached(priority: .utility) {
@@ -109,13 +149,12 @@ final class SampleWidths {
         }
     }
 
-    /// The widths as saved in Cicero's caches folder, for this build of Cicero on this version of macOS only: a new
-    /// one may put other text in a font's own script, or CoreText measure it differently.
     nonisolated private enum Saved {
         static let url = Locations.standard.caches.appendingPathComponent("sample-widths.cache", isDirectory: false)
         static var version: String {
             let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-            return "1|\(build)|\(ProcessInfo.processInfo.operatingSystemVersionString)"
+            // For this build of Cicero on this version of macOS only: a new one may put other text in a font's own script, or CoreText measure it differently.
+            return "2|\(build)|\(ProcessInfo.processInfo.operatingSystemVersionString)"
         }
 
         @concurrent
@@ -135,29 +174,24 @@ final class SampleWidths {
         }
     }
 
-    /// The sample's width per point of `font`'s size, `text` being what the tile draws in it: measured before, or now.
     nonisolated static func ratio(of sample: Sample, text: String, in font: CTFont) -> CGFloat {
         let key = sample.key(text: text)
-        if let ratio = ratios.withLock({ $0[key] }) { return ratio }
+        if let ratio = ratios.withLock({ $0.value(key, text: sample.text) }) { return ratio }
         let ratio = width(of: text, in: font) / CTFontGetSize(font)
-        ratios.withLock { $0[key] = ratio }
+        ratios.withLock { $0.add([key: ratio], text: sample.text) }
         return ratio
     }
 
-    /// From the left edge of whichever reaches further left, the first glyph's outline or its line, to the right edge of
-    /// whichever reaches further right: all a tile needs room for.
     nonisolated static func width(of text: String, in font: CTFont) -> CGFloat {
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font]))
+        let shown = NSMutableAttributedString(string: text, attributes: [.font: font])
+        shown.showMissingAsNotdef(in: font)
+        let line = CTLineCreateWithAttributedString(shown)
         let advance = CTLineGetTypographicBounds(line, nil, nil, nil)
         let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
         guard !ink.isEmpty else { return advance }
         return max(advance, ink.maxX) - min(0, ink.minX)
     }
 
-    /// A share of the samples on each core, so a new preview text is measured in a moment: the grid waits for it to show
-    /// the text (see `FontGrid.shown`).
-    /// What measuring the samples found: the list's ratio (nil without a sample to measure), each sample's width by
-    /// `Sample.savedKey`, and how many weren't known from the saved ones.
     nonisolated struct Measured: Sendable {
         var ratio: CGFloat?
         var used: [String: CGFloat]
@@ -189,25 +223,23 @@ final class SampleWidths {
         return measured
     }
 
-    /// One share of the samples, measured by one task: their widths per point of the size, by `Sample.savedKey`, and how
-    /// many were measured rather than known.
     nonisolated private struct Lane: Sendable {
         var widths: [CGFloat] = []
         var used: [String: CGFloat] = [:]
         var new = 0
     }
 
-    /// Each sample's width per point of the size, from the saved ones or measured; nil once the task is cancelled. What a
-    /// lane measures goes into `ratios` once at its end: ten lanes taking the lock for every sample kept waiting on it.
     nonisolated private static func widths(of samples: ArraySlice<Sample>, known: [String: CGFloat], scriptSamples: ScriptSamples) -> Lane? {
         var lane = Lane()
         lane.widths.reserveCapacity(samples.count)
-        var measured: [String: CGFloat] = [:]
-        defer { if !measured.isEmpty { ratios.withLock { $0.merge(measured) { first, _ in first } } } }
+        var measured: [String: [String: CGFloat]] = [:]
+        defer {
+            if !measured.isEmpty { ratios.withLock { ratios in for (text, found) in measured { ratios.add(found, text: text) } } }
+        }
         for (index, sample) in samples.enumerated() {
-            if index % 32 == 0, Task.isCancelled { return nil }
+            if index % 8 == 0, Task.isCancelled { return nil }
             let path = sample.face.path
-            // Not a file on a server, which asking anything could hold up, unless it was read already; it isn't saved.
+            // Not a file on a server, which asking anything could hold up, unless it was read already.
             var file = stat()
             let local = Reachability.isOnLocalDisk(path)
             if local {
@@ -221,19 +253,18 @@ final class SampleWidths {
                 lane.used[savedKey] = ratio
                 continue
             }
-            // Nor one a cloud service keeps online only, which reading would download: its tile measures it once it has
-            // it, and it counts the next time the list is measured.
+            // Nor one a cloud service keeps online only, which reading would download.
             if local, file.st_flags & UInt32(SF_DATALESS) != 0, !FontLoader.shared.hasDescriptors(for: path) { continue }
-            let text = scriptSamples.text(sample.text, for: sample.face, cached: false)
+            let font = FontLoader.shared.font(sample.face, size: 100, weight: sample.weight, variations: sample.variations,
+                                              features: sample.features, cached: false)
+            let text = scriptSamples.text(sample.text, for: sample.face, cached: false, font: font)
             let key = sample.key(text: text)
             let ratio: CGFloat
-            if let known = measured[key] ?? ratios.withLock({ $0[key] }) {
+            if let known = measured[sample.text]?[key] ?? ratios.withLock({ $0.value(key, text: sample.text) }) {
                 ratio = known
             } else {
-                let font = FontLoader.shared.font(sample.face, size: 100, weight: sample.weight, variations: sample.variations,
-                                                  features: sample.features, cached: false)
                 ratio = width(of: text, in: font) / CTFontGetSize(font)
-                measured[key] = ratio
+                measured[sample.text, default: [:]][key] = ratio
             }
             lane.widths.append(ratio)
             if let savedKey { lane.used[savedKey] = ratio }
@@ -242,7 +273,6 @@ final class SampleWidths {
         return lane
     }
 
-    /// All but the widest twentieth, or all of fewer than twenty.
     nonisolated static func widest(_ ratios: [CGFloat]) -> CGFloat? {
         guard !ratios.isEmpty else { return nil }
         let sorted = ratios.sorted()

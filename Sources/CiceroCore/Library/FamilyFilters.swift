@@ -1,35 +1,25 @@
 import Foundation
 
-/// An item of the sidebar: the families it holds are the ones `FamilyFilters.filter(for:)` lets through.
 public enum SidebarItem: Hashable, Sendable {
     case all, active, inactive, system, problems
-    /// Families with a style that arrived on the Mac in the last `FamilyFilters.recentDays` days.
     case recent
-    /// Families with a style on until Cicero quits (Activate Temporarily); not application sets'.
     case temporary
     case folder(UUID)
     case set(UUID)
     case smartSet(UUID)
     case tag(String)
     case foundry(String)
-    /// By name: a built-in classification under the name the user gave it, or one of theirs.
     case classification(String)
     case characterSet(String)
 }
 
 extension LibraryFace {
-    /// On until Cicero quits, from Activate Temporarily.
     public var isOnUntilQuit: Bool { state == .active(.temporary(.untilQuit)) }
 }
 
-/// What the filters ask about characters. The app answers from what it remembers; the `cicero` tool from the coverage
-/// index as it is.
 public struct CoverageAnswers {
-    /// A character set by its id, built-in or the user's ("custom.<uuid>").
     public var characterSet: (String) -> CharacterSetDefinition?
-    /// How many of the set's characters the family's regular style lacks; nil while not checked yet.
     public var missingCount: (CharacterSetDefinition, Family) -> Int?
-    /// Whether the family's regular style supports the language; nil while not checked yet.
     public var supports: (Family, String) -> Bool?
 
     public init(characterSet: @escaping (String) -> CharacterSetDefinition?,
@@ -40,24 +30,16 @@ public struct CoverageAnswers {
         self.supports = supports
     }
 
-    /// Nothing checked yet: every character question answers nil.
     public static var none: CoverageAnswers { CoverageAnswers(characterSet: { _ in nil }, missingCount: { _, _ in nil }, supports: { _, _ in nil }) }
 }
 
-/// The tests that decide which families a search, a sidebar item and a smart folder hold, for the app and the
-/// `cicero` tool alike. Each test looks up anything expensive once, so it can run over every family of a large
-/// library.
 public struct FamilyFilters {
     public var library: Library
     public var data: UserData
-    /// The classification guessed for a family nothing in its files classifies; nil for none (see
-    /// `UserData.classificationNamer(guess:)`).
     public var classificationGuess: (Family) -> Classification?
     public var coverage: CoverageAnswers
-    /// What "now" is, for Recents and the smart folder rules about days.
     public var now: Date
 
-    /// How many days a family stays in Recents.
     public static let recentDays = 7
 
     public init(library: Library, data: UserData, classificationGuess: @escaping (Family) -> Classification? = { _ in nil },
@@ -73,17 +55,12 @@ public struct FamilyFilters {
         data.classificationNamer(guess: classificationGuess)
     }
 
-    /// Whether the family's regular style has every character of the set; nil while still being checked.
     public func has(_ set: CharacterSetDefinition, _ family: Family) -> Bool? {
         coverage.missingCount(set, family).map { $0 == 0 }
     }
 
     // MARK: Search
 
-    /// A test for whether families match a search: by what the library searches (see `Library.matches`), and by the
-    /// user's note, the foundry and classification the family is shown in, a built-in classification by its usual
-    /// words too, and its tags; and by the search field's tokens (see `Family.matches`). `moreTexts` are a family's other
-    /// texts to look in, lowercased: the `cicero` command's `find` gives its fonts' licenses and descriptions.
     public func searchMatcher(_ search: SearchQuery, tokens: [SearchToken] = [],
                               moreTexts: @escaping (Family) -> [String] = { _ in [] }) -> (Family) -> Bool {
         guard !search.isEmpty else { return tokens.isEmpty ? { _ in true } : { $0.matches(tokens) } }
@@ -107,7 +84,6 @@ public struct FamilyFilters {
 
     // MARK: Sidebar items
 
-    /// A test for one sidebar item. Problems holds no family.
     public func filter(for item: SidebarItem) -> (Family) -> Bool {
         switch item {
         case .all: return { _ in true }
@@ -121,7 +97,6 @@ public struct FamilyFilters {
         case .problems: return { _ in false }
         case .folder(let id): return { $0.folderIDs.contains(id) }
         case .set(let id):
-            // Families it has only some styles of too.
             let members = Set(data.sets.first { $0.id == id }?.memberFamilies ?? [])
             return { members.contains($0.id) }
         case .smartSet(let id):
@@ -145,7 +120,6 @@ public struct FamilyFilters {
 
     // MARK: Smart folders
 
-    /// A test for many families at once: set and folder rules resolve their members once.
     public func matcher(for smartSet: SmartSet) -> (Family) -> Bool {
         let checks = smartSet.rules.map(check(for:))
         guard !checks.isEmpty else { return { _ in false } }
@@ -160,7 +134,6 @@ public struct FamilyFilters {
         }
         switch rule.field {
         case .name:
-            // The fonts' own name, or the one in the Mac's language a family shows.
             let lower = value.lowercased()
             func names(_ family: Family) -> [String] {
                 family.name == family.id ? [family.id.lowercased()] : [family.id.lowercased(), family.name.lowercased()]
@@ -179,7 +152,6 @@ public struct FamilyFilters {
             }
             return compare { foundryName($0) == value }
         case .designer:
-            // Any style's: a family's styles may credit different designers, or some of them none.
             let lower = value.lowercased()
             func designers(_ family: Family) -> [String] { family.faces.compactMap { $0.face.designer?.lowercased() } }
             switch rule.comparison {
@@ -194,7 +166,6 @@ public struct FamilyFilters {
             let tagged = data.families(tagged: value)
             return compare { tagged.contains($0.id) }
         case .note:
-            // Without text: whether the family has a note at all, as Has Note says, for sets made before there was one.
             let lower = value.lowercased()
             let notes = data.familyNotes.mapValues { $0.lowercased() }
             let contains = rule.comparison != .doesNotContain
@@ -206,7 +177,6 @@ public struct FamilyFilters {
             let noted = data.familyNotes
             return compare { noted[$0.id] != nil }
         case .rating:
-            // No rating is 0 stars.
             let ratings = data.familyRatings
             let stars = Int(value) ?? 0
             switch rule.comparison {
@@ -238,7 +208,7 @@ public struct FamilyFilters {
                 }
             }
         case .format:
-            return compare { $0.format.rawValue == value }
+            return compare { $0.faces.contains { FontFormat.of(path: $0.face.path).rawValue == value } }
         case .styles:
             let number = Int(value) ?? 0
             switch rule.comparison {
@@ -280,7 +250,6 @@ public struct FamilyFilters {
             default: return { activations[$0.id]?.count ?? 0 == number }
             }
         case .lastActivated:
-            // A family never turned on since Cicero began counting wasn't turned on in the last days either.
             let activations = data.activations
             let cutoff = now.addingTimeInterval(-Double(Int(value) ?? 0) * 86_400)
             let recent = rule.comparison != .notInLast

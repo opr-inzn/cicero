@@ -2,24 +2,27 @@ import AppKit
 import CiceroCore
 import UniformTypeIdentifiers
 
-/// The families of a document's fonts that the library has, in the order the Fonts in Document sheet lists them, for the
-/// browser to show (Show in Library).
 struct DocumentList: Equatable {
     let name: String
     let families: [String]
 }
 
-/// The fonts a document uses, for the Fonts in Document sheet, which shows them against the library.
 struct DocumentFontsReport: Identifiable {
     let id = UUID()
     let url: URL
     let fonts: [DocumentFont]
+    let embedded: [String: PDFEmbeddedFont]
+
+    init(url: URL, fonts: [DocumentFont], embedded: [String: PDFEmbeddedFont] = [:]) {
+        self.url = url
+        self.fonts = fonts
+        self.embedded = embedded
+    }
 
     var name: String { url.lastPathComponent }
 }
 
 extension AppModel {
-    /// File → Find Fonts in Document…
     func presentFindFontsPanel() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
@@ -32,56 +35,101 @@ extension AppModel {
         findFonts(in: url)
     }
 
-    /// Reads which fonts the document uses, off the main thread, and shows them.
     func findFonts(in url: URL) {
         Task {
-            let read = await Task.detached(priority: .userInitiated) { Result { try DocumentFonts.read(url) } }.value
+            let read = await Task.detached(priority: .userInitiated) {
+                Result {
+                    let fonts = try DocumentFonts.read(url)
+                    let embedded = PDFEmbeddedFont.extractAll(from: url).filter { $0.value.makeFont() != nil }
+                    return (fonts, embedded)
+                }
+            }.value
             switch read {
-            case .success(let fonts) where fonts.isEmpty:
-                showToast("“\(url.lastPathComponent)” doesn’t name any fonts")
-            case .success(let fonts):
-                documentFonts = DocumentFontsReport(url: url, fonts: fonts)
+            case .success(let (fonts, _)) where fonts.isEmpty:
+                showToast("“\(url.lastPathComponent)” doesn’t list any fonts")
+            case .success(let (fonts, embedded)):
+                ask { $0.documentFonts = DocumentFontsReport(url: url, fonts: fonts, embedded: embedded) }
             case .failure:
                 showToast("Couldn’t read the fonts in “\(url.lastPathComponent)”")
             }
         }
     }
 
-    /// The families of the document's fonts that the library has, each once.
+    func embeddedFont(for font: DocumentFont, in report: DocumentFontsReport) -> PDFEmbeddedFont? {
+        guard let key = font.postScriptName?.lowercased() else { return nil }
+        return report.embedded[key]
+    }
+
+    func showSimilar(to font: DocumentFont, embedded: PDFEmbeddedFont) {
+        let index = measurements
+        let table = similarFonts
+        let data = data
+        Task {
+            let result: [String]? = await Task.detached(priority: .userInitiated) {
+                guard let (ctFont, glyphMap) = embedded.makeFont() else { return nil }
+                let (measured, reading) = index.inspect(ctFont, glyphMap: glyphMap)
+                var guessedClass: String?
+                if let chances = reading?.classification,
+                   let best = chances.indices.max(by: { chances[$0] < chances[$1] }),
+                   chances[best] >= ClassificationGuesses.letterLikelihood {
+                    guessedClass = data.name(of: LetterEmbedding.classifications[best])
+                } else if measured?[.monospaced] == 1 {
+                    guessedClass = data.name(of: .monospaced)
+                }
+                return table.nearest(
+                    measurements: measured, embedding: reading?.embedding, tags: reading?.tags,
+                    classification: guessedClass, name: font.displayName, limit: SimilarFonts.longestList
+                )
+            }.value
+            guard let nearest = result, !nearest.isEmpty else {
+                showToast("Couldn’t compare “\(font.displayName)” with your library")
+                return
+            }
+            if similarFamilyID == nil, documentList == nil, externalSimilar == nil {
+                listReturn = selectedItems
+                listReturnPage = openFamilyID
+            }
+            clearSearch()
+            selection = nil
+            similarFamilyID = nil
+            documentList = nil
+            externalSimilar = DocumentList(name: font.displayName, families: nearest)
+            openFamilyID = nil
+            selectedIDs = []
+            scrollsToTop += 1
+        }
+    }
+
     func libraryFamilies(of report: DocumentFontsReport) -> [String] {
         var seen = Set<String>()
         return documentMatches(report).compactMap(\.family).filter { seen.insert($0).inserted }
     }
 
-    /// Fills the browser with the families the document uses that the library has, as Show Similar Fonts does: the
-    /// sidebar shows nothing selected, and selecting an item there, or Done in the bar above them, goes back.
     func showInLibrary(_ report: DocumentFontsReport) {
-        if similarFamilyID == nil, documentList == nil {
+        if similarFamilyID == nil, documentList == nil, externalSimilar == nil {
             listReturn = selectedItems
             listReturnPage = openFamilyID
         }
         clearSearch()
         selection = nil
         similarFamilyID = nil
+        externalSimilar = nil
         documentList = DocumentList(name: report.name, families: libraryFamilies(of: report))
         openFamilyID = nil
         selectedIDs = []
+        scrollsToTop += 1
     }
 
-    /// Done in the bar above Show in Library's families.
     func endDocumentList() {
         guard documentList != nil else { return }
         returnFromList()
     }
 
-    /// The fonts an app says its document uses, as InDesign does for Find Fonts in Current Document in the menu bar.
     func showFonts(_ fonts: [DocumentFont], ofDocumentNamed name: String) {
-        guard !fonts.isEmpty else { return showToast("“\(name)” doesn’t name any fonts") }
-        documentFonts = DocumentFontsReport(url: URL(fileURLWithPath: name), fonts: fonts)
+        guard !fonts.isEmpty else { return showToast("“\(name)” doesn’t list any fonts") }
+        ask { $0.documentFonts = DocumentFontsReport(url: URL(fileURLWithPath: name), fonts: fonts) }
     }
 
-    /// The library's face for each of the document's fonts. Cached until the library changes: the sheet asks on
-    /// every update, and matching looks at every face.
     func documentMatches(_ report: DocumentFontsReport) -> [DocumentFontMatch] {
         if let cached = documentMatchesCache, cached.report == report.id, cached.fingerprint == library.fingerprint {
             return cached.matches
@@ -91,7 +139,6 @@ extension AppModel {
         return matches
     }
 
-    /// Turns on every font of the document that's in the library and off.
     func activateAll(in report: DocumentFontsReport) {
         let faces = documentMatches(report).compactMap(\.face).filter(\.canActivate)
         guard !faces.isEmpty else { return }

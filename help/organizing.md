@@ -75,7 +75,7 @@ Add folders of fonts to see their fonts in your library without activating them.
 
 ### Add a location
 
-Choose **File → Add Location** (⇧⌘O), click **+** next to **Locations**, or click **+** in **Preferences → Locations**, and pick a folder of fonts. You can pick several folders at once.
+Choose **File → Add Location** (⇧⌘O), click **+** next to **Locations**, or click **+** in **Preferences → Locations**, and pick a folder of fonts. You can pick several folders at once. Or drag folders from the Finder onto the sidebar.
 
 A folder called “Fonts” is shown with the name of the folder it’s in, like “Projects Fonts”.
 
@@ -130,7 +130,7 @@ With **Copy into ~/Library/Fonts** (the setting at first) or **Move into ~/Libra
   The browser stays where it is and selects them there. It only goes elsewhere when they can’t show where you are: to **Added Fonts** for files left where they are, or, from anywhere but a folder, tag or location, to **All Fonts**.
 - In the Finder, right-click a font file and choose **Open With → Cicero**. To have a double-click open fonts in Cicero, select a font file, choose **File → Get Info** in the Finder, pick Cicero under **Open with** and click **Change All**
 
-Cicero reads OpenType, TrueType, font collections and datafork TrueType. It leaves out web fonts (WOFF and WOFF2), which are made for websites: Adobe apps can’t use them. Cicero then shows the fonts you added in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or one of your locations, are just shown. Dropping a folder adds it as a location, whichever way you activate fonts.
+Cicero reads OpenType, TrueType, font collections and datafork TrueType. It leaves out web fonts (WOFF and WOFF2), which are made for websites: Adobe apps can’t use them. Cicero then shows the fonts you added in the browser: it selects the first of them and scrolls to it. Files Cicero lists already, like those in your Fonts folder or one of your locations, are just shown. Dropping a folder on the browser adds the font files in it, and in the folders inside it, as if you’d dropped them one by one. With **Leave files where they are**, or on **Added Fonts**, Cicero adds the folder as a location instead. To add a folder as a location, drop it on the sidebar.
 
 ### Fonts already in your library
 
@@ -138,7 +138,7 @@ A font file you add may have fonts your library has already, from another file: 
 
 - **Skip it** leaves the file out. The library’s copy stays in use, and Cicero shows it.
 - **Add as a copy** lists or installs the file next to the library’s copy, as for any other file. You can switch between them later with [Use Copy From](activating.md#use-another-copy-of-a-font).
-- **Replace your copy** moves your copy to the Trash and puts the added file in its place, under the same name and in the same folder. A font that was on stays on, and one that was off stays off. For one that’s off in your Fonts folder, the added file goes into Cicero’s Library instead, still off, when Cicero installs fonts there. Otherwise Cicero first waits until macOS has let go of the old file, usually a second or so, as macOS would otherwise turn the new one on. If that takes longer than 10 seconds, the new file gets a “2” in its name for the moment, and gets its name back as soon as macOS lets go, while Cicero is open. It stays in every folder and tag it was in. If your copy is in one of your own folders, like a client’s folder, the file there is replaced, and Cicero warns you first. So it does if you have the font in more than one place, like a client’s folder and your Fonts folder: each of those files is replaced. It only works file for file: if your copy is a collection and the added fonts come in a file each, or the other way round, you can’t choose it for that family. Fonts that come with macOS or an app, and Adobe Fonts, stay where they are. If InDesign, Illustrator or Photoshop is open, Cicero asks first: those apps keep the old version until they restart, and documents open in them can show wrong letters, so quit them first or restart them afterwards.
+- **Replace your copy** moves your copy to the Trash and puts the added file in its place, under the same name and in the same folder. A font that was on stays on, and one that was off stays off. For one that’s off in your Fonts folder, the added file goes into Cicero’s Library instead, still off, when Cicero installs fonts there. Otherwise Cicero first waits until macOS has let go of the old file, usually a second or so, as macOS would otherwise turn the new one on. If that takes longer than 10 seconds, the new file gets a “2” in its name for the moment, and gets its name back as soon as macOS lets go, while Cicero is open. It stays in every folder and tag it was in. If your copy is in one of your own folders, like a client’s folder, the file there is replaced, and Cicero warns you first. So it does if you have the font in more than one place, like a client’s folder and your Fonts folder: each of those files is replaced. It only works file for file: if your copy is a collection and the added fonts come in a file each, or the other way round, you can’t choose it for that family. Fonts that come with macOS or inside an app, and Adobe Fonts, stay where they are. Fonts in an app’s Fonts folder, like those under **Proofing**, are replaced when Cicero can write to the folder. If InDesign, Illustrator or Photoshop is open, Cicero asks first: those apps keep the old version until they restart, and documents open in them can show wrong letters, so quit them first or restart them afterwards.
 
 The sheet says how many styles of each family the file has, which versions you have and where, and whether the added one is **Newer**, **Older**, the **Same Version** or the **Same File**. Each family starts at **Replace your copy** when the added one is newer (at **Add as a copy** if it can’t be replaced), else at **Skip it**. With **Replace your copy** chosen in Preferences, every family that can be replaced starts there; **Choose for All** sets them all at once. **Add** adds the files, those with no fonts in your library included, and **Cancel** adds none of them.
 
@@ -237,7 +237,7 @@ They’re tags like any other: rename them, delete them, or make your own. Libra
 
 ### Tag fonts
 
-- Right-click families and choose **Tags**, then a tag. A checkmark shows the tags they have; choose a checked one to take it off. **Remove All Tags** takes every tag off them, and **New Tag** makes a tag and gives it to them. The families keep the tags they have.
+- Right-click families and choose **Tags**, then a tag. A checkmark shows the tags they have; choose a checked one to take it off. **Remove All** takes every tag off them, and **New Tag** makes a tag and gives it to them. The families keep the tags they have.
 - On a font page, right-click the text, the header or a style for the same menu.
 - Drag families onto a tag under **Tags** in the sidebar.
 - In the [Info panel](browsing.md#see-a-fonts-details), click **Change** next to **Tags**.

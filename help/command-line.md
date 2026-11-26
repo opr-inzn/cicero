@@ -135,7 +135,7 @@ Coverage is the coverage of each family’s regular style, as everywhere in Cice
 | `--text "Grüße, Łódź"` | draws this text. Without it, “Sphinx of black quartz, judge my vow.” A line break in the text starts a new line |
 | `--all-styles` | draws every style of the families, not only the regular style |
 | `--size 72` | the letters’ size in pixels, from 6 to 400 (48 at first) |
-| `--width 1600` | the picture’s width in pixels, from 200 to 8000 (1200 at first). Long text goes on to the next line |
+| `--width 1600` | the picture’s width in pixels, from 200 to 8000 (1200 at first). Long text goes on to the next line. A picture can have at most 36 million pixels (8000 wide: 4500 high) |
 | `--png ~/Desktop/fonts.png` | where to put the picture. Without it, the picture goes in a temporary folder, and the command says where |
 
 Instead of a family, you can name one style: by its PostScript name (`Inter-Bold`), its full name, or the family’s name and the style’s name (`"Inter Bold"`). Up to 50 styles fit in one picture.
@@ -144,7 +144,7 @@ Cicero draws each font from its file, on or off. **When a font doesn’t have a 
 
 ### Fonts Cicero hides
 
-The command shows the fonts Cicero’s window shows. When **Settings → General** hides fonts that come with macOS, fonts from Creative Cloud or fonts installed for proofing in Adobe apps, the command hides them too. Add these to any command to show them, or `--no-…` to hide them, only for that command:
+The command shows the fonts Cicero’s window shows. When **Preferences → General** hides fonts that come with macOS, fonts from Creative Cloud or fonts installed for proofing in Adobe apps, the command hides them too. Add these to any command to show them, or `--no-…` to hide them, only for that command:
 
 | Option | Shows |
 |---|---|
@@ -246,6 +246,8 @@ An error is `{ "schema": 1, "error": { "code": "notFound", "message": "…", "su
 | 4 | `needsConfirmation` | the change asks first; nothing changed. Ask the user, then run it again with `--yes` |
 | 5 | `busy` | Cicero is open but didn’t take the change within 5 seconds, or another `cicero` command was making one; nothing changed |
 
+`activate` and `deactivate` exit with 6 when a file couldn’t be turned on or off, also when others could. The answer is the same as with 0: `failed` lists those files and why, `changed` the families that did change.
+
 `coverage` exits with 3 when the family lacks characters. It isn’t an error: the answer is the same as with 0, with `"covered": false`. A script can ask `if cicero coverage Inter --set adobe-latin-3 > /dev/null` without reading the JSON.
 
 ## Questions
@@ -264,7 +266,7 @@ No. Only one of them changes Cicero’s data at a time. While Cicero is open, th
 
 ### Why doesn’t it find a font that comes with macOS?
 
-When **Show system fonts** is off in **Settings → General**, the command leaves those fonts out too, as Cicero’s window does. It says so when you ask for one by name. Add `--system-fonts` to see them (see [Fonts Cicero hides](#fonts-cicero-hides)).
+When **Show system fonts** is off in **Preferences → General**, the command leaves those fonts out too, as Cicero’s window does. It says so when you ask for one by name. Add `--system-fonts` to see them (see [Fonts Cicero hides](#fonts-cicero-hides)).
 
 ### How do I remove the command?
 

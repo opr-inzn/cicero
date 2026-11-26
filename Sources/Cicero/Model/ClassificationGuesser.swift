@@ -2,19 +2,12 @@ import CiceroCore
 import Foundation
 import FoundationModels
 
-/// Classifications for the families nothing in their files classifies (see `Classification.of`), guessed from
-/// their names by the language model Apple Intelligence keeps on the Mac, while Settings → General → Classify fonts
-/// automatically is on; they come before the model of letters' guesses (see `AppModel.letterGuesses`), as the
-/// language model answers only when a name says. The model runs on the Mac, so nothing is sent anywhere. Each family
-/// is asked about once, one at a time in the background; the answers, "can't tell" among them, are kept in the caches.
 final class ClassificationGuesser {
-    /// Family name → the model's guess; `.unclassified` where it couldn't tell.
     private(set) var guesses: [String: Classification]
 
     private let url: URL
     private var pending: [Question] = []
     private var task: Task<Void, Never>?
-    /// Families the model failed to answer for, in a way that may not last; asked again at the next launch.
     private var failed: Set<String> = []
 
     init(caches: URL) {
@@ -22,10 +15,8 @@ final class ClassificationGuesser {
         guesses = ClassificationGuesses.savedNames(caches: caches)
     }
 
-    /// Whether the model can answer. macOS 15 has none that apps can ask.
     enum Availability { case available, notEnabled, notReady, unavailable }
 
-    /// Follows Apple Intelligence as it's turned on or off, the model observing its own availability.
     static var availability: Availability {
         guard #available(macOS 26, *) else { return .unavailable }
         return switch SystemLanguageModel.default.availability {
@@ -36,20 +27,16 @@ final class ClassificationGuesser {
         }
     }
 
-    /// Whether this Mac's macOS has a model to tell from names at all, Apple Intelligence on or not.
     static var readsNames: Bool {
         if #available(macOS 26, *) { true } else { false }
     }
 
-    /// Asks about the families that have no guess yet, in place of any it hasn't got to. `found` is called as
-    /// guesses come, a few at a time.
     func guess(_ families: [Family], found: @escaping () -> Void) {
         pending = families.filter { guesses[$0.id] == nil && !failed.contains($0.id) }.map(Question.init)
         guard task == nil, !pending.isEmpty, Self.availability == .available else { return }
         task = Task { [weak self] in await self?.work(found: found) }
     }
 
-    /// Stops asking and forgets every guess.
     func forget() {
         task?.cancel()
         task = nil
@@ -60,7 +47,6 @@ final class ClassificationGuesser {
     }
 
     private func work(found: @escaping () -> Void) async {
-        // Never started on macOS 15 (see `availability`).
         guard #available(macOS 26, *) else { return }
         var reported = ContinuousClock.now
         var changed = false
@@ -72,10 +58,8 @@ final class ClassificationGuesser {
         }
         while !pending.isEmpty {
             let question = pending.removeFirst()
-            // Asked for again while it was being asked about.
             guard guesses[question.name] == nil else { continue }
             let outcome = await Self.ask(question)
-            // Forgotten meanwhile: another task may be asking already.
             guard !Task.isCancelled else { return }
             switch outcome {
             case .answer(let classification):
@@ -84,7 +68,6 @@ final class ClassificationGuesser {
             case .notNow:
                 failed.insert(question.name)
             case .later:
-                // Busy, or the model went away: the next scan asks again.
                 pending = []
             }
             if ContinuousClock.now - reported > .seconds(1) { report() }
@@ -101,7 +84,6 @@ final class ClassificationGuesser {
 
     // MARK: Asking
 
-    /// What the model is told about a family.
     private struct Question {
         var name: String
         var foundry: String?
@@ -146,9 +128,7 @@ final class ClassificationGuesser {
 
     private enum Outcome {
         case answer(Classification)
-        /// No answer this time, but there may be one at another.
         case notNow
-        /// No answer to any question for now.
         case later
     }
 
@@ -176,7 +156,6 @@ final class ClassificationGuesser {
         } catch let error as LanguageModelSession.GenerationError {
             switch error {
             case .rateLimited, .concurrentRequests, .assetsUnavailable: return .later
-            // Names the model won't talk about, or can't make sense of.
             case .guardrailViolation, .refusal, .decodingFailure, .unsupportedLanguageOrLocale, .exceededContextWindowSize: return .answer(.unclassified)
             default: return .notNow
             }

@@ -1,6 +1,5 @@
 import Foundation
 
-/// A file's size and modification time (whole milliseconds), which decide whether its cached faces are current.
 struct FaceStamp: Hashable, Sendable {
     var modified: Int64
     var size: Int64
@@ -16,27 +15,20 @@ struct FaceStamp: Hashable, Sendable {
     }
 }
 
-/// What was read from one font file.
 struct CachedFile: Hashable, Sendable {
     var stamp: FaceStamp
     var dateAdded: Date?
-    /// Empty when CoreText couldn't read the file.
     var faces: [FontFace]
 }
 
 extension Classification {
-    /// The classifications a face's PANOSE digits or letters can say, in the order the caches number them.
     fileprivate static let saved: [Classification] = [.serif, .sansSerif, .monospaced, .script, .ornamental, .symbol]
 }
 
-/// The on-disk face cache: a flat little-endian binary file. It's read once per launch and must be
-/// fast; a hand-written layout decodes in a few milliseconds where Codable takes tens.
 enum FaceCache {
-    private static let magic: UInt32 = 0x4346_5450  // "PTFC"
-    /// Part of the library cache's version too, as it writes faces the same way.
-    static let version: UInt32 = 12
-    /// Laid out like this version, but without `FontFace.figures`, so every file is read again. The library cache
-    /// still restores a library saved with it, its faces without figures, so the window shows its fonts until then.
+    private static let magic: UInt32 = 0x4346_5450
+    static let version: UInt32 = 13
+    static let withoutSymbols: UInt32 = 12
     static let withoutFigures: UInt32 = 11
 
     static func encode(_ files: [String: CachedFile]) -> Data {
@@ -56,25 +48,29 @@ enum FaceCache {
         return writer.data
     }
 
-    /// nil when the data isn't a cache this version understands.
     static func decode(_ data: Data) -> [String: CachedFile]? {
         data.withUnsafeBytes { buffer -> [String: CachedFile]? in
             var reader = ByteReader(buffer: buffer)
             do {
                 guard try reader.u32() == magic else { return nil }
                 let saved = try reader.u32()
-                guard saved == version else { return nil }
+                guard saved == version || saved == withoutSymbols || saved == withoutFigures else { return nil }
                 let count = Int(try reader.u32())
                 var files: [String: CachedFile] = [:]
-                files.reserveCapacity(count)
+                files.reserveCapacity(min(count, reader.remaining / 32))
                 for _ in 0..<count {
                     let path = try reader.string()
-                    let stamp = FaceStamp(modified: try reader.i64(), size: try reader.i64())
+                    var stamp = FaceStamp(modified: try reader.i64(), size: try reader.i64())
+                    // Kept for what it says of files out of reach. One there is read again for what the older layout lacks.
+                    if saved == withoutFigures { stamp.size = -1 }
                     let dateAdded = try reader.optionalDouble().map { Date(timeIntervalSinceReferenceDate: $0) }
                     let faceCount = Int(try reader.u32())
                     var faces: [FontFace] = []
-                    faces.reserveCapacity(faceCount)
+                    faces.reserveCapacity(min(faceCount, reader.remaining / 16))
                     for _ in 0..<faceCount { faces.append(try reader.face(path: path)) }
+                    if saved == withoutSymbols, faces.contains(where: { $0.familyClass == 0 && !$0.isMonospaced && $0.letterShape == nil }) {
+                        stamp.size = -1
+                    }
                     files[path] = CachedFile(stamp: stamp, dateAdded: dateAdded, faces: faces)
                 }
                 return files
@@ -85,7 +81,6 @@ enum FaceCache {
     }
 }
 
-/// Little-endian values, and strings as a length and UTF-8; optionals start with 0 (nil) or 1.
 struct ByteWriter {
     var data = Data()
 
@@ -129,12 +124,10 @@ struct ByteWriter {
         withUnsafeBytes(of: id.uuid) { data.append(contentsOf: $0) }
     }
 
-    /// 0 for none, else its place in `Classification.saved` plus one.
     mutating func write(_ classification: Classification?) {
         write(UInt8(classification.flatMap { Classification.saved.firstIndex(of: $0) }.map { $0 + 1 } ?? 0))
     }
 
-    /// Everything but the face's path, which the face cache writes once per file.
     mutating func write(_ face: FontFace) {
         write(UInt32(face.id.index))
         write(face.postScriptName)
@@ -180,6 +173,8 @@ struct ByteReader {
     init(buffer: UnsafeRawBufferPointer) {
         self.buffer = buffer
     }
+
+    var remaining: Int { buffer.count - offset }
 
     private mutating func take(_ count: Int) throws -> Int {
         guard count >= 0, offset + count <= buffer.count else { throw Truncated() }
@@ -228,7 +223,6 @@ struct ByteReader {
         return Classification.saved[code - 1]
     }
 
-    /// A face as `ByteWriter` writes it, from the file at `path`.
     mutating func face(path: String) throws -> FontFace {
         let index = Int(try u32())
         let postScriptName = try string()

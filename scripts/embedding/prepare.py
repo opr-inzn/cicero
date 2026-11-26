@@ -22,6 +22,7 @@ import argparse
 import csv
 import json
 import re
+import subprocess
 from pathlib import Path
 
 LICENSES = {
@@ -35,7 +36,6 @@ SMALL, LARGE = 8, 96
 
 
 def parse_metadata(text):
-    """A text-format protobuf as nested dicts; repeated fields as lists."""
     root, stack = {}, []
     current = root
     for line in text.splitlines():
@@ -82,7 +82,6 @@ def axis_range(axes, tag):
 
 
 def widths(axes):
-    """The widths besides the normal one to draw a variable font at."""
     found = axis_range(axes, "wdth")
     if not found:
         return []
@@ -93,7 +92,6 @@ def widths(axes):
 
 
 def optical_sizes(axes):
-    """The optical sizes besides its own to draw a variable font at."""
     found = axis_range(axes, "opsz")
     if not found:
         return []
@@ -102,7 +100,6 @@ def optical_sizes(axes):
 
 
 def instances(fonts, axes, italic):
-    """(file, variations, weight, width, optical size) for the styles to draw."""
     fonts = [font for font in fonts if (first(font, "style") == "italic") == italic]
     if not fonts:
         return []
@@ -127,7 +124,6 @@ def instances(fonts, axes, italic):
 
 
 def tags(root):
-    """Google's tags for each family, 0 to 1."""
     found = {}
     path = root / "tags" / "all" / "families.csv"
     with path.open(newline="") as file:
@@ -142,11 +138,99 @@ def tags(root):
     return found
 
 
+TEXT_LICENSE_SUFFIXES = {"", ".txt", ".md", ".rst", ".rtf", ".html", ".htm"}
+
+
+def repo_licensed(repo):
+    for lf in repo.rglob("*"):
+        if not lf.is_file() or lf.suffix.lower() not in TEXT_LICENSE_SUFFIXES:
+            continue
+        if not any(w in lf.name.lower() for w in ("ofl", "license", "licence", "copying")):
+            continue
+        text = lf.read_text(errors="ignore").lower()
+        if any(k in text for k in ("sil open font license", "apache license", "mit license", "ubuntu font licence")):
+            return True
+    return False
+
+
+def extra_families(extra_dir, inspect_bin, known_names, manifest):
+    raw = subprocess.check_output([str(inspect_bin), str(extra_dir)], text=True)
+    faces = json.loads(raw)
+    grouped = {}
+    license_cache = {}
+    for face in faces:
+        path = Path(face["file"])
+        repo = path
+        while repo.parent != extra_dir and repo.parent != repo:
+            repo = repo.parent
+        lic_ok = license_cache.get(repo)
+        if lic_ok is None:
+            lic_ok = repo_licensed(repo)
+            license_cache[repo] = lic_ok
+        if not lic_ok:
+            continue
+        grouped.setdefault(face["family"], []).append(face)
+
+    added = []
+    for name in sorted(grouped):
+        if name.lower() in known_names:
+            continue
+        group = grouped[name]
+        entries = []
+        for italic in (False, True):
+            sub = [f for f in group if f["italic"] == italic]
+            if not sub:
+                continue
+            variables = [f for f in sub if f["axes"]]
+            if variables:
+                v = variables[0]
+                axes = [{"tag": [a["tag"]], "min_value": [a["min_value"]], "max_value": [a["max_value"]]} for a in v["axes"]]
+                weight_range = axis_range(axes, "wght")
+                width_range = axis_range(axes, "wdth")
+                normal = {"wdth": min(max(100, width_range[0]), width_range[1])} if width_range else {}
+                if weight_range is None:
+                    picks = [(v["file"], normal, v["weight"], 100, None)]
+                else:
+                    low, high = weight_range
+                    ws = [w for w in WEIGHTS if low <= w <= high] or [min(max(400, low), high)]
+                    picks = [(v["file"], {"wght": w, **normal}, w, 100, None) for w in ws]
+                    if not italic:
+                        for wd in widths(axes):
+                            picks += [(v["file"], {"wght": w, "wdth": wd}, w, wd, None) for w in ws if w <= 500]
+                        for sz in optical_sizes(axes):
+                            picks += [(v["file"], {"wght": w, "opsz": sz, **normal}, w, 100, sz) for w in ws if w <= 500]
+            else:
+                by_weight = {}
+                for f in sub:
+                    by_weight.setdefault(f["weight"], f)
+                statics = [(f["file"], {}, f["weight"], 100, None) for f in by_weight.values()]
+                picks = [e for e in statics if 300 <= e[2] <= 700] or [min(statics, key=lambda e: abs(e[2] - 400))]
+            for file, variations, weight, width, size in picks:
+                entries.append({"row": len(manifest), "weight": weight, "width": width, "opsz": size, "italic": italic})
+                manifest.append({"file": file, "variations": variations})
+        if not entries:
+            continue
+        known_names.add(name.lower())
+        added.append({
+            "name": name,
+            "directory": f"extra/{name}",
+            "category": None,
+            "classifications": [],
+            "stroke": None,
+            "tags": {},
+            "entries": entries,
+            "extra": True,
+        })
+    return added
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("fonts")
     parser.add_argument("work")
     parser.add_argument("--other-scripts", action="store_true")
+    parser.add_argument("--extra", help="folder of extra verified open-license font repos")
+    parser.add_argument("--inspect-bin", default="/tmp/inspect-fonts", help="compiled inspect-fonts.swift binary")
     arguments = parser.parse_args()
     root, out = Path(arguments.fonts).expanduser(), Path(arguments.work).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -189,9 +273,15 @@ def main():
                 "tags": tagged.get(name, {}),
                 "entries": entries,
             })
+    extra_count = 0
+    if arguments.extra:
+        known = {f["name"].lower() for f in families}
+        added = extra_families(Path(arguments.extra).expanduser(), Path(arguments.inspect_bin), known, manifest)
+        families.extend(added)
+        extra_count = len(added)
     (out / "manifest.json").write_text(json.dumps(manifest))
     (out / "families.json").write_text(json.dumps(families, indent=1))
-    print(f"{len(families)} families, {len(manifest)} styles to draw; skipped {skipped}")
+    print(f"{len(families)} families ({extra_count} extra), {len(manifest)} styles to draw; skipped {skipped}")
 
 
 if __name__ == "__main__":

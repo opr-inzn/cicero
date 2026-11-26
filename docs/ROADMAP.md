@@ -1,39 +1,11 @@
 # Roadmap
 
-Features that could come next, roughly in the order they'd come, with how each could work, what's still open and
-about how big it is (S: a few hours, M: about a day). Nothing here is promised; the order changes as Cicero does.
-What's done is in the [changelog](../CHANGELOG.md).
+Features that could come next, roughly in the order they'd come, with how each could work and what's still open.
+Nothing here is promised; the order changes as Cicero does. What's done is in the [changelog](../CHANGELOG.md).
 
 ## Next
 
-### Better similar lists (M)
-
-**What.** Show Similar Fonts lists that look more alike, text serifs and grotesques above all, among which the lists are
-least sure now.
-
-**How.** The small model that looks at the letters learned from open-source families, four fifths of them, with the
-rest kept back to test it. Train it on all of them, and on more text serifs and grotesques, where more examples made the
-most difference. Judge its lists against the current ones on a library of fonts it has never seen, family by family; it
-replaces the current model only when its lists are picked more often.
-
-**Open.**
-- Whether a second model, trained another way, makes better lists alongside the first: so far it helps the six on a
-  font page a little and makes the twelve in the list worse.
-- The families to add: each needs tags for what it is (serif, grotesque, humanist and so on), set by hand.
-
-### Similar styles (M)
-
-**What.** Show Similar Fonts for a single style, so that an italic finds italics and a condensed style condensed ones.
-Similar fonts compare families by their regular styles now.
-
-**How.** Measure and embed every style rather than each family's regular one (about a millisecond each), and compare a
-style with the others of its slant. Families' lists stay as they are.
-
-**Open.**
-- How to show a style's list: the browser lists families, so styles would need a list of their own.
-- A family's own other styles: whether they belong in the list.
-
-### Subfolders in Locations and Folders (M)
+### Subfolders in Locations and Folders
 
 **What.** Show the folders inside a location under its row, and let folders hold other folders. A location is one row
 now, with the fonts of every folder inside it, and folders are one flat list: FontExplorer X's nested sets come in as
@@ -50,7 +22,7 @@ Folder turns them all on. Backups from before load as a flat list; FontExplorer 
 - What can go inside a folder: smart folders and app folders too, or folders only; and whether deleting a folder
   deletes the ones inside it or moves them up.
 
-### Search licenses and descriptions (M)
+### Search licenses and descriptions
 
 **What.** Let the search field find words in each font's license, license URL and description, as `cicero find` does:
 "rosettatype.com" finds the families whose license points there, and "sturdy serif" can find "sturdy" in a description
@@ -69,7 +41,68 @@ match as they do now: each word must begin a word somewhere in the family. Show 
   to it.
 - Libraries saved before: whether Cicero reads every font again once, or fills in the texts as it opens each file.
 
+### Vault
+
+**What.** A place for your fonts' licenses and the files that come with them that Cicero can't use: license PDFs,
+receipts, web fonts (WOFF and WOFF2) and the ZIP a foundry sends. One family can have several licenses, one for each
+client: Söhne for one client with all 12 styles, and for another with only 2 styles of an older version. Dropping a web
+font now only says Cicero can't use it, and licenses are kept only as tags and notes.
+
+**How.**
+- Vault is an item in the sidebar's Library section, listing licenses grouped by owner. A license has an owner (a name
+  you type, with the ones used before suggested), a name, kinds (Desktop, Web, App, Trial, Other), a project or domain,
+  a date, an end date, a note, its files and the styles it covers.
+- Dropping files or a ZIP on Vault, or Save in Vault on the web font toast, opens a sheet. Cicero copies the files into
+  ~/Cicero/Vault/Owner/License (it never moves the originals), unpacks a ZIP, guesses the kinds from the files (OTF
+  gives Desktop, WOFF2 gives Web) and links each font file to its style in the library, style by style, not by family.
+- A license's page shows its details, the styles it covers with the library's version beside each, and its files, with
+  Quick Look and Show in Finder.
+- The Info panel lists a family's licenses, each with its owner and how many of the styles it covers, never only
+  "Licensed". A license that covers only some styles is marked.
+- The Vault's fonts aren't in the library: not scanned, listed or turned on. Conflicts, Replace and Move to Trash never
+  touch them. Deleting a license moves it and its files to the Trash, with Undo. Files stay exactly as they came.
+- Back Up Library gets "Include the Vault", on by default, with its count and size: the license PDFs are the proof.
+
+**Open.**
+- Whether a ZIP is kept too, next to its unpacked files, so everything stays as it came, at twice the space.
+- Whether one Vault item is enough, or each owner gets its own sidebar item.
+- Whether the font page's styles table shows whom each style is licensed for.
+- Whether Cicero can read the names in WOFF and WOFF2 files to link them, or links web fonts through the desktop fonts
+  next to them.
+- Later, not in the first version: turning on a license's own version of a font for an old job (through Use Copy
+  From), and exporting one owner's files for a developer or a printer. Installing fonts from the Vault stays out until
+  then, since an old version could replace a newer one.
+
+### Pangrams and Wikipedia texts
+
+**What.** Two new sources for the preview text and the font page's type tester: a random pangram, and the start of a
+random Wikipedia article in a language you choose. The presets are four fixed texts now, all Latin, so a font made for
+Arabic or Japanese is hard to try with real text.
+
+**How.**
+- Pangrams come with the app, a few dozen, so they work offline. Each click gives one that wasn't shown just before.
+- Wikipedia texts come from Wikipedia's own API (`https://<language>.wikipedia.org/api/rest_v1/page/random/summary`),
+  which needs no key. Cicero sends nothing about your fonts.
+- The language is the Mac's, or for a font made for another script, a language of that script (`ScriptSample` already
+  finds a font's main script).
+- Under a Wikipedia text, a line names the article and links to it, as its license (CC BY-SA) asks. The line goes away
+  when you change the text.
+- While Cicero waits, the old text stays. Offline, the Wikipedia button is off and Pangram still works.
+- `cicero compare` and the MCP `compare` tool get `--sample pangram|wikipedia` and `--language`, next to `--text`.
+
+**Open.**
+- Where the buttons go in Preview Options: two items at the top of Presets, a row of buttons under the text field with a
+  language menu, or two small buttons in the field.
+- In the type tester: whether a click on its new button gives a pangram at once, with a menu for the rest, or always
+  opens the menu.
+- The language: the Mac's, the font's script, or a menu to choose any language.
+- Whether Cicero asks once before its first Wikipedia request, or only says so in the privacy policy.
+- Where the pangrams come from: Wikipedia's list of pangrams, ones written for Cicero, or both, without the crude ones.
+
 ## Not planned
 
 Buying fonts inside Cicero, font subscription and rental services, and team servers with accounts: Cicero has no
 accounts and keeps what it knows about your fonts on your Mac.
+
+A version for Windows, and a universal app for Macs with Intel processors: Cicero runs on macOS 15 or later on Apple
+silicon only.

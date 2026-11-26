@@ -1,19 +1,14 @@
 import CiceroCore
 import SwiftUI
 
-/// Offers to copy FontExplorer X's Font Library in, where an import up to 0.10.13 made it a location (see
-/// `AppModel.offerEarlierImportCopy`), then shows the copying. Not Now leaves it a location until the next launch.
 struct EarlierImportSheet: View {
     let prompt: EarlierImportPrompt
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var stage: ImportStage?
     @State private var task: Task<Void, Never>?
-    /// How long the copying has left, from when Copy Fonts is pressed.
     @State private var estimate = CopyTimeEstimate(intoFontsFolder: true)
-    /// Cicero's Library was chosen in this sheet, so it can be undone here.
     @State private var choseFontLibrary = false
-    /// How many files it copies, counted again when they'd go elsewhere (see `EarlierImportPrompt.copying`).
     @State private var copying: Int
 
     init(prompt: EarlierImportPrompt) {
@@ -44,15 +39,21 @@ struct EarlierImportSheet: View {
             }
             HStack(spacing: 12) {
                 if let stage {
-                    progress(stage)
+                    ImportProgress(stage: stage, starting: "Activating fonts…", estimate: estimate, stacked: true)
                 } else {
                     Text("Your current setup is saved first, in ~/Library/Application Support/Cicero/Backups.").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button(stage == nil ? "Not Now" : "Cancel", role: .cancel) {
-                    if let task { task.cancel() } else { dismiss() }
+                    if let task {
+                        stage = .stopping
+                        task.cancel()
+                    } else {
+                        model.declineEarlierImport(prompt)
+                        dismiss()
+                    }
                 }
-                .disabled(stage != nil && !isCopying)
+                .disabled(stage.map { !$0.canStop } ?? false)
                 Button("Copy Fonts") { start() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(stage != nil)
@@ -71,55 +72,26 @@ struct EarlierImportSheet: View {
         }
     }
 
-    private var name: String { model.data.folderNames[prompt.folder.id.uuidString] ?? prompt.folder.displayName }
+    private var name: String { prompt.name }
 
-    /// What happens: where the files go, what stays on, what's kept, and that the location goes.
     private var detail: String {
         let total = prompt.files.count
         let place = model.installPlace
         let files = switch copying {
-        case total: total == 1 ? "Cicero copies its font file into \(place)." : "Cicero copies its \(total.formatted()) font files into \(place)."
-        case 0: total == 1 ? "Its font file is in \(place) already." : "Its \(total.formatted()) font files are in \(place) already."
-        case total - 1: "Cicero copies \(copying.formatted()) of its \(total.formatted()) font files into \(place). The other one is there already."
-        default: "Cicero copies \(copying.formatted()) of its \(total.formatted()) font files into \(place). The others are there already."
+        case total: total == 1 ? "Cicero copies its font file into \(place)." : "Cicero copies its \(total.plain) font files into \(place)."
+        case 0: total == 1 ? "Its font file is in \(place) already." : "Its \(total.plain) font files are in \(place) already."
+        case total - 1: "Cicero copies \(copying.plain) of its \(total.plain) font files into \(place). The other one is there already."
+        default: "Cicero copies \(copying.plain) of its \(total.plain) font files into \(place). The others are there already."
         }
-        // Which copies are on: as their fonts are now.
         let state = switch prompt.onCount {
         case 0: total == 1 ? " The copy is inactive, as the font is now." : " The copies are inactive, as the fonts are now."
         case total: total == 1 ? " The font is active now, and its copy will be too." : " The fonts are active now, and their copies will be too."
-        case 1: " The font that’s active now will be active as its copy; the others come in inactive."
-        default: " The \(prompt.onCount.formatted()) styles that are active now will be active as their copies; the others come in inactive."
+        case 1: " The 1 style that’s active now stays active. The others are added as inactive."
+        default: " The \(prompt.onCount.plain) styles that are active now stay active. The others are added as inactive."
         }
         let office = model.data.installsIntoFontLibrary ? " Microsoft Office can’t use fonts in Cicero’s Library." : ""
         return "\(files)\(state)\(office) Your folders, tags, ratings and notes stay as they are. "
             + "Then the location is removed. FontExplorer X’s own files stay where they are."
-    }
-
-    @ViewBuilder
-    private func progress(_ stage: ImportStage) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            switch stage {
-            case .copying(let done, let total):
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                // Too narrow for both on one line beside the buttons.
-                CopyingProgressLine(done: done, total: total, estimate: estimate, stacked: true)
-            case .reading(let done, let total):
-                ProgressView(value: Double(done), total: Double(max(total, 1)))
-                Text("Reading fonts, \(done.formatted()) of \(total.formatted())")
-            case .starting:
-                ProgressView()
-                Text("Turning fonts on")
-            }
-        }
-        .progressViewStyle(.linear)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-        .frame(maxWidth: 260, alignment: .leading)
-    }
-
-    private var isCopying: Bool {
-        if case .copying = stage { true } else { false }
     }
 
     private func start() {
@@ -129,14 +101,15 @@ struct EarlierImportSheet: View {
             let copied = await model.copyEarlierImport(prompt) { stage in
                 let now = ProcessInfo.processInfo.systemUptime
                 Task { @MainActor in
+                    guard self.stage != .stopping else { return }
                     if case .copying(let done, _) = stage { self.estimate.note(done: done, at: now) }
                     self.stage = stage
                 }
             }
             task = nil
             if let copied {
-                model.showToast(copied == 0 ? "FontExplorer X’s fonts were in \(model.installPlace) already. Removed the location"
-                    : "Copied \(copied == 1 ? "1 font file" : "\(copied.formatted()) font files") into \(model.installPlace) and removed the location")
+                model.showToast(copied == 0 ? "FontExplorer X’s fonts were in \(model.installPlace) already"
+                    : "Copied \(copied == 1 ? "1 font file" : "\(copied.plain) font files") into \(model.installPlace)")
             }
             dismiss()
         }

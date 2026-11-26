@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Draws the picture behind the DMG's window, Resources/DMG/background.png and its @2x, in the website's
 // type and colours: a line that says what to do, and the two wells make-dmg.sh puts Cicero and the
-// Applications folder into, an arrow between them. Run it again when the wording or the layout changes;
+// Applications folder into, an arrow between them. Run it again when the wording or the layout changes.
 // the sizes here, the wells and the window and icon positions in dmg-settings.py go together.
 //
 //     scripts/make-dmg-background.mjs path/to/cicero-website
@@ -24,9 +24,7 @@ if (!fonts || !existsSync(join(fonts, "Mischief-Regular.woff2"))) {
 const chrome = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const font = (file) => `url(data:font/woff2;base64,${readFileSync(join(fonts, file)).toString("base64")}) format("woff2")`;
 
-// In points. The layout keeps to the top 400, which the window always shows below the Finder's title and
-// tab bars. The picture runs on in paper to the window's full height, so it fills the window whether or
-// not the path and status bars are turned on, and Finder's white never shows below it.
+// In points: the layout stays in the top 400 below Finder's title and tab bars, and the background extends to 68 + 400 + 56 so Finder's white never shows when the path and status bars are off.
 const WIDTH = 660, LAYOUT = 400, HEIGHT = 68 + LAYOUT + 56;
 
 const page = `<!doctype html>
@@ -49,7 +47,7 @@ const page = `<!doctype html>
   .needs { position: absolute; top: ${LAYOUT - 42}px; left: 0; right: 0; margin: 0; font: 12px/1 Areal; color: #a5a49f; }
 </style>
 <h1>Drag Cicero into Applications.</h1>
-<p class="lede">Then open it from your Applications folder.</p>
+<p class="lede">Once copied, open it from Applications.</p>
 <div class="well" style="left: 90px"></div>
 <div class="well" style="left: 370px"></div>
 <svg class="arrow" width="48" height="12" viewBox="0 0 48 12" fill="none" stroke="#a5a49f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
