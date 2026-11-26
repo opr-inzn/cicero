@@ -1,12 +1,11 @@
 # Roadmap
 
-Features that could come next, roughly in the order they'd come, with how each could work, what's still open and
-about how big it is (S: a few hours, M: about a day, L: several days). Nothing here is promised; the order changes as
-Cicero does. What's done is in the [changelog](../CHANGELOG.md).
+Features that could come next, roughly in the order they'd come, with how each could work and what's still open.
+Nothing here is promised; the order changes as Cicero does. What's done is in the [changelog](../CHANGELOG.md).
 
 ## Next
 
-### Subfolders in Locations and Folders (M)
+### Subfolders in Locations and Folders
 
 **What.** Show the folders inside a location under its row, and let folders hold other folders. A location is one row
 now, with the fonts of every folder inside it, and folders are one flat list: FontExplorer X's nested sets come in as
@@ -23,7 +22,7 @@ Folder turns them all on. Backups from before load as a flat list; FontExplorer 
 - What can go inside a folder: smart folders and app folders too, or folders only; and whether deleting a folder
   deletes the ones inside it or moves them up.
 
-### Search licenses and descriptions (M)
+### Search licenses and descriptions
 
 **What.** Let the search field find words in each font's license, license URL and description, as `cicero find` does:
 "rosettatype.com" finds the families whose license points there, and "sturdy serif" can find "sturdy" in a description
@@ -42,7 +41,7 @@ match as they do now: each word must begin a word somewhere in the family. Show 
   to it.
 - Libraries saved before: whether Cicero reads every font again once, or fills in the texts as it opens each file.
 
-### Vault (L)
+### Vault
 
 **What.** A place for your fonts' licenses and the files that come with them that Cicero can't use: license PDFs,
 receipts, web fonts (WOFF and WOFF2) and the ZIP a foundry sends. One family can have several licenses, one for each
