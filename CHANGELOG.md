@@ -4,7 +4,7 @@ Each version’s notes here become its release notes on the [releases page](http
 
 ## 0.13.0
 
-- **A new app icon:** Cicero’s icon is now a map of glyphs, with a gradient in Dark Mode.
+- **A new app icon:** Cicero’s icon is now a map of glyphs, blue in Light Mode and dark in Dark Mode.
 - **Find a look-alike for a font a PDF is missing:** when a PDF carries a font that isn’t in your library, click **Show Similar** next to it to see the families in your library that look most like it.
 - **Better classification:** Cicero guesses more fonts’ classifications correctly, from their letters, their names and the fonts like them.
 - **Rename in the sidebar:** double-click a folder, tag or location, or choose **Rename**, to change its name in place, as in the Finder.
