@@ -91,7 +91,7 @@ public struct FontExporter: Sendable {
 
     // An export or backup must never move any of these to the Trash to make room.
     public static func keptPaths(in library: Library, data: UserData, locations: Locations) -> [String] {
-        var paths = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.inactiveFolder.path]
+        var paths = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.inactiveFolder.path, locations.vault.path]
             + data.scannedFolders().map(\.path)
         for family in library.families {
             for face in family.faces { paths += [face.face.path] + face.otherCopies }

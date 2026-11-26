@@ -13,6 +13,8 @@ struct BackupSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var includeFonts = true
     @State private var fonts: [BackupFont]?
+    @State private var includeVault = true
+    @State private var vault: [BackupVaultFile]?
     @State private var progress: BackupProgress?
     @State private var task: Task<Void, Never>?
     @State private var runID = UUID()
@@ -26,6 +28,8 @@ struct BackupSheet: View {
             }
             DetailToggle("Include font files", detail: fontsDetail, isOn: $includeFonts)
                 .disabled(fonts?.isEmpty == true || progress != nil)
+            DetailToggle("Include the Vault", detail: vaultDetail, isOn: $includeVault)
+                .disabled(vault?.isEmpty == true || progress != nil)
             if let progress {
                 VStack(alignment: .leading, spacing: 4) {
                     switch progress {
@@ -50,13 +54,14 @@ struct BackupSheet: View {
                 }
                 Button("Back Up") { backUp() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(progress != nil || (includeFonts && fonts == nil))
+                    .disabled(progress != nil || (includeFonts && fonts == nil) || (includeVault && vault == nil))
             }
         }
         .padding(20)
         .frame(width: 520)
         .interactiveDismissDisabled(progress != nil)
         .task { fonts = await model.backupInventory() }
+        .task { vault = await model.vaultInventory() }
     }
 
     private var fontsDetail: String {
@@ -64,6 +69,14 @@ struct BackupSheet: View {
         if fonts.isEmpty { return "There are no font files in your library." }
         let size = fonts.reduce(Int64(0)) { $0 + $1.size }
         return "\(fonts.count == 1 ? "1 file" : "\(fonts.count.plain) files"), \(size.formatted(.byteCount(style: .file)))"
+    }
+
+    private var vaultDetail: String {
+        guard let vault else { return "Counting…" }
+        if vault.isEmpty { return "There’s nothing in the Vault." }
+        let licenses = Vault.licenseCount(in: vault)
+        let size = vault.reduce(Int64(0)) { $0 + $1.size }
+        return "\(licenses == 1 ? "1 license" : "\(licenses.plain) licenses"), \(vault.count == 1 ? "1 file" : "\(vault.count.plain) files"), \(size.formatted(.byteCount(style: .file)))"
     }
 
     private func backUp() {
@@ -76,13 +89,14 @@ struct BackupSheet: View {
         guard panel.runModal() == .OK, let destination = panel.url else { return }
         let fonts = fonts ?? []
         let include = includeFonts && !fonts.isEmpty
+        let vaultFiles = includeVault ? vault ?? [] : []
         let run = UUID()
         runID = run
         progress = include ? .copying(done: 0, total: fonts.count) : .compressing
         task = Task {
             defer { task = nil }
             do {
-                try await model.backUp(to: destination, fonts: fonts, includeFonts: include) { step in
+                try await model.backUp(to: destination, fonts: fonts, includeFonts: include, vault: vaultFiles) { step in
                     Task { @MainActor in
                         if runID == run, task != nil { progress = step }
                     }

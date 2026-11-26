@@ -9,13 +9,27 @@ public struct BackupManifest: Codable, Equatable, Sendable {
     public var home: String
     public var includesFonts: Bool
     public var fonts: [BackupFont]
+    public var vault: [BackupVaultFile]?
 
-    public init(created: Date, appVersion: String, home: String, includesFonts: Bool, fonts: [BackupFont]) {
+    public init(created: Date, appVersion: String, home: String, includesFonts: Bool, fonts: [BackupFont], vault: [BackupVaultFile]? = nil) {
         self.created = created
         self.appVersion = appVersion
         self.home = home
         self.includesFonts = includesFonts
         self.fonts = fonts
+        self.vault = vault
+    }
+}
+
+public struct BackupVaultFile: Codable, Equatable, Sendable {
+    public var path: String
+    public var archivePath: String?
+    public var size: Int64
+
+    public init(path: String, archivePath: String? = nil, size: Int64) {
+        self.path = path
+        self.archivePath = archivePath
+        self.size = size
     }
 }
 
@@ -111,7 +125,7 @@ public struct LibraryBackup: Sendable {
         try FileManager.default.trashItem(at: url, resultingItemURL: &location)
         return location as URL?
     }
-    private let locations: Locations
+    let locations: Locations
     private let home: URL
 
     public init(locations: Locations, home: URL = FileManager.default.homeDirectoryForCurrentUser) {
@@ -192,16 +206,16 @@ public struct LibraryBackup: Sendable {
 
     @concurrent
     public func write(
-        to destination: URL, userData: UserData, fonts: [BackupFont], includeFonts: Bool, keeping kept: [String] = [],
+        to destination: URL, userData: UserData, fonts: [BackupFont], includeFonts: Bool, vault: [BackupVaultFile] = [], keeping kept: [String] = [],
         appVersion: String, progress: @escaping @Sendable (BackupProgress) -> Void
     ) async throws {
         let fm = FileManager.default
         // Never replace an item that is or holds a font in the backup, a Fonts folder, Cicero's folder or a watched folder: it would go to the Trash.
-        let kept = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.inactiveFolder.path]
+        let kept = [locations.userFonts.path, locations.allUsersFonts.path, locations.support.path, locations.inactiveFolder.path, locations.vault.path]
             + userData.scannedFolders().map(\.path) + fonts.map { expand($0.path) } + kept
         let replacement = try ItemReplacement(for: destination, keeping: kept)
         defer { replacement.discard() }
-        let bytes = includeFonts ? fonts.reduce(Int64(0)) { $0 + max(0, $1.size) } : 0
+        let bytes = (includeFonts ? fonts.reduce(Int64(0)) { $0 + max(0, $1.size) } : 0) + vault.reduce(Int64(0)) { $0 + max(0, $1.size) }
         try Self.checkSpace([(fm.temporaryDirectory, bytes), (replacement.staged.deletingLastPathComponent(), bytes)])
         let staging = fm.temporaryDirectory.appendingPathComponent("Cicero Backup \(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: staging) }
@@ -222,6 +236,9 @@ public struct LibraryBackup: Sendable {
                 manifest.fonts[index].archivePath = archivePath
             }
             progress(.copying(done: fonts.count, total: fonts.count))
+        }
+        if !vault.isEmpty {
+            manifest.vault = try copyVault(vault, into: folder)
         }
         try Self.manifestEncoder.encode(manifest).write(to: folder.appendingPathComponent("manifest.json", isDirectory: false))
         try UserDataStore.encoded(userData).write(to: folder.appendingPathComponent("user-data.json", isDirectory: false))
@@ -416,7 +433,7 @@ public struct LibraryBackup: Sendable {
         return path.dropFirst().split(separator: "/", omittingEmptySubsequences: false).allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
     }
 
-    private static func archivedFile(_ archivePath: String, in folder: URL) -> URL? {
+    static func archivedFile(_ archivePath: String, in folder: URL) -> URL? {
         guard isPlainPath("/" + archivePath) else { return nil }
         let parts = archivePath.split(separator: "/")
         var url = folder

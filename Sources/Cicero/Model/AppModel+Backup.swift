@@ -77,12 +77,18 @@ extension AppModel {
         await backup.inventory(of: library, records: data.records)
     }
 
-    func backUp(to destination: URL, fonts: [BackupFont], includeFonts: Bool, progress: @escaping @Sendable (BackupProgress) -> Void) async throws {
+    func vaultInventory() async -> [BackupVaultFile] {
+        let vault = vault
+        return await Task.detached(priority: .userInitiated) { vault.backupInventory() }.value
+    }
+
+    func backUp(to destination: URL, fonts: [BackupFont], includeFonts: Bool, vault: [BackupVaultFile] = [],
+                progress: @escaping @Sendable (BackupProgress) -> Void) async throws {
         guard startJob(.backingUp) else { throw CancellationError() }
         defer { endJob(.backingUp) }
         // Replace in the save panel must never trash a font, even when the sheet hasn't counted them yet.
         let kept = FontExporter.keptPaths(in: library, data: data, locations: locations)
-        try await backup.write(to: destination, userData: data, fonts: fonts, includeFonts: includeFonts, keeping: kept,
+        try await backup.write(to: destination, userData: data, fonts: fonts, includeFonts: includeFonts, vault: vault, keeping: kept,
                                appVersion: appVersion, progress: progress)
     }
 
@@ -111,7 +117,7 @@ extension AppModel {
         return nil
     }
 
-    func restore(_ contents: BackupContents, settings: Bool, fonts: Bool, progress: @escaping @Sendable (Int, Int) -> Void) async {
+    func restore(_ contents: BackupContents, settings: Bool, fonts: Bool, vault restoresVault: Bool = false, progress: @escaping @Sendable (Int, Int) -> Void) async {
         guard startJob(.restoring) else { return }
         defer { endJob(.restoring) }
         let backup = backup
@@ -121,6 +127,14 @@ extension AppModel {
         let fontLibrary = settings && !contents.userData.fontLibraryPath.isEmpty ? nil : current.fontLibraryPath
         var fontResult: FontRestoreResult?
         if fonts { fontResult = await backup.restoreFonts(contents, fontLibrary: fontLibrary, progress: progress) }
+        if restoresVault {
+            let result = await backup.restoreVault(contents)
+            reloadVault()
+            if !settings, !fonts {
+                return showToast(result.restored == 1 ? "Restored 1 license to the Vault" : "Restored \(result.restored.plain) licenses to the Vault"
+                    + (result.skipped > 0 ? ", \(result.skipped.plain) were already there" : ""))
+            }
+        }
         let fallbackFolder = (fontResult?.fallbackPaths.isEmpty ?? true) ? nil : backup.fallbackFolder
         if let fontResult, fontResult.cancelled {
             if let fallbackFolder { addFallbackFolder(fallbackFolder) }

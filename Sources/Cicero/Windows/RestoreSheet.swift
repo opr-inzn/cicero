@@ -13,11 +13,13 @@ struct RestoreSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var settings = true
     @State private var fonts = true
+    @State private var vault = true
     @State private var isRestoring = false
     @State private var progress: (done: Int, total: Int)?
     @State private var task: Task<Void, Never>?
 
     private var includesFonts: Bool { contents.manifest.includesFonts && contents.fontCount > 0 }
+    private var includesVault: Bool { !(contents.manifest.vault ?? []).isEmpty }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -30,6 +32,9 @@ struct RestoreSheet: View {
                 DetailToggle("Folders, locations and settings", detail: settingsDetail, isOn: $settings)
                 if includesFonts {
                     DetailToggle("Font files", detail: fontsDetail, isOn: $fonts)
+                }
+                if includesVault {
+                    DetailToggle("The Vault", detail: vaultDetail, isOn: $vault)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -57,7 +62,7 @@ struct RestoreSheet: View {
                 }
                 Button("Restore") { restore() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(isRestoring || (!settings && !(fonts && includesFonts)))
+                    .disabled(isRestoring || (!settings && !(fonts && includesFonts) && !(vault && includesVault)))
             }
         }
         .padding(20)
@@ -82,12 +87,17 @@ struct RestoreSheet: View {
         "\(contents.fontCount == 1 ? "1 file" : "\(contents.fontCount.plain) files"). Restores each file to its original location unless a file is already there."
     }
 
+    private var vaultDetail: String {
+        let licenses = Vault.licenseCount(in: contents.manifest.vault ?? [])
+        return "\(licenses == 1 ? "1 license" : "\(licenses.plain) licenses") with their files. A license that’s already in the Vault stays as it is."
+    }
+
     private func restore() {
         let includeFonts = fonts && includesFonts
         isRestoring = true
         progress = includeFonts ? (0, contents.fontCount) : nil
         task = Task {
-            await model.restore(contents, settings: settings, fonts: includeFonts) { done, total in
+            await model.restore(contents, settings: settings, fonts: includeFonts, vault: vault && includesVault) { done, total in
                 Task { @MainActor in progress = (done, total) }
             }
             contents.discard()

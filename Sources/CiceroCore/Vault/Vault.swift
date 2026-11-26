@@ -245,7 +245,7 @@ public struct Vault: Sendable {
         return try? decoder.decode(VaultLicense.self, from: data)
     }
 
-    private static func visibleFolders(in folder: URL) -> [URL] {
+    static func visibleFolders(in folder: URL) -> [URL] {
         let keys: [URLResourceKey] = [.isDirectoryKey, .isPackageKey]
         let items = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])) ?? []
         return items.filter {
@@ -288,7 +288,7 @@ public struct Vault: Sendable {
     }
 
     public func discard(_ draft: VaultDraft) {
-        guard draft.staging.deletingLastPathComponent().standardizedFileURL == root,
+        guard draft.staging.deletingLastPathComponent().standardizedFileURL.path == root.standardizedFileURL.path,
               draft.staging.lastPathComponent.hasPrefix(Self.stagingPrefix) else { return }
         try? FileManager.default.removeItem(at: draft.staging)
     }
@@ -407,7 +407,7 @@ public struct Vault: Sendable {
     }
 
     private func removeIfEmpty(_ folder: URL) {
-        guard folder.deletingLastPathComponent().standardizedFileURL == root else { return }
+        guard folder.deletingLastPathComponent().standardizedFileURL.path == root.standardizedFileURL.path else { return }
         let items = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? ["?"]
         guard items.allSatisfy({ $0 == ".DS_Store" }) else { return }
         try? FileManager.default.removeItem(at: folder)
