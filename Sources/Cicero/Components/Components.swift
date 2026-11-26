@@ -102,7 +102,7 @@ struct FontLine: View {
             let text = text.isEmpty ? " " : text
             let scheme = colorScheme
             let scale = displayScale
-            let line = Self.line(of: font, in: height, scale: scale)
+            let line = Self.line(of: font, text: text, in: height, scale: scale)
             // A line can be much taller than the row (Zapfino's is 57.5 pt in a row of 22), and its swashes reach further.
             let room = UnclippedText(font: font).room
             let top = min(0, line.top - room.top), bottom = max(height, line.top + line.height + room.bottom)
@@ -139,10 +139,16 @@ struct FontLine: View {
         }
     }
 
-    private static func line(of font: CTFont, in height: CGFloat, scale: CGFloat) -> (top: CGFloat, height: CGFloat, baseline: CGFloat) {
+    private static func line(of font: CTFont, text: String, in height: CGFloat, scale: CGFloat) -> (top: CGFloat, height: CGFloat, baseline: CGFloat) {
         let pixel = { (value: CGFloat) in (value * scale).rounded(.down) / scale }
-        let ascent = CTFontGetAscent(font).rounded()
-        let line = pixel(ascent + CTFontGetDescent(font))
+        var ascent = CTFontGetAscent(font).rounded(), descent = CTFontGetDescent(font)
+        let ink = CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font])), .useGlyphPathBounds)
+        // Some fonts draw far past their own ascent, as FH Asfalt, whose capitals are 1.6 times as tall.
+        if ink.maxY > ascent + 0.5 || -ink.minY > descent + 0.5 {
+            ascent = ink.maxY.rounded()
+            descent = -ink.minY
+        }
+        let line = pixel(ascent + descent)
         let top = pixel((height - line) / 2)
         return (top, line, top + ascent)
     }
