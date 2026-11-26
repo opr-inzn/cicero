@@ -267,7 +267,7 @@ struct FontList: View {
                 if width > 0 { visibleWidth = width }
             }
             .topBar {
-                header(columns: columns, widths: widths, sort: sort)
+                header(columns: columns, widths: widths, sort: sort).topBarTint()
             }
             .hardTopScrollEdge()
             .visibleHeight($visibleHeight)

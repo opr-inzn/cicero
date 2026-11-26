@@ -97,6 +97,7 @@ private struct TextTab: View {
                 controls
                 if !query.text.isEmpty && !(matches.isEmpty && !isSearching) { columnTitles }
             }
+            .topBarTint()
         }
         .hardTopScrollEdge()
         .task(id: query) { await search(query) }
@@ -294,6 +295,7 @@ private struct LanguagesTab: View {
             }
             .padding(10)
             .overlay(alignment: .bottom) { Divider() }
+            .topBarTint()
         }
         .hardTopScrollEdge()
     }
@@ -348,6 +350,7 @@ private struct LanguagesTab: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 10)
+                .topBarTint()
             }
             .hardTopScrollEdge()
             .task(id: query) { await load(query) }

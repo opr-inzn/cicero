@@ -33,6 +33,10 @@ extension View {
         if #available(macOS 26, *) { scrollEdgeEffectStyle(isHard ? .hard : nil, for: .top) } else { self }
     }
 
+    @ViewBuilder func topBarTint() -> some View {
+        if #available(macOS 26, *) { background(Color.canvas.opacity(0.75)) } else { self }
+    }
+
     func toolbarGlassFollowsAppearance() -> some View {
         modifier(FreshScrollEdges())
     }
