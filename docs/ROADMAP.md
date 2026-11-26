@@ -6,19 +6,6 @@ What's done is in the [changelog](../CHANGELOG.md).
 
 ## Next
 
-### Better similar lists (M)
-
-**What.** Show Similar Fonts lists that look more alike, text serifs and grotesques above all, among which the lists are
-least sure now.
-
-**How.** The small model that looks at the letters learned from every open-source family Cicero trains on. Train it on
-more text serifs and grotesques, where more examples made the most difference. Judge its lists against the current ones
-on a library of fonts it has never seen, family by family; it replaces the current model only when its lists are picked
-more often.
-
-**Open.**
-- The families to add: each needs tags for what it is (serif, grotesque, humanist and so on), set by hand.
-
 ### Subfolders in Locations and Folders (M)
 
 **What.** Show the folders inside a location under its row, and let folders hold other folders. A location is one row
@@ -59,3 +46,6 @@ match as they do now: each word must begin a word somewhere in the family. Show 
 
 Buying fonts inside Cicero, font subscription and rental services, and team servers with accounts: Cicero has no
 accounts and keeps what it knows about your fonts on your Mac.
+
+A version for Windows, and a universal app for Macs with Intel processors: Cicero runs on macOS 15 or later on Apple
+silicon only.

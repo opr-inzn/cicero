@@ -54,11 +54,11 @@ If you work with Arabic, Hebrew, Devanagari, Thai, Chinese, Japanese, Korean or 
 
 ## Contributing
 
-Bug reports, sample fonts, sample texts, ideas and pull requests are all welcome. [CONTRIBUTING.md](CONTRIBUTING.md) says how: open an issue before a larger change, open pull requests against the `beta` branch, and say how you tested.
+Bug reports, sample fonts, sample texts, ideas and pull requests are all welcome. [CONTRIBUTING.md](CONTRIBUTING.md) says how: open an issue before a larger change, open pull requests against `main`, and say how you tested.
 
 ## Roadmap
 
-Coming next: **better similar lists**, from a letter model trained on more families and judged on fonts it has never seen, **subfolders** in Locations and Folders, and a search field that **searches licenses and descriptions**. How they could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
+Coming next: **subfolders** in Locations and Folders, and a search field that **searches licenses and descriptions**. How they could work, and what’s still open, is in the [roadmap](docs/ROADMAP.md).
 
 ## Privacy
 
@@ -76,6 +76,5 @@ Classifications Cicero recognizes, from the shapes of the letters or, on macOS 2
 - Order of Latin, Greek and Cyrillic letters: the glyph names, categories and scripts of [GlyphsInfo](https://github.com/schriftgestalt/GlyphsInfo) by Georg Seifert, BSD 3-Clause License.
 - Updates: [Sparkle](https://sparkle-project.org).
 - Typefaces: [Mischief](https://www.lucasportron.com) by Lucas Portron and [ABC Areal](https://abcdinamo.com/typefaces/areal) by Dinamo.
-- Design and functionality inspired by [Typecase](https://typecase.app/) and [Pica](https://pica.joshpuckett.me/).
 
 Cicero is released under the [MIT License](LICENSE). The bundled data keeps its own licenses, included in the app: Hyperglot’s in [Languages-LICENSE.txt](Resources/Languages-LICENSE.txt), and the character set sources’ (MIT, Apache License 2.0 and Unicode License V3) in [CharacterSets-LICENSES.txt](Resources/CharacterSets-LICENSES.txt), and GlyphsInfo’s in [GlyphsInfo-LICENSE.txt](Resources/GlyphsInfo-LICENSE.txt). Sparkle comes with its own license.
