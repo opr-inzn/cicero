@@ -116,6 +116,7 @@ private struct SidebarUpdateButton: View {
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
                 .id(colorScheme)
+                .id(appearsActive)
                 .overlay {
                     if !appearsActive {
                         Capsule().stroke(.separator, lineWidth: 0.5)
