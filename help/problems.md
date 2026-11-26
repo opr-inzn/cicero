@@ -36,7 +36,7 @@ Cicero remembers these files or families, but they can’t be found. They may ha
 
 - **A font installed from its own folder** (“Installed from its own folder, now missing”): its file moved or was deleted, so the font no longer works. If you moved it on purpose, add its new folder as a location and activate it again. **Forget** tells macOS to stop looking for it, and clears Cicero’s record of it. A file on a disk that isn’t connected, or in one of your locations that can’t be found, is under [Unavailable Fonts](#unavailable-fonts) instead.
 - **A copy Cicero installed** (“Copy missing from ~/Library/Fonts” or “Copy missing from Cicero’s Library”): the copy is gone from your Fonts folder or Cicero’s Library. **Forget** clears Cicero’s record of it.
-- **A family in one of your folders whose fonts are missing** (“Listed in “Favs”, but its fonts are missing”): **Forget Family** takes the whole family out of the folder. Families that are only away for now, on a disk that isn’t connected or online only in a cloud folder, aren’t listed.
+- **A family in one of your folders whose fonts are missing** (“Listed in “Favs”, now missing”): **Forget Family** takes the whole family out of the folder. Families that are only away for now, on a disk that isn’t connected or online only in a cloud folder, aren’t listed.
 
 With more than one missing item, **Forget All** at the top forgets them all at once, families missing from folders too.
 

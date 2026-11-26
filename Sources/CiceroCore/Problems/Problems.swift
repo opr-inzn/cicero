@@ -621,7 +621,7 @@ public enum ProblemDetector {
             for family in set.memberFamilies where context.library.family(family) == nil && !context.library.offlineFamilies.contains(family) {
                 problems.append(Problem(
                     id: "missing.set.\(set.id.uuidString).\(family)", kind: .missing, title: family,
-                    summary: "Listed in “\(set.name)”, but its fonts are missing.",
+                    summary: "Listed in “\(set.name)”, now missing.",
                     files: [], fixes: [.removeFromSet(set.id, family: family)], fileFixes: [:]
                 ))
             }
