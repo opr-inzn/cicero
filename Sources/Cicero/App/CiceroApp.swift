@@ -11,7 +11,8 @@ struct CiceroApp: App {
     @State private var promptWatcher: PromptWatcher
 
     init() {
-        UserDefaults.standard.register(defaults: ["NSUseAnimatedFocusRing": false])
+        // AppKit reads NSAutoFillSystemInsertMenuEnabled only once and keeps the answer, so it must be off here, before any window or menu, or AutoFill is in every text context menu.
+        UserDefaults.standard.register(defaults: ["NSUseAnimatedFocusRing": false, "NSAutoFillSystemInsertMenuEnabled": false])
         let model = AppModel()
         let updates = Updates()
         let promptWatcher = PromptWatcher(model: model)
