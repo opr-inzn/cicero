@@ -103,11 +103,7 @@ enum VersionSwitch {
         launchctl remove "$label"
         """
         let pid = String(ProcessInfo.processInfo.processIdentifier)
-        let launchctl = Process()
-        launchctl.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        launchctl.arguments = ["remove", helperLabel]
-        try? launchctl.run()
-        launchctl.waitUntilExit()
+        cancelReplace()
         let submit = Process()
         submit.executableURL = URL(fileURLWithPath: "/bin/launchctl")
         submit.arguments = ["submit", "-l", helperLabel, "--", "/bin/sh", "-c", script, "switch-version",
@@ -115,6 +111,14 @@ enum VersionSwitch {
         do { try submit.run() } catch { throw Failure.helper }
         submit.waitUntilExit()
         guard submit.terminationStatus == 0 else { throw Failure.helper }
+    }
+
+    static func cancelReplace() {
+        let launchctl = Process()
+        launchctl.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        launchctl.arguments = ["remove", helperLabel]
+        try? launchctl.run()
+        launchctl.waitUntilExit()
     }
 
     // Must verify the Ed25519 signature over the whole DMG against SUPublicEDKey before mounting or copying.

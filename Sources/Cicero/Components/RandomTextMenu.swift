@@ -2,9 +2,9 @@ import CiceroCore
 import SwiftUI
 
 struct RandomTextMenu: View {
+    let place: SampleSources.Place
     let current: () -> String?
     let wholeParagraph: Bool
-    var started: () -> Void = {}
     let apply: (String) -> Void
     let showMessage: (String) -> Void
 
@@ -30,18 +30,31 @@ struct RandomTextMenu: View {
     }
 
     private func fetch(_ language: String) {
-        let wholeParagraph = wholeParagraph, current = current, apply = apply, showMessage = showMessage
+        let place = place, wholeParagraph = wholeParagraph, current = current, apply = apply, showMessage = showMessage
         guard let asked = current() else { return }
-        started()
-        SampleSources.shared.start {
+        let sources = SampleSources.shared
+        sources.start(at: place) {
             do {
-                let article = try await SampleSources.shared.article(in: language)
+                let article = try await sources.article(in: language)
                 guard !Task.isCancelled, current() == asked else { return }
                 apply(wholeParagraph ? article.text : article.opening)
             } catch {
                 guard !Task.isCancelled, current() == asked else { return }
-                showMessage("Cicero couldn’t get a text from Wikipedia. Check your internet connection and try again.")
+                showMessage(Self.message(for: error))
             }
+        }
+    }
+
+    private static func message(for error: Error) -> String {
+        switch (error as? URLError)?.code {
+        case .timedOut:
+            "Wikipedia took too long to answer. Try again."
+        case .notConnectedToInternet, .networkConnectionLost, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed,
+             .dataNotAllowed, .internationalRoamingOff, .secureConnectionFailed:
+            "Cicero couldn’t reach Wikipedia. Check your internet connection and try again."
+        default:
+            error is URLError ? "Cicero couldn’t reach Wikipedia. Try again."
+                : "Wikipedia didn’t send a text. Try again later."
         }
     }
 }

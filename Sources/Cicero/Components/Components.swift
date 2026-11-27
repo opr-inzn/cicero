@@ -1005,23 +1005,26 @@ struct PreviewOptionsButton: View {
 
 private struct PreviewOptions: View {
     @Environment(PreviewSettings.self) private var preview
+    @Environment(AppModel.self) private var model
     let own: OwnPreviewOptions?
-    @State private var failure: String?
     private var sources: SampleSources { .shared }
 
     var body: some View {
         @Bindable var preview = preview
         let text = own?.text ?? $preview.sampleText
+        let waiting = sources.loading == .presets
         Form {
             Section {
-                TextField("Preview Text", text: text, prompt: Text(own?.placeholder ?? "Preview text"))
+                TextField("Preview Text", text: waiting ? .constant("") : text,
+                          prompt: Text(waiting ? "Getting a text from Wikipedia…" : own?.placeholder ?? "Preview text"))
                     .labelsHidden()
                     .noAutoFill()
+                    .disabled(waiting)
                 HStack {
                     Menu("Presets\u{200A}") {
                         Section("Random") {
-                            RandomTextMenu(current: { text.wrappedValue }, wholeParagraph: false, started: { failure = nil },
-                                           apply: { text.wrappedValue = $0 }, showMessage: { failure = $0 })
+                            RandomTextMenu(place: .presets, current: { text.wrappedValue }, wholeParagraph: false,
+                                           apply: { text.wrappedValue = $0 }, showMessage: { [model] in model.showToast($0) })
                         }
                         if !preview.savedPresets.isEmpty {
                             Section("Saved") {
@@ -1039,10 +1042,6 @@ private struct PreviewOptions: View {
                     .menuStyle(.button)
                     .buttonStyle(.borderless)
                     .fixedSize()
-                    if sources.loading > 0 {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
                     Spacer()
                     if preview.isSavedPreset(text.wrappedValue) {
                         Button("Remove Preset") { preview.savedPresets.removeAll { $0 == text.wrappedValue } }
@@ -1052,16 +1051,6 @@ private struct PreviewOptions: View {
                             .disabled(!preview.canSavePreset(text.wrappedValue))
                             .help("Save the current preview text as a preset")
                     }
-                }
-                if let article = sources.source(of: text.wrappedValue) {
-                    Link("From Wikipedia: \(article.title)", destination: article.url)
-                        .font(.caption)
-                        .help("Open the article. Wikipedia’s texts are under the CC BY-SA 4.0 license.")
-                }
-                if let failure {
-                    Text(failure)
-                        .font(.caption)
-                        .foregroundStyle(.red)
                 }
                 // ß in capitals is SS, as the text is set in every font, not all of which have ẞ.
                 LabeledContent("Case") {
@@ -1081,9 +1070,12 @@ private struct PreviewOptions: View {
                 } else {
                     row("Size", $preview.size, range: PreviewSettings.sizes, unit: " pt")
                 }
+                if own == nil {
+                    row("Leading", $preview.gridLineSpacing, range: PreviewSettings.lineSpacings, step: 5, unit: "%")
+                        .help("Line spacing, as a percentage of the font size, when a sample takes more than one line")
+                }
             }
         }
-        .onChange(of: text.wrappedValue) { failure = nil }
         .formStyle(.grouped)
         .popoverFormMargins()
         .frame(width: 340)

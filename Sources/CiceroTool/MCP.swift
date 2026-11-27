@@ -230,10 +230,11 @@ enum MCPTools {
         let previous = last
         let task = Task { @MainActor in
             _ = await previous?.value
+            guard !Task.isCancelled else { return failure(CommandError(.failed, "The call was stopped, so nothing changed.")) }
             return await run(entry, arguments)
         }
         last = task
-        return await task.value
+        return await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
     }
 
     @MainActor

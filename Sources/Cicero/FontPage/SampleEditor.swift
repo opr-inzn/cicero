@@ -390,7 +390,7 @@ private struct SampleMenu<Content: View>: View {
             .disabled(!hasSelection)
         Button("Paste", systemImage: "doc.on.clipboard") { view?.paste(nil) }
         Divider()
-        RandomTextMenu(current: { view?.window == nil ? nil : view?.string }, wholeParagraph: true,
+        RandomTextMenu(place: .tester, current: { view?.window == nil ? nil : view?.string }, wholeParagraph: true,
                        apply: { (view as? SampleTextView)?.replaceText(with: $0) }, showMessage: showMessage)
         if let article = SampleSources.shared.source(of: view?.string ?? "") {
             Button("Open “\(article.title)” on Wikipedia", systemImage: "safari") { NSWorkspace.shared.open(article.url) }

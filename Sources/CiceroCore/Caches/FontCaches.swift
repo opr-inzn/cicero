@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Synchronization
 
 public enum SystemFontCaches {
     public enum Scope: Sendable {
@@ -150,11 +151,15 @@ extension Process {
         let errors = Pipe()
         process.standardError = errors
         process.standardOutput = FileHandle.nullDevice
+        let cancelled = Mutex(false)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 DispatchQueue.global(qos: .utility).async {
                     do {
-                        try process.run()
+                        try cancelled.withLock { cancelled in
+                            if cancelled { throw CancellationError() }
+                            try process.run()
+                        }
                     } catch {
                         continuation.resume(throwing: error)
                         return
@@ -166,7 +171,10 @@ extension Process {
                 }
             }
         } onCancel: {
-            if process.isRunning { process.terminate() }
+            cancelled.withLock { cancelled in
+                cancelled = true
+                if process.isRunning { process.terminate() }
+            }
         }
     }
 }

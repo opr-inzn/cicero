@@ -380,10 +380,15 @@ struct FamilyItem: ViewModifier {
 }
 
 private struct TargetsMenu: View {
+    @Environment(PreviewSettings.self) private var preview
     let family: Family
     let model: AppModel
 
     var body: some View {
+        if let article = SampleSources.shared.source(of: preview.sampleText) {
+            Button("Open “\(article.title)” on Wikipedia", systemImage: "safari") { NSWorkspace.shared.open(article.url) }
+            Divider()
+        }
         FamilyMenu(families: model.targets(for: family), model: model)
     }
 }

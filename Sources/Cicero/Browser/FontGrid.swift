@@ -78,7 +78,8 @@ struct FontGrid: View {
         let measure = Measure.of(shown.text, size: preview.size)
         let ratio = shown.ratio
         let (count, tile, restingTile) = layout(minimum: measure.minimumWidth(size: preview.size, ratio: ratio))
-        let sampleHeight = max(measure.height(size: preview.size), restingTile * Self.sampleHeightPerWidth)
+        let wraps = count == 1
+        let sampleHeight = wraps ? measure.height(size: preview.size) : max(measure.height(size: preview.size), restingTile * Self.sampleHeightPerWidth)
         let factor = tile != restingTile ? tile / restingTile : nil
         let fit = measure.fit(size: preview.size, ratio: ratio, restingTile: restingTile,
                               drawn: factor.map { GridScale.drawn(preview.size, factor: $0) } ?? preview.size)
@@ -92,7 +93,8 @@ struct FontGrid: View {
                     ForEach(groups) { group in
                         Section {
                             ForEach(group.families) { family in
-                                Tile(family: family, sampleText: shown.text, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit, model: model)
+                                Tile(family: family, sampleText: shown.text, sampleHeight: sampleHeight, baselineBelowCentre: measure.baselineBelowCentre, fit: fit,
+                                     wraps: wraps, model: model)
                                     .modifier(FamilyItem(family: family, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                                     .onAppear { ReadAhead.around(family, in: families) }
                             }
@@ -113,7 +115,8 @@ struct FontGrid: View {
             }
             .modifier(PinnedBar(isShown: pinned != nil, infoShown: infoShown, scale: scale) {
                 if let pinned {
-                    Tile(family: pinned, sampleText: shown.text, sampleHeight: measure.height(size: preview.size), baselineBelowCentre: measure.baselineBelowCentre, fit: fit, model: model)
+                    Tile(family: pinned, sampleText: shown.text, sampleHeight: measure.height(size: preview.size), baselineBelowCentre: measure.baselineBelowCentre, fit: fit,
+                         wraps: false, model: model)
                         .modifier(FamilyItem(family: pinned, order: FamilyOrder(families), model: model, anchor: $anchor) { focused = true })
                         .frame(width: rowWidth)
                         .opacity(known == nil ? 0 : 1)
@@ -344,6 +347,7 @@ private struct Tile: View {
     let sampleHeight: CGFloat
     let baselineBelowCentre: CGFloat
     let fit: SampleFit
+    let wraps: Bool
     let model: AppModel
 
     var body: some View {
@@ -360,22 +364,36 @@ private struct Tile: View {
             let sample = SampleWidths.Sample(face: style.face, text: sampleText, weight: weight,
                                              variations: model.variations(for: family, face: style.id), features: model.searchFeatures)
             let text = model.scriptSamples.text(sample.text, for: style.face)
-            Color.clear
-                .frame(maxWidth: .infinity)
-                .frame(height: sampleHeight)
-                .alignmentGuide(.firstTextBaseline) { $0.height / 2 + baselineBelowCentre }
-                .overlay(alignment: Alignment(horizontal: .center, vertical: .firstTextBaseline)) {
-                    FontText(
-                        text: text, face: style.face,
-                        size: preview.size, weight: weight, variations: sample.variations, features: sample.features,
-                        scale: { fit.scale(sample, text: text, in: $0) }, showsPlaceholder: true
-                    )
-                    .foregroundStyle(Color.ink)
-                    .minimumScaleFactor(0.4)
-                    // Its whole line, though that's higher than the sample: proposed less, it shrank to fit, drawn below the baseline it reported.
-                    .fixedSize(horizontal: false, vertical: true)
+            if wraps {
+                FontText(
+                    text: text, face: style.face,
+                    size: preview.size, weight: weight, variations: sample.variations, features: sample.features,
+                    lineLimit: nil, lineHeight: preview.size * fit.factor * preview.gridLineSpacing / 100, scale: { _ in fit.factor },
+                    showsPlaceholder: true
+                )
+                .foregroundStyle(Color.ink)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: sampleHeight)
+            } else {
+                Color.clear
                     .frame(maxWidth: .infinity)
-                }
+                    .frame(height: sampleHeight)
+                    .alignmentGuide(.firstTextBaseline) { $0.height / 2 + baselineBelowCentre }
+                    .overlay(alignment: Alignment(horizontal: .center, vertical: .firstTextBaseline)) {
+                        FontText(
+                            text: text, face: style.face,
+                            size: preview.size, weight: weight, variations: sample.variations, features: sample.features,
+                            scale: { fit.scale(sample, text: text, in: $0) }, showsPlaceholder: true
+                        )
+                        .foregroundStyle(Color.ink)
+                        .minimumScaleFactor(0.4)
+                        // Its whole line, though that's higher than the sample: proposed less, it shrank to fit, drawn below the baseline it reported.
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                    }
+            }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     Text(family.name)

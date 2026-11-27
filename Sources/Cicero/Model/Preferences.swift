@@ -14,6 +14,7 @@ final class PreviewSettings {
     var savedPresets: [String] { didSet { defaults.set(savedPresets, forKey: Keys.savedPresets) } }
     var size: Double { didSet { SavedSoon.set(size, forKey: Keys.size) } }
     var lineSpacing: Double { didSet { SavedSoon.set(lineSpacing, forKey: Keys.lineSpacing) } }
+    var gridLineSpacing: Double { didSet { SavedSoon.set(gridLineSpacing, forKey: Keys.gridLineSpacing) } }
 
     @ObservationIgnored private let defaults = UserDefaults.standard
 
@@ -22,6 +23,7 @@ final class PreviewSettings {
         static let savedPresets = "preview.savedPresets"
         static let size = "preview.size"
         static let lineSpacing = "preview.lineSpacing"
+        static let gridLineSpacing = "preview.gridLineSpacing"
     }
 
     init() {
@@ -30,6 +32,8 @@ final class PreviewSettings {
         size = min(max(defaults.object(forKey: Keys.size) as? Double ?? 32, Self.sizes.lowerBound), Self.sizes.upperBound)
         lineSpacing = min(max(defaults.object(forKey: Keys.lineSpacing) as? Double ?? 120, Self.lineSpacings.lowerBound),
                           Self.lineSpacings.upperBound)
+        gridLineSpacing = min(max(defaults.object(forKey: Keys.gridLineSpacing) as? Double ?? 120, Self.lineSpacings.lowerBound),
+                              Self.lineSpacings.upperBound)
     }
 
     func isSavedPreset(_ text: String) -> Bool { savedPresets.contains(text) }
@@ -45,12 +49,12 @@ final class PreviewSettings {
 
 enum SavedSoon {
     // Only in memory until saved: read a value from where it's kept (`PreviewSettings`, `SavedSoon.Value`), never from the defaults.
-    private static var pending: [String: Any] = [:]
+    private static var pending: [String: Any?] = [:]
     private static var save: Task<Void, Never>?
     private static var observesQuit = false
 
-    static func set(_ value: Any, forKey key: String) {
-        pending[key] = value
+    static func set(_ value: Any?, forKey key: String) {
+        pending[key] = .some(value)
         if !observesQuit {
             observesQuit = true
             NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
@@ -71,7 +75,9 @@ enum SavedSoon {
         save = nil
         let values = pending
         pending = [:]
-        for (key, value) in values { UserDefaults.standard.set(value, forKey: key) }
+        for (key, value) in values {
+            if let value { UserDefaults.standard.set(value, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
+        }
     }
 
     @Observable

@@ -195,17 +195,18 @@ final class AppModel {
     private(set) var searchTokens: [SearchToken] = []
     @ObservationIgnored var lastTyped = ""
     var isEditingSidebar = false
-    var isInfoPresented = false
-    var infoFits = true {
-        didSet { if infoFits != oldValue { infoForced = false } }
+    enum InfoPanelState { case hidden, shown, forced }
+    private var infoPanel = InfoPanelState.hidden
+    var isInfoPresented: Bool {
+        get { infoPanel != .hidden }
+        set { infoPanel = newValue ? (infoPanel == .forced ? .forced : .shown) : .hidden }
     }
-    private var infoForced = false
+    var infoFits = true {
+        didSet { if infoFits != oldValue, infoPanel == .forced { infoPanel = .shown } }
+    }
     var isInfoShown: Bool {
-        get { isInfoPresented && (infoFits || infoForced) }
-        set {
-            isInfoPresented = newValue
-            infoForced = newValue && !infoFits
-        }
+        get { infoPanel == .forced || infoPanel == .shown && infoFits }
+        set { infoPanel = newValue ? (infoFits ? .shown : .forced) : .hidden }
     }
     var infoTab: InfoTab = .info
     var shownInfoTab: InfoTab { infoTab == .axes && inspectedFamily?.isVariable != true ? .info : infoTab }
@@ -245,7 +246,7 @@ final class AppModel {
     @ObservationIgnored var documentMatchesCache: (report: UUID, fingerprint: Int, matches: [DocumentFontMatch])?
     private(set) var toast: String?
     private(set) var toastUndo: (() -> Void)?
-    @ObservationIgnored private var heldToast: String?
+    @ObservationIgnored private var heldToasts: [(message: String, undo: (() -> Void)?)] = []
 
     // MARK: Compare
 
@@ -276,7 +277,6 @@ final class AppModel {
     // Operations run one at a time, or their changes to the records would overwrite each other.
     @ObservationIgnored private var operation: Task<Void, Never>?
     @ObservationIgnored private var lastScan = Date.distantPast
-    @ObservationIgnored private var movingAtLaunch = false
     @ObservationIgnored private var scanCount = 0
     @ObservationIgnored private var revealProgress: Task<Void, Never>?
     @ObservationIgnored private var latestProgress: ScanProgress?
@@ -290,6 +290,7 @@ final class AppModel {
         self?.fontsChanged(changed.map(ScanScope.files) ?? .everything)
     }
     @ObservationIgnored private var pendingScope: ScanScope?
+    @ObservationIgnored private var heldScope: ScanScope?
     @ObservationIgnored private var runningScan: (id: Int, scope: ScanScope, check: Bool)?
     @ObservationIgnored private var changedDuringScan: Set<String> = []
     @ObservationIgnored private var fontdChangedDuringScan = false
@@ -363,7 +364,7 @@ final class AppModel {
         let center = NotificationCenter.default
         center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, !self.movingAtLaunch, self.runningOperations == 0, Date().timeIntervalSince(self.lastScan) > 60,
+                guard let self, self.runningOperations == 0, Date().timeIntervalSince(self.lastScan) > 60,
                       self.runningScan.map({ $0.scope != .everything }) ?? true
                 else { return }
                 self.rescan(check: true)
@@ -386,7 +387,6 @@ final class AppModel {
         let migrating = needsFontLibraryMigration
         let renaming = launchEngine.hasFormerInactiveFolders
         let reassembling = launchEngine.hasLibraryMove
-        movingAtLaunch = migrating || renaming || reassembling
         enqueue { model in
             if reassembling { await model.engine.finishLibraryMove(libraryPath: model.data.fontLibraryPath, records: model.data.records) }
             model.data.records = await model.engine.reconcileTemporary(model.data.records)
@@ -398,7 +398,6 @@ final class AppModel {
             if migrating { await model.migrateFontLibrary() }
             let emptied = await model.engine.emptyInactiveFolder(model.data.records)
             model.data.records = emptied.records
-            model.movingAtLaunch = false
             let renames = model.engine.renamesLater
             if !renames.isEmpty { model.renameBackLater(renames) }
             if migrating || renaming || reassembling || tidied.removed > 0 || emptied.moved > 0 { model.rescan(check: true) }
@@ -520,25 +519,29 @@ final class AppModel {
     }
 
     @discardableResult
-    private func rescan(_ scope: ScanScope, check: Bool) -> Int {
-        if let running = runningScan, running.scope.walksFolders, !scope.walksAll {
-            pendingScope = nil
-            switch scope {
-            case .files(let changes): changedDuringScan.formUnion(changes)
+    private func rescan(_ asked: ScanScope, check: Bool) -> Int {
+        let merged = [heldScope, pendingScope].compactMap(\.self).reduce(asked) { $0.adding($1) }
+        heldScope = nil
+        pendingScope = nil
+        rescanTask?.cancel()
+        if let running = runningScan, running.scope.walksFolders, !merged.walksAll {
+            switch merged {
+            case .files(let changes):
+                if changes.isEmpty { return running.id }
+                changedDuringScan.formUnion(changes)
             case .fontd(let except):
                 changedDuringScan.formUnion(except)
                 fontdChangedDuringScan = true
             case .everything: break
             }
-            return running.id
+            return running.id + 1
         }
-        var scope = scope.adding(.files(changedDuringScan))
+        var scope = merged.adding(.files(changedDuringScan))
         if fontdChangedDuringScan { scope = scope.adding(.fontd(except: [])) }
         changedDuringScan = []
         fontdChangedDuringScan = false
         if let running = runningScan { scope = scope.adding(running.scope) }
         let check = check && runningScan?.check != false
-        pendingScope = nil
         scanTask?.cancel()
         if scope == .everything { lastScan = Date() }
         scanCount += 1
@@ -620,7 +623,11 @@ final class AppModel {
 
     private func fontsChanged(_ scope: ScanScope) {
         if runningOperations > 0 {
-            if changeSeenBeforeScan == nil { changeSeenBeforeScan = scanCount }
+            if case .fontd = scope {
+                if changeSeenBeforeScan == nil { changeSeenBeforeScan = scanCount }
+            } else {
+                heldScope = heldScope.map { $0.adding(scope) } ?? scope
+            }
             return
         }
         var scope = scope
@@ -652,6 +659,9 @@ final class AppModel {
     func rebuildFontList() {
         coverageTask?.cancel()
         measurementTask?.cancel()
+        letterGuessTask?.cancel()
+        letterGuessTask = nil
+        letterGuessesPending = false
         coverageRun &+= 1
         measurementRun &+= 1
         coverageProgress = nil
@@ -854,10 +864,18 @@ final class AppModel {
 
     var isWorking: Bool { queuedOperations > 0 || commandRequests?.isAnswering == true }
 
-    func finishWork(within limit: Duration) async {
+    var quitWaitMessage: String? {
+        if let job { return job.waitMessage }
+        return isWorking ? "Cicero is still changing fonts. Try again when it’s done" : nil
+    }
+
+    func finishWork(within limit: Duration) async -> Bool {
         commandRequests?.stop()
         let deadline = ContinuousClock.now + limit
         while isWorking, ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(50)) }
+        guard isWorking else { return true }
+        commandRequests?.start()
+        return false
     }
 
     func holdScans() {
@@ -870,9 +888,13 @@ final class AppModel {
 
     private func endOperation() {
         runningOperations -= 1
-        if let seen = changeSeenBeforeScan, runningOperations == 0 {
-            changeSeenBeforeScan = nil
-            if scanCount == seen { rescan() }
+        guard runningOperations == 0 else { return }
+        let missedFontd = changeSeenBeforeScan.map { $0 == scanCount } ?? false
+        changeSeenBeforeScan = nil
+        if missedFontd {
+            rescan()
+        } else if let held = heldScope {
+            rescan(held, check: true)
         }
     }
 
@@ -935,22 +957,26 @@ final class AppModel {
 
     func showToast(_ message: String, undo: (() -> Void)? = nil) {
         let message = message.isEmpty || ".!?…".contains(message.last!) ? message : message + "."
-        if importing != nil || earlierImportPrompt != nil { return heldToast = message }
+        if importing != nil || earlierImportPrompt != nil {
+            if undo != nil || !heldToasts.contains(where: { $0.message == message && $0.undo == nil }) { heldToasts.append((message, undo)) }
+            return
+        }
         toast = message
         toastUndo = undo
         toastTask?.cancel()
         toastTask = Task { [weak self] in
             try? await Task.sleep(for: undo == nil ? .seconds(3) : Self.undoTime)
-            guard !Task.isCancelled else { return }
-            self?.toast = nil
-            self?.toastUndo = nil
+            guard !Task.isCancelled, let self else { return }
+            self.toast = nil
+            self.toastUndo = nil
+            self.showHeldToast()
         }
     }
 
     private func showHeldToast() {
-        guard importing == nil, earlierImportPrompt == nil, let held = heldToast else { return }
-        heldToast = nil
-        showToast(held)
+        guard importing == nil, earlierImportPrompt == nil, toast == nil, !heldToasts.isEmpty else { return }
+        let held = heldToasts.removeFirst()
+        showToast(held.message, undo: held.undo)
     }
 
     func undoToast() {
@@ -959,6 +985,7 @@ final class AppModel {
         toast = nil
         toastUndo = nil
         undo?()
+        showHeldToast()
     }
 
     // MARK: Groups
@@ -985,9 +1012,9 @@ final class AppModel {
         refreshGroups()
     }
 
-    func ask(overActivationSheets: Bool = false, _ show: @escaping (AppModel) -> Void) {
+    func ask(overActivationSheets: Bool = false, next: Bool = false, _ show: @escaping (AppModel) -> Void) {
         guard isAsking(overActivationSheets: overActivationSheets) else { return show(self) }
-        pendingPrompts.append((overActivationSheets, show))
+        pendingPrompts.insert((overActivationSheets, show), at: next ? 0 : pendingPrompts.endIndex)
         watchPrompts()
     }
 
@@ -1006,7 +1033,7 @@ final class AppModel {
     }
 
     private func drainPrompts() {
-        if let index = pendingPrompts.firstIndex(where: { !isAsking(overActivationSheets: $0.overActivationSheets) }) {
+        while let index = pendingPrompts.firstIndex(where: { !isAsking(overActivationSheets: $0.overActivationSheets) }) {
             let next = pendingPrompts.remove(at: index)
             next.show(self)
         }
@@ -1087,7 +1114,7 @@ final class AppModel {
             let found = await Task.detached(priority: .utility) {
                 ClassificationGuesses.letters(of: families, measurements: measurements)
             }.value
-            guard let self else { return }
+            guard let self, !Task.isCancelled else { return }
             self.letterGuessTask = nil
             if self.guessesClassifications, found != self.letterGuesses {
                 self.letterGuesses = found

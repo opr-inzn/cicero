@@ -98,7 +98,13 @@ extension AppModel {
             case .success(let library):
                 let waits = source == .fontBase && urls.count == 1 && FontBaseImport.isThisMacs(urls[0])
                 let prompt = ImportPrompt(library: library, origin: origin, urls: urls, waitsForQuit: waits)
-                if importing != nil { importing = prompt } else { ask { $0.importing = prompt } }
+                ask { model in
+                    if let job = model.job {
+                        prompt.library.discard()
+                        return model.showToast(job.waitMessage)
+                    }
+                    model.importing = prompt
+                }
             case .failure:
                 switch source {
                 case .fontExplorer: showToast("That isn’t a FontExplorer X library or backup")

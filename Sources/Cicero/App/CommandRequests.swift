@@ -60,7 +60,11 @@ final class CommandRequests {
         let answer: JSON
         if let request = taken.request {
             if request.command.needsLibrary {
-                while !model.hasScanned, model.lastEndedScan == 0 { try? await Task.sleep(for: .milliseconds(100)) }
+                let deadline = ContinuousClock.now + .seconds(300)
+                while !model.hasScanned, model.lastEndedScan == 0, ContinuousClock.now < deadline, source != nil,
+                      request.sender?.isRunning != false {
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
             }
             let environment = ToolEnvironment(locations: model.locations, defaults: .standard, resources: nil, registrar: CoreTextRegistrar())
             do {
@@ -74,7 +78,8 @@ final class CommandRequests {
                     throw CommandError(.busy, "Cicero is restoring a backup. Nothing changed. Try again when it’s done.")
                 }
                 guard model.hasScanned || !request.command.needsLibrary else {
-                    throw CommandError(.failed, "Cicero couldn’t read the library. Try again in a moment.")
+                    throw model.lastEndedScan == 0 ? CommandError(.busy, "Cicero is still reading the library. Nothing changed. Try again in a moment.")
+                        : CommandError(.failed, "Cicero couldn’t read the library. Try again in a moment.")
                 }
                 answer = try await WriteRunner.run(request, in: context, writer: AppRequestWriter(model: model))
             } catch let error as CommandError {

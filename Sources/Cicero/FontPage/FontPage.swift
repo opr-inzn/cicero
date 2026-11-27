@@ -534,6 +534,14 @@ private struct TesterText: View {
             .padding(.top, Self.padding + lowered)
             .padding(.bottom, Self.padding - lowered)
             .padding(.horizontal, -24)
+            .opacity(SampleSources.shared.loading == .tester ? 0 : 1)
+            .overlay {
+                if SampleSources.shared.loading == .tester {
+                    Text("Getting a text from Wikipedia…")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+            }
             .contentShape(.rect)
             .contextMenu { FamilyMenu(families: [family], model: model) }
             .onAppear {
@@ -616,43 +624,17 @@ private final class TesterTextStore {
     private static let glyphsKey = "typeTester.glyphs"
 
     var text: String {
-        didSet { saveSoon() }
+        didSet { SavedSoon.set(text, forKey: Self.key) }
     }
     var glyphs: [SampleGlyphRun] {
-        didSet { saveSoon() }
+        didSet { SavedSoon.set(glyphs.isEmpty ? nil : try? JSONEncoder().encode(glyphs), forKey: Self.glyphsKey) }
     }
-
-    @ObservationIgnored private var pendingSave: Task<Void, Never>?
 
     private init() {
         let text = (UserDefaults.standard.string(forKey: Self.key) ?? TesterText.defaultText) as NSString
         self.text = text as String
         let saved = UserDefaults.standard.data(forKey: Self.glyphsKey).flatMap { try? JSONDecoder().decode([SampleGlyphRun].self, from: $0) }
         glyphs = (saved ?? []).filter { $0.isIn(text) }
-        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated { TesterTextStore.shared.save() }
-        }
-    }
-
-    // Not with each letter: SwiftUI draws every view with an @AppStorage again whenever anything is saved to the defaults, whatever the key.
-    private func saveSoon() {
-        pendingSave?.cancel()
-        pendingSave = Task {
-            try? await Task.sleep(for: .seconds(1))
-            guard !Task.isCancelled else { return }
-            save()
-        }
-    }
-
-    private func save() {
-        pendingSave?.cancel()
-        pendingSave = nil
-        UserDefaults.standard.set(text, forKey: Self.key)
-        if glyphs.isEmpty {
-            UserDefaults.standard.removeObject(forKey: Self.glyphsKey)
-        } else if let data = try? JSONEncoder().encode(glyphs) {
-            UserDefaults.standard.set(data, forKey: Self.glyphsKey)
-        }
     }
 }
 

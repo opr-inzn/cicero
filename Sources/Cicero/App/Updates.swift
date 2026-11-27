@@ -104,15 +104,23 @@ final class Updates {
     }
 
     func installReadyUpdate() {
+        guard canQuitNow() else { return }
         installReady?()
     }
 
     func restartToUpdate() {
+        guard canQuitNow() else { return }
         if let installReady { return installReady() }
         guard let available, switching == nil else { return }
         Task {
             do { try await replace(with: available) } catch { checkForUpdates() }
         }
+    }
+
+    private func canQuitNow() -> Bool {
+        guard let model = AppDelegate.launchModel, let message = model.quitWaitMessage else { return true }
+        model.showToast(message)
+        return false
     }
 
     private func checkIfWaiting() {
@@ -132,6 +140,7 @@ final class Updates {
 
     private func trackChanged() {
         switchOffer = nil
+        if track == .stable, let readyVersion, Channels.isNightly(readyVersion) { dropReadyUpdate() }
         guard readyVersion == nil else { return }
         checkTrackWhenReady = true
         checkIfWaiting()
@@ -161,6 +170,7 @@ final class Updates {
     }
 
     fileprivate func ready(_ version: String, notes: ReleaseNotes?, install: @escaping () -> Void) {
+        guard switching == nil, track == .nightly || !Channels.isNightly(version) else { return dropReadyUpdate() }
         readyVersion = version
         readyNotes = notes
         installReady = install
@@ -168,18 +178,34 @@ final class Updates {
 
     fileprivate func finished(error: Error?) {
         checkingNewTrack = false
-        guard let error = error as NSError?, status == .checking else { return }
+        guard let error = error as NSError? else { return }
         if error.domain == SUSparkleErrorDomain, error.code == Int(SUError.noUpdateError.rawValue) {
-            status = .upToDate
+            if status == .checking { status = .upToDate }
             return
         }
-        status = .failed(error.localizedDescription)
+        switch status {
+        case .available: break
+        case .idle, .checking, .upToDate, .failed: status = .failed(error.localizedDescription)
+        }
+    }
+
+    private func dropReadyUpdate() {
+        readyVersion = nil
+        readyNotes = nil
+        installReady = nil
+        showsReadyNotes = false
+        // Sparkle has no call that drops an update it got ready: its installer, a launchd job by this name, would still put it in place at quit.
+        let remove = Process()
+        remove.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        remove.arguments = ["remove", "\(Bundle.main.bundleIdentifier ?? "")-sparkle-updater"]
+        try? remove.run()
+        remove.waitUntilExit()
     }
 
     // MARK: Switching
 
     func switchTo(_ release: Release) async {
-        guard readyVersion == nil else { return }
+        guard readyVersion == nil, switching == nil else { return }
         do {
             try await replace(with: release)
         } catch {
@@ -195,7 +221,11 @@ final class Updates {
             staged = copied
             switching = "Opening Cicero \(release.version)"
             try VersionSwitch.replaceAfterQuit(current: Bundle.main.bundleURL, with: copied)
-            NSApp.terminate(nil)
+            NSApp.terminateFromRunLoop(ifCancelled: { [weak self] in
+                VersionSwitch.cancelReplace()
+                try? FileManager.default.removeItem(at: copied)
+                self?.switching = nil
+            })
         } catch {
             if let staged { try? FileManager.default.removeItem(at: staged) }
             switching = nil

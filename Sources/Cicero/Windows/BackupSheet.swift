@@ -16,6 +16,7 @@ struct BackupSheet: View {
     @State private var progress: BackupProgress?
     @State private var task: Task<Void, Never>?
     @State private var runID = UUID()
+    @State private var isStopping = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -29,6 +30,9 @@ struct BackupSheet: View {
             if let progress {
                 VStack(alignment: .leading, spacing: 4) {
                     switch progress {
+                    case _ where isStopping:
+                        ProgressView()
+                        Text("Stopping…")
                     case .copying(let done, let total):
                         ProgressView(value: Double(done), total: Double(max(total, 1)))
                         Text("Copying fonts, \(done.plain) of \(total.plain)…")
@@ -45,9 +49,11 @@ struct BackupSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) {
-                    task?.cancel()
-                    dismiss()
+                    guard let task else { return dismiss() }
+                    isStopping = true
+                    task.cancel()
                 }
+                .disabled(isStopping)
                 Button("Back Up") { backUp() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(progress != nil || (includeFonts && fonts == nil))
@@ -80,7 +86,10 @@ struct BackupSheet: View {
         runID = run
         progress = include ? .copying(done: 0, total: fonts.count) : .compressing
         task = Task {
-            defer { task = nil }
+            defer {
+                task = nil
+                if isStopping { dismiss() }
+            }
             do {
                 try await model.backUp(to: destination, fonts: fonts, includeFonts: include) { step in
                     Task { @MainActor in

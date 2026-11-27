@@ -46,6 +46,13 @@ enum ApplicationsFolder {
             UserDefaults.standard.set(true, forKey: dontAskKey)
         }
         guard response == .alertFirstButtonReturn else { return }
+        if let message = AppDelegate.launchModel?.quitWaitMessage {
+            let wait = NSAlert()
+            wait.messageText = "Couldn’t Move Cicero to the Applications Folder"
+            wait.informativeText = message + "."
+            wait.runModal()
+            return
+        }
         do {
             try move(forOpenAtLogin: forOpenAtLogin)
         } catch {
@@ -76,11 +83,11 @@ enum ApplicationsFolder {
         }
         if forOpenAtLogin { UserDefaults.standard.set(true, forKey: openAtLoginKey) }
         let processes = [ProcessInfo.processInfo.processIdentifier] + replaced.map(\.processIdentifier)
-        try relaunch(move.destination, detaching: move.diskImageToDetach, after: processes)
-        NSApp.terminate(nil)
+        let relaunching = try relaunch(move.destination, detaching: move.diskImageToDetach, after: processes)
+        NSApp.terminateFromRunLoop(ifCancelled: { relaunching.terminate() })
     }
 
-    private static func relaunch(_ app: URL, detaching diskImage: URL?, after processes: [pid_t]) throws {
+    private static func relaunch(_ app: URL, detaching diskImage: URL?, after processes: [pid_t]) throws -> Process {
         let script = """
             app=$1 image=$2
             shift 2
@@ -94,6 +101,7 @@ enum ApplicationsFolder {
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = ["-c", script, "sh", app.path, diskImage?.path ?? ""] + processes.map(String.init)
         try process.run()
+        return process
     }
 
     private static func isDiskImage(_ volume: URL) -> Bool {

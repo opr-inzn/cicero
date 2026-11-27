@@ -243,7 +243,7 @@ extension AppModel {
                 model.addFontFiles(paths, resolving: duplicates, choices: choices, method: method, into: location, then: then,
                                    askedAboutOpenApps: true)
             }
-            return ask { $0.openAppsReplacePrompt = prompt }
+            return ask(next: true) { $0.openAppsReplacePrompt = prompt }
         }
         let left = Set(skipped.flatMap(\.paths)).subtracting(duplicates.filter { choices[$0.id] != .skip }.flatMap(\.paths))
             .union(replacements.map(\.added))

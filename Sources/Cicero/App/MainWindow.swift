@@ -274,7 +274,7 @@ private struct ReplaceAlerts: ViewModifier {
             ) { prompt in
                 Button("Replace") { model.replaceEverywhere(prompt) }
                     .keyboardShortcut(.defaultAction)
-                Button("Choose for Each") { model.ask { $0.duplicatePrompt = prompt } }
+                Button("Choose for Each") { model.ask(next: true) { $0.duplicatePrompt = prompt } }
                 Button("Cancel", role: .cancel) {}
             } message: { prompt in
                 Text(replaceMessage(prompt))

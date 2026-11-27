@@ -298,8 +298,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         guard model.isWorking else { return .terminateNow }
         Task {
-            await model.finishWork(within: .seconds(30))
-            sender.reply(toApplicationShouldTerminate: true)
+            let finished = await model.finishWork(within: .seconds(30))
+            if !finished, let message = model.quitWaitMessage {
+                NSApp.bringForward()
+                model.showToast(message)
+            }
+            sender.reply(toApplicationShouldTerminate: finished)
         }
         return .terminateLater
     }

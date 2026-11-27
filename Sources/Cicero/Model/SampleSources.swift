@@ -4,13 +4,15 @@ import Observation
 
 @Observable
 final class SampleSources {
+    enum Place { case presets, tester }
+
     static let shared = SampleSources()
     private static let recentKey = "sampleSources.recentLanguages"
 
     private(set) var recent: [String] { didSet { UserDefaults.standard.set(recent, forKey: Self.recentKey) } }
     private var fetched: [(article: WikipediaArticle, opening: String)] = []
-    private(set) var loading = 0
-    private var request: Task<Void, Never>?
+    private(set) var loading: Place?
+    @ObservationIgnored private var request: Task<Void, Never>?
     let macLanguages: [String]
 
     private init() {
@@ -22,9 +24,13 @@ final class SampleSources {
             .filter { Wikipedia.languages.contains($0) && !mac.contains($0) }.prefix(3))
     }
 
-    func start(_ work: @escaping () async -> Void) {
+    func start(at place: Place, _ work: @escaping () async -> Void) {
         request?.cancel()
-        request = Task { await work() }
+        loading = place
+        request = Task {
+            await work()
+            if !Task.isCancelled { loading = nil }
+        }
     }
 
     var shortList: [String] {
@@ -32,8 +38,6 @@ final class SampleSources {
     }
 
     func article(in language: String) async throws -> WikipediaArticle {
-        loading += 1
-        defer { loading -= 1 }
         let article = try await Wikipedia.randomArticle(in: language)
         if !macLanguages.contains(language) {
             recent = Array(([language] + recent.filter { $0 != language && !macLanguages.contains($0) }).prefix(3))

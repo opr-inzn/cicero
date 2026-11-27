@@ -42,6 +42,14 @@ final class PromptWatcher {
 }
 
 extension NSApplication {
+    func terminateFromRunLoop(ifCancelled: @escaping () -> Void = {}) {
+        // Not from a task on the main actor: there, terminate waits for a later reply that only another main-actor task can send, and Cicero hangs.
+        RunLoop.main.perform {
+            NSApp.terminate(nil)
+            ifCancelled()
+        }
+    }
+
     func bringForward(opening open: () -> Void = {}) {
         unhide(nil)
         activate()

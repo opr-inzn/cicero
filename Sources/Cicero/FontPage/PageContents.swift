@@ -74,7 +74,6 @@ final class PageContents {
     private var ready: [FaceID: PageContent] = [:]
     private var recent: [FaceID] = []
     private var loading: [FaceID: (generation: Int, task: Task<PageContent, Never>)] = [:]
-    private var generation = 0
     private static let kept = 24
 
     init(coverage: CoverageIndex) {
@@ -102,10 +101,9 @@ final class PageContents {
         if let under = loading[face.id], under.generation == version { return under.task }
         loading[face.id]?.task.cancel()
         let coverage = coverage
-        let started = generation
         let task = Task {
             let content = await Self.read(face, version: version, coverage: coverage)
-            guard !Task.isCancelled, started == generation, loading[face.id]?.generation == version else { return content }
+            guard !Task.isCancelled, loading[face.id]?.generation == version else { return content }
             loading[face.id] = nil
             keep(content, for: face.id)
             return content
@@ -176,7 +174,7 @@ final class PageFeatures {
         if let under = loading[key] { return under }
         let task = Task {
             let features = await Task.detached(priority: .userInitiated) { FontFeatureGroup.load(for: face) }.value
-            if loading[key] != nil {
+            if !Task.isCancelled, loading[key] != nil {
                 loading[key] = nil
                 ready[key] = features
             }
