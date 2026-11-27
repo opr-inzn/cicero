@@ -1012,7 +1012,7 @@ private struct PreviewOptions: View {
     var body: some View {
         @Bindable var preview = preview
         let text = own?.text ?? $preview.sampleText
-        let waiting = sources.loading == .presets
+        let waiting = own == nil && sources.loading == .presets
         Form {
             Section {
                 TextField("Preview Text", text: waiting ? .constant("") : text,
@@ -1022,9 +1022,11 @@ private struct PreviewOptions: View {
                     .disabled(waiting)
                 HStack {
                     Menu("Presets\u{200A}") {
-                        Section("Random") {
-                            RandomTextMenu(place: .presets, current: { text.wrappedValue }, wholeParagraph: false,
-                                           apply: { text.wrappedValue = $0 }, showMessage: { [model] in model.showToast($0) })
+                        if own == nil {
+                            Section("Random") {
+                                RandomTextMenu(place: .presets, current: { text.wrappedValue }, wholeParagraph: false,
+                                               apply: { text.wrappedValue = $0 }, showMessage: { [model] in model.showToast($0) })
+                            }
                         }
                         if !preview.savedPresets.isEmpty {
                             Section("Saved") {

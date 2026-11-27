@@ -3,6 +3,7 @@ import Foundation
 
 struct TextLine {
     let line: CTLine
+    let text: String
     let width: CGFloat
     let overhang: CGFloat
     let ascent: CGFloat
@@ -19,6 +20,7 @@ struct TextLine {
         let shown = NSMutableAttributedString(string: text.isEmpty ? " " : text, attributes: attributes)
         if showsNotdef { shown.showMissingAsNotdef(in: font) }
         line = CTLineCreateWithAttributedString(shown)
+        self.text = shown.string
         let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
         width = max(CTLineGetTypographicBounds(line, nil, nil, nil), ink.maxX.rounded(.up))
         overhang = max(0, -ink.minX.rounded(.down))

@@ -315,7 +315,7 @@ private struct OverlayLayout: View {
     var body: some View {
         let ascent = CompareSample.topAscent(of: samples)
         let descent = samples.map(\.line.descent).max() ?? 0
-        let stems = samples.map { FirstStem.x(in: $0.line.line) ?? 0 }
+        let stems = samples.map { FirstStem.x(in: $0.line.line, text: $0.line.text) ?? 0 }
         let starts = stems.map { (stems.max() ?? 0) - $0 }
         let overhang = zip(samples, starts).map { max(0, $0.line.overhang - $1) }.max() ?? 0
         let width = (zip(samples, starts).map { $0.line.width + $1 }.max() ?? 0) + 2
