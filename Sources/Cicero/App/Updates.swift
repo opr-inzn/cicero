@@ -65,6 +65,7 @@ final class Updates {
     @ObservationIgnored private var installReady: (() -> Void)?
     @ObservationIgnored private var latest: [Track: Release] = [:]
     @ObservationIgnored private var checkingNewTrack = false
+    @ObservationIgnored private var removedInstaller = false
 
     init() {
         let controller = SPUStandardUpdaterController(
@@ -111,7 +112,7 @@ final class Updates {
     func restartToUpdate() {
         guard canQuitNow() else { return }
         if let installReady { return installReady() }
-        guard let available, switching == nil else { return }
+        guard let available, switching == nil, track == .nightly || !available.isNightly else { return }
         Task {
             do { try await replace(with: available) } catch { checkForUpdates() }
         }
@@ -140,7 +141,14 @@ final class Updates {
 
     private func trackChanged() {
         switchOffer = nil
-        if track == .stable, let readyVersion, Channels.isNightly(readyVersion) { dropReadyUpdate() }
+        if track == .stable {
+            if let readyVersion, Channels.isNightly(readyVersion) { dropReadyUpdate() }
+            if available?.isNightly == true {
+                available = nil
+                availableNotes = nil
+                if case .available = status { status = .idle }
+            }
+        }
         guard readyVersion == nil else { return }
         checkTrackWhenReady = true
         checkIfWaiting()
@@ -153,6 +161,7 @@ final class Updates {
     }
 
     fileprivate func found(_ version: String, release: Release?, notes: ReleaseNotes?) {
+        guard track == .nightly || release?.isNightly != true else { return }
         status = .available(version)
         available = release
         availableNotes = notes
@@ -178,7 +187,10 @@ final class Updates {
 
     fileprivate func finished(error: Error?) {
         checkingNewTrack = false
+        let removedInstaller = self.removedInstaller
+        self.removedInstaller = false
         guard let error = error as NSError? else { return }
+        if removedInstaller, error.domain == SUSparkleErrorDomain, error.code == Int(SUError.installationError.rawValue) { return }
         if error.domain == SUSparkleErrorDomain, error.code == Int(SUError.noUpdateError.rawValue) {
             if status == .checking { status = .upToDate }
             return
@@ -194,7 +206,7 @@ final class Updates {
         readyNotes = nil
         installReady = nil
         showsReadyNotes = false
-        // Sparkle has no call that drops an update it got ready: its installer, a launchd job by this name, would still put it in place at quit.
+        removedInstaller = true
         let remove = Process()
         remove.executableURL = URL(fileURLWithPath: "/bin/launchctl")
         remove.arguments = ["remove", "\(Bundle.main.bundleIdentifier ?? "")-sparkle-updater"]

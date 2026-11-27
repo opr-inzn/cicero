@@ -1025,19 +1025,19 @@ private struct PreviewOptions: View {
                         if own == nil {
                             Section("Random") {
                                 RandomTextMenu(place: .presets, current: { text.wrappedValue }, wholeParagraph: false,
-                                               apply: { text.wrappedValue = $0 }, showMessage: { [model] in model.showToast($0) })
+                                               apply: { choose($0, in: text) }, showMessage: { [model] in model.showToast($0) })
                             }
                         }
                         if !preview.savedPresets.isEmpty {
                             Section("Saved") {
                                 ForEach(preview.savedPresets, id: \.self) { sample in
-                                    Button(Self.title(of: sample)) { text.wrappedValue = sample }
+                                    Button(Self.title(of: sample)) { choose(sample, in: text) }
                                 }
                             }
                         }
                         Section {
                             ForEach(PreviewSettings.presets, id: \.self) { sample in
-                                Button(sample) { text.wrappedValue = sample }
+                                Button(sample) { choose(sample, in: text) }
                             }
                         }
                     }
@@ -1056,7 +1056,7 @@ private struct PreviewOptions: View {
                 }
                 // ß in capitals is SS, as the text is set in every font, not all of which have ẞ.
                 LabeledContent("Case") {
-                    CaseButtons { text.wrappedValue = $0.apply(to: text.wrappedValue) }
+                    CaseButtons { choose($0.apply(to: text.wrappedValue), in: text) }
                 }
             }
             Section {
@@ -1078,10 +1078,16 @@ private struct PreviewOptions: View {
                 }
             }
         }
+        .onChange(of: text.wrappedValue) { if own == nil { sources.stop(at: .presets) } }
         .formStyle(.grouped)
         .popoverFormMargins()
         .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func choose(_ sample: String, in text: Binding<String>) {
+        if own == nil { sources.stop(at: .presets) }
+        text.wrappedValue = sample
     }
 
     private static func title(of preset: String) -> String {

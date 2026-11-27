@@ -67,10 +67,7 @@ final class CommandRequests {
                 }
             }
             let environment = ToolEnvironment(locations: model.locations, defaults: .standard, resources: nil, registrar: CoreTextRegistrar())
-            do {
-                let proofing = request.command.needsLibrary ? try await LibraryContext.scanForProofing(model.data, shown: request.shown, environment: environment) : nil
-                let context = LibraryContext(library: proofing ?? model.library, data: model.data, shown: request.shown, environment: environment)
-                // Asked again after the wait for the library: a change the user cancelled meanwhile must never be made.
+            func refuseIfNotWanted() throws {
                 if let sender = request.sender, !sender.isRunning { throw CommandError(.failed, "The command stopped, so nothing changed.") }
                 guard !model.store.isReadOnly || request.command == .rescan else { throw CommandError(.failed, model.store.readOnlyMessage) }
                 // A restore replaces the setup with the backup's when it ends, and a change made meanwhile would be lost.
@@ -81,6 +78,13 @@ final class CommandRequests {
                     throw model.lastEndedScan == 0 ? CommandError(.busy, "Cicero is still reading the library. Nothing changed. Try again in a moment.")
                         : CommandError(.failed, "Cicero couldn’t read the library. Try again in a moment.")
                 }
+            }
+            do {
+                try refuseIfNotWanted()
+                let proofing = request.command.needsLibrary ? try await LibraryContext.scanForProofing(model.data, shown: request.shown, environment: environment) : nil
+                let context = LibraryContext(library: proofing ?? model.library, data: model.data, shown: request.shown, environment: environment)
+                // Asked again after the proofing scan: a change the user cancelled meanwhile must never be made.
+                try refuseIfNotWanted()
                 answer = try await WriteRunner.run(request, in: context, writer: AppRequestWriter(model: model))
             } catch let error as CommandError {
                 answer = error.json

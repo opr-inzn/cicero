@@ -524,34 +524,43 @@ private struct TesterText: View {
         let room = Self.room(for: text.wrappedValue, glyphs: shownGlyphs(glyphs.wrappedValue), in: font, kerning: kerning,
                              lineHeight: lineHeightPoints)
         let lowered = Self.lowered(in: font, room: room)
-        SampleEditor(text: text, glyphs: glyphs, defaultText: defaultText, family: family.id, face: face, font: font,
-                     kerning: kerning, lineHeight: lineHeightPoints, alignment: alignment.paragraph, margin: 24,
-                     roomAbove: room.above, roomBelow: room.below, caseChange: caseChange,
-                     showMessage: { model.showToast($0) }) {
-            FamilyMenu(families: [family], model: model)
+        let article = SampleSources.shared.loading == .tester ? nil : SampleSources.shared.source(of: text.wrappedValue)
+        VStack(alignment: .leading, spacing: 0) {
+            SampleEditor(text: text, glyphs: glyphs, defaultText: defaultText, family: family.id, face: face, font: font,
+                         kerning: kerning, lineHeight: lineHeightPoints, alignment: alignment.paragraph, margin: 24,
+                         roomAbove: room.above, roomBelow: room.below, caseChange: caseChange,
+                         showMessage: { model.showToast($0) }) {
+                FamilyMenu(families: [family], model: model)
+            }
+                .frame(minHeight: 280)
+                .padding(.top, Self.padding + lowered)
+                .padding(.bottom, Self.padding - lowered)
+                .padding(.horizontal, -24)
+                .opacity(SampleSources.shared.loading == .tester ? 0 : 1)
+                .overlay {
+                    if SampleSources.shared.loading == .tester {
+                        Text("Getting a text from Wikipedia…")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .contentShape(.rect)
+                .contextMenu { FamilyMenu(families: [family], model: model) }
+                .onAppear {
+                    if self.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        self.text = Self.defaultText
+                        store.glyphs = []
+                    }
+                }
+                .onChange(of: face.id, initial: true) { decided = (face.id, freshSample) }
+                .onChange(of: store.text) { _, new in if new != typed { decided = (face.id, freshSample) } }
+                .onChange(of: text.wrappedValue) { SampleSources.shared.stop(at: .tester) }
+                .onDisappear { SampleSources.shared.stop(at: .tester) }
+            if let article {
+                WikipediaCredit(article: article)
+                    .padding(.bottom, 12)
+            }
         }
-            .frame(minHeight: 280)
-            .padding(.top, Self.padding + lowered)
-            .padding(.bottom, Self.padding - lowered)
-            .padding(.horizontal, -24)
-            .opacity(SampleSources.shared.loading == .tester ? 0 : 1)
-            .overlay {
-                if SampleSources.shared.loading == .tester {
-                    Text("Getting a text from Wikipedia…")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(.rect)
-            .contextMenu { FamilyMenu(families: [family], model: model) }
-            .onAppear {
-                if self.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    self.text = Self.defaultText
-                    store.glyphs = []
-                }
-            }
-            .onChange(of: face.id, initial: true) { decided = (face.id, freshSample) }
-            .onChange(of: store.text) { _, new in if new != typed { decided = (face.id, freshSample) } }
     }
 
     private var freshSample: String? {

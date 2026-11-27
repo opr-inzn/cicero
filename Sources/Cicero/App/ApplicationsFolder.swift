@@ -92,8 +92,9 @@ enum ApplicationsFolder {
             app=$1 image=$2
             shift 2
             for pid in "$@"; do
-                for _ in $(seq 300); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+                for _ in $(seq 600); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
             done
+            for pid in "$@"; do kill -0 "$pid" 2>/dev/null && exit 0; done
             [ -z "$image" ] || /usr/bin/hdiutil detach "$image" -quiet
             /usr/bin/open "$app"
             """

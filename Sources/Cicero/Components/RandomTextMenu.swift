@@ -78,3 +78,18 @@ private extension NSImage {
         return image
     }()
 }
+
+struct WikipediaCredit: View {
+    let article: WikipediaArticle
+
+    var body: some View {
+        let language = Locale(identifier: "en").localizedString(forLanguageCode: article.language) ?? article.language
+        // In an isolate, so the arrow stays after a title in Arabic or Hebrew.
+        var title = AttributedString("\u{2068}\(article.title)\u{2069} ↗")
+        title.link = article.url
+        return Text(AttributedString("From Wikipedia in \(language): ") + title + AttributedString(" · CC BY-SA 4.0"))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .help("Open the article. Wikipedia’s texts are under the CC BY-SA 4.0 license.")
+    }
+}

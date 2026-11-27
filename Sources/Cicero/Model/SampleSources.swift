@@ -33,6 +33,13 @@ final class SampleSources {
         }
     }
 
+    func stop(at place: Place) {
+        guard loading == place else { return }
+        request?.cancel()
+        request = nil
+        loading = nil
+    }
+
     var shortList: [String] {
         macLanguages + recent
     }
