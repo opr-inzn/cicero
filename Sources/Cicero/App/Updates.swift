@@ -36,7 +36,7 @@ final class Updates {
     var offeredNotes: ReleaseNotes? { readyVersion != nil ? readyNotes : availableNotes }
     var showsReadyNotes = false
     var switchOffer: Release?
-    private(set) var switching: String?
+    private(set) var switching: Switching?
     var switchFailure: (release: Release, message: String)?
 
     var checksAutomatically: Bool {
@@ -216,6 +216,13 @@ final class Updates {
 
     // MARK: Switching
 
+    struct Switching {
+        let step: String
+        let version: String
+        var short: String { "\(step)…" }
+        var full: String { "\(step) Cicero \(version)" }
+    }
+
     func switchTo(_ release: Release) async {
         guard readyVersion == nil, switching == nil else { return }
         do {
@@ -226,12 +233,12 @@ final class Updates {
     }
 
     private func replace(with release: Release) async throws {
-        switching = "Downloading Cicero \(release.version)"
+        switching = Switching(step: "Downloading", version: release.version)
         var staged: URL?
         do {
-            let copied = try await VersionSwitch.stage(release) { [weak self] step in self?.switching = step }
+            let copied = try await VersionSwitch.stage(release) { [weak self] step in self?.switching = Switching(step: step, version: release.version) }
             staged = copied
-            switching = "Opening Cicero \(release.version)"
+            switching = Switching(step: "Opening", version: release.version)
             try VersionSwitch.replaceAfterQuit(current: Bundle.main.bundleURL, with: copied)
             NSApp.terminateFromRunLoop(ifCancelled: { [weak self] in
                 VersionSwitch.cancelReplace()

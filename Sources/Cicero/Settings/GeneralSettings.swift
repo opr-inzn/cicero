@@ -178,7 +178,7 @@ struct GeneralSettings: View {
     }
 
     private var updateStatus: String {
-        if let switching = updates.switching { return switching }
+        if let switching = updates.switching { return switching.full }
         if let version = updates.readyVersion { return "Cicero \(version) is ready to install." }
         switch updates.status {
         case .idle: return updates.isNightly ? "Nightly version." : "Stable version."

@@ -106,7 +106,7 @@ private struct SidebarUpdateButton: View {
 
     @ViewBuilder
     private func button(busy: Bool) -> some View {
-        let label = Label(updates.switching ?? "Restart to Update", systemImage: "arrow.down.circle")
+        let label = Label(updates.switching?.short ?? "Restart to Update", systemImage: "arrow.down.circle")
             .font(.callout.weight(.medium))
             .lineLimit(1)
             .foregroundStyle(appearsActive && !busy ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
