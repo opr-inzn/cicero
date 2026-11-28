@@ -238,6 +238,11 @@ final class Updates {
         do {
             let copied = try await VersionSwitch.stage(release) { [weak self] step in self?.switching = Switching(step: step, version: release.version) }
             staged = copied
+            guard track == .nightly || !release.isNightly else {
+                try? FileManager.default.removeItem(at: copied)
+                switching = nil
+                return
+            }
             switching = Switching(step: "Opening", version: release.version)
             try VersionSwitch.replaceAfterQuit(current: Bundle.main.bundleURL, with: copied)
             NSApp.terminateFromRunLoop(ifCancelled: { [weak self] in
