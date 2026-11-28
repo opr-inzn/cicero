@@ -40,10 +40,10 @@ final class Updates {
     var switchFailure: (release: Release, message: String)?
 
     var checksAutomatically: Bool {
-        didSet { controller.updater.automaticallyChecksForUpdates = checksAutomatically }
+        didSet { updater.automaticallyChecksForUpdates = checksAutomatically }
     }
     var installsAutomatically: Bool {
-        didSet { controller.updater.automaticallyDownloadsUpdates = installsAutomatically }
+        didSet { updater.automaticallyDownloadsUpdates = installsAutomatically }
     }
     var track: Track {
         didSet {
@@ -57,9 +57,10 @@ final class Updates {
     let build = Channels.build
     var isNightly: Bool { Channels.isNightly(version) }
 
-    @ObservationIgnored private let channels = Channels()
-    @ObservationIgnored private let controller: SPUStandardUpdaterController
-    @ObservationIgnored private var observation: NSKeyValueObservation?
+    @ObservationIgnored private let channels: Channels
+    @ObservationIgnored private let driver: UserDriver
+    @ObservationIgnored private let updater: SPUUpdater
+    @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var checkWhenReady = false
     @ObservationIgnored private var checkTrackWhenReady = false
     @ObservationIgnored private var installReady: (() -> Void)?
@@ -68,11 +69,14 @@ final class Updates {
     @ObservationIgnored private var removedInstaller = false
 
     init() {
-        let controller = SPUStandardUpdaterController(
-            startingUpdater: false, updaterDelegate: channels, userDriverDelegate: nil)
-        self.controller = controller
-        checksAutomatically = controller.updater.automaticallyChecksForUpdates
-        installsAutomatically = controller.updater.automaticallyDownloadsUpdates
+        let channels = Channels()
+        let driver = UserDriver(hostBundle: .main, delegate: nil)
+        let updater = SPUUpdater(hostBundle: .main, applicationBundle: .main, userDriver: driver, delegate: channels)
+        self.channels = channels
+        self.driver = driver
+        self.updater = updater
+        checksAutomatically = updater.automaticallyChecksForUpdates
+        installsAutomatically = updater.automaticallyDownloadsUpdates
         if UserDefaults.standard.object(forKey: Channels.key) == nil {
             UserDefaults.standard.set(Channels.getsNightlies, forKey: Channels.key)
         }
@@ -85,18 +89,27 @@ final class Updates {
         }
         #endif
         guard isAvailable else { return }
-        controller.startUpdater()
+        do {
+            try updater.start()
+        } catch {
+            status = .failed(error.localizedDescription)
+            return
+        }
         if checksAutomatically {
             status = .checking
-            controller.updater.checkForUpdatesInBackground()
+            updater.checkForUpdatesInBackground()
         }
-        observation = controller.updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] _, _ in
+        let changed: (SPUUpdater, Any) -> Void = { [weak self] _, _ in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.canCheckForUpdates = self.controller.updater.canCheckForUpdates
+                self.canCheckForUpdates = self.updater.canCheckForUpdates
                 self.checkIfWaiting()
             }
         }
+        observations = [
+            updater.observe(\.canCheckForUpdates, options: [.initial, .new], changeHandler: changed),
+            updater.observe(\.sessionInProgress, options: [.new], changeHandler: changed),
+        ]
     }
 
     func checkForUpdates() {
@@ -125,23 +138,24 @@ final class Updates {
     }
 
     private func checkIfWaiting() {
-        guard controller.updater.canCheckForUpdates else { return }
+        guard updater.canCheckForUpdates else { return }
         if checkWhenReady {
             checkWhenReady = false
             checkTrackWhenReady = false
             status = .checking
-            controller.checkForUpdates(nil)
-        } else if checkTrackWhenReady {
+            updater.checkForUpdates()
+        } else if checkTrackWhenReady, !updater.sessionInProgress {
             checkTrackWhenReady = false
             checkingNewTrack = true
             status = .checking
-            controller.updater.checkForUpdateInformation()
+            updater.checkForUpdateInformation()
         }
     }
 
     private func trackChanged() {
         switchOffer = nil
         if track == .stable {
+            driver.endNightlySession()
             if let readyVersion, Channels.isNightly(readyVersion) { dropReadyUpdate() }
             if available?.isNightly == true {
                 available = nil
@@ -256,6 +270,48 @@ final class Updates {
             guard track == .nightly || !release.isNightly else { return trackChanged() }
             throw error
         }
+    }
+}
+
+private final class UserDriver: SPUStandardUserDriver {
+    private var showsNightly = false
+    private var end: (() -> Void)?
+
+    func endNightlySession() {
+        guard showsNightly, let end else { return }
+        end()
+    }
+
+    private func once<T>(_ reply: @escaping (T) -> Void, ending value: T) -> (T) -> Void {
+        var replied = false
+        let wrapped: (T) -> Void = { [weak self] answer in
+            guard !replied else { return }
+            replied = true
+            self?.end = nil
+            reply(answer)
+        }
+        end = { wrapped(value) }
+        return wrapped
+    }
+
+    override func showUpdateFound(with appcastItem: SUAppcastItem, state: SPUUserUpdateState, reply: @escaping (SPUUserUpdateChoice) -> Void) {
+        showsNightly = appcastItem.channel == "nightly"
+        super.showUpdateFound(with: appcastItem, state: state, reply: once(reply, ending: .dismiss))
+    }
+
+    override func showDownloadInitiated(cancellation: @escaping () -> Void) {
+        let cancel = once({ (_: Void) in cancellation() }, ending: ())
+        super.showDownloadInitiated(cancellation: { cancel(()) })
+    }
+
+    override func showReady(toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void) {
+        super.showReady(toInstallAndRelaunch: once(reply, ending: .skip))
+    }
+
+    override func dismissUpdateInstallation() {
+        end = nil
+        showsNightly = false
+        super.dismissUpdateInstallation()
     }
 }
 
