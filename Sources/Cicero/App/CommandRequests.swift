@@ -13,13 +13,13 @@ final class CommandRequests {
     init(model: AppModel) {
         self.model = model
         support = model.locations.support
+        Requests.tidy(support: support)
     }
 
     func start() {
         guard source == nil else { return }
         let folder = Requests.folder(support: support)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        Requests.tidy(support: support)
         let descriptor = open(folder.path, O_EVTONLY)
         guard descriptor >= 0 else { return }
         let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: .write, queue: .main)
