@@ -147,7 +147,7 @@ struct GeneralSettings: View {
             presenting: updates.switchOffer
         ) { release in
             Button(release.isNightly ? "Switch to \(release.version)" : "Go Back to \(release.version)") { switchTo(release) }
-                .disabled(model.job != nil)
+                .disabled(model.job != nil || updates.switching != nil)
             // Cancel is the default so Return never replaces the app by accident.
             Button("Cancel", role: .cancel) {}
                 .keyboardShortcut(.defaultAction)
