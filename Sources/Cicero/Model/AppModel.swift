@@ -873,7 +873,7 @@ final class AppModel {
         commandRequests?.stop()
         let deadline = ContinuousClock.now + limit
         while isWorking, ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(50)) }
-        guard isWorking else { return true }
+        guard isWorking || job != nil else { return true }
         commandRequests?.start()
         return false
     }
