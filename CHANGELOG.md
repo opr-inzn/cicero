@@ -7,6 +7,7 @@ Each version’s notes here become its release notes on the [releases page](http
 - **Random sample texts:** in the preview text’s **Presets** menu, and when you Control-click the sample text on a font page, choose **Pangram** for a random pangram, or **Wikipedia** for a text from a random article in the language you choose. Your Mac’s languages show first, and the others are in **Other Languages**. On a font page, a line under a Wikipedia text names its article. Click it to open the article.
 - **Wikipedia texts, waiting and errors:** while Cicero gets a text, the preview text shows “Getting a text from Wikipedia…”. If it can’t get one, a message at the bottom of the window says why: no internet connection, or Wikipedia didn’t answer.
 - **Long samples wrap:** when a sample is too wide to show two fonts side by side, it wraps onto more lines. Set the space between the lines with **Leading** in the preview options.
+- **Quit and backups:** if a backup, restore or import starts while Cicero waits to quit for a font change, Cicero no longer quits in the middle of it. It stays open and says what it is still doing.
 
 ## 0.13.0
 
