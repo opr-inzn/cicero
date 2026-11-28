@@ -174,7 +174,7 @@ final class Updates {
         availableNotes = nil
         guard checkingNewTrack else { return }
         checkingNewTrack = false
-        guard readyVersion == nil else { return }
+        guard readyVersion == nil, switching == nil else { return }
         if let release = latest[track], Channels.isOlder(release.build, than: build) { switchOffer = release }
     }
 
@@ -241,7 +241,7 @@ final class Updates {
             guard track == .nightly || !release.isNightly else {
                 try? FileManager.default.removeItem(at: copied)
                 switching = nil
-                return
+                return trackChanged()
             }
             switching = Switching(step: "Opening", version: release.version)
             try VersionSwitch.replaceAfterQuit(current: Bundle.main.bundleURL, with: copied)
@@ -253,6 +253,7 @@ final class Updates {
         } catch {
             if let staged { try? FileManager.default.removeItem(at: staged) }
             switching = nil
+            guard track == .nightly || !release.isNightly else { return trackChanged() }
             throw error
         }
     }
