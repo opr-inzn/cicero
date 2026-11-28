@@ -113,8 +113,7 @@ private struct SidebarContent: View {
 
     private func movableRows(_ rows: [SidebarRow], in list: String, section: SidebarSection?) -> some View {
         let shownRows = shown(rows, in: section)
-        let hasHierarchy = (section == .folders || section == .sets) && shownRows.contains { $0.hasChildren || $0.depth > 0 }
-        return ForEach(shownRows) { row($0, section: section, hasHierarchy: hasHierarchy) }
+        return ForEach(shownRows) { row($0, section: section) }
             .onMove { source, destination in
                 var transaction = Transaction(animation: nil)
                 transaction.disablesAnimations = true
@@ -305,26 +304,24 @@ private struct SidebarContent: View {
     // MARK: Rows
 
     @ViewBuilder
-    private func row(_ row: SidebarRow, section: SidebarSection?, hasHierarchy: Bool) -> some View {
+    private func row(_ row: SidebarRow, section: SidebarSection?) -> some View {
         let hidden = !model.isVisible(row.key) || (section.map { !model.isVisible($0.key) } ?? false)
         let content = HStack(spacing: 4) {
             if model.isEditingSidebar { checkbox(row.key, row.title).disabled(!row.canHide) }
-            if hasHierarchy {
-                if row.hasChildren {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(highlight.dropTarget == row.item ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-                        .rotationEffect(.degrees(row.isExpanded ? 90 : 0))
-                        .transaction { $0.animation = nil }
-                        .frame(width: 12, height: 18)
-                        .contentShape(.rect)
-                        .onTapGesture { model.toggleExpanded(for: row) }
-                        .accessibilityLabel(row.isExpanded ? "Collapse" : "Expand")
-                } else {
-                    Color.clear.frame(width: 12, height: 1)
-                }
-            }
             SidebarLabel(row: row, highlight: highlight, fit: fit)
+        }
+        .overlay(alignment: .leading) {
+            if row.hasChildren, !model.isEditingSidebar {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(highlight.dropTarget == row.item ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                    .rotationEffect(.degrees(row.isExpanded ? 90 : 0))
+                    .transaction { $0.animation = nil }
+                    .frame(width: 16, height: 22)
+                    .background(SidebarChevronHitTarget { model.toggleExpanded(for: row) })
+                    .accessibilityLabel(row.isExpanded ? "Collapse" : "Expand")
+                    .offset(x: -16)
+            }
         }
         .padding(.leading, CGFloat(row.depth) * 14)
         .badge(row.badge > 0 ? Text(row.badge.plain) : nil)
@@ -360,14 +357,6 @@ private struct SidebarContent: View {
                     )
                     .padding(.vertical, 5)
                 }
-        } else if takesRowFiles(row.item) {
-            content
-                .background(FontDropTarget(files: .init(isOver: { isOver in
-                    setDropTarget(isOver, for: row)
-                }) { urls in
-                    clearDropTarget(for: row)
-                    model.dropFiles(urls, on: row.item)
-                }))
         } else if model.takesFamilies(row.item) {
             content
                 .background(FontDropTarget(isOver: { isOver in
@@ -381,14 +370,6 @@ private struct SidebarContent: View {
                 })
         } else {
             content
-        }
-    }
-
-    private func takesRowFiles(_ item: SidebarItem) -> Bool {
-        switch item {
-        case .folder(let id): id != WatchedFolder.adobeFontsID && id != WatchedFolder.addedFilesID
-        case .subfolder: true
-        default: false
         }
     }
 
@@ -768,6 +749,54 @@ private nonisolated struct GroupDrag: Codable, Transferable {
 private extension UTType {
     nonisolated static let ciceroSidebarGroup = UTType(exportedAs: "com.maximilianinzinger.cicero.sidebar-group")
     nonisolated static let ciceroSidebarRow = UTType(exportedAs: "com.maximilianinzinger.cicero.sidebar-row")
+}
+
+private struct SidebarChevronHitTarget: NSViewRepresentable {
+    var toggle: () -> Void
+
+    func makeNSView(context: Context) -> HitView {
+        let view = HitView()
+        view.toggle = toggle
+        return view
+    }
+
+    func updateNSView(_ view: HitView, context: Context) {
+        view.toggle = toggle
+    }
+
+    final class HitView: NSView {
+        var toggle: () -> Void = {}
+        private static let targets = NSHashTable<HitView>.weakObjects()
+        private static var monitor: Any?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window != nil {
+                Self.targets.add(self)
+                Self.installMonitor()
+            } else {
+                Self.targets.remove(self)
+            }
+        }
+
+        // The chevron is drawn outside the cell view's leading edge, so AppKit's cell hitTest rejects clicks on it.
+        private static func installMonitor() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+                guard let window = event.window, window.attachedSheet == nil else { return event }
+                for view in targets.allObjects {
+                    guard view.window === window, !view.isHiddenOrHasHiddenAncestor else { continue }
+                    if let clip = view.enclosingScrollView?.contentView,
+                       !clip.bounds.contains(clip.convert(event.locationInWindow, from: nil)) { continue }
+                    if view.bounds.contains(view.convert(event.locationInWindow, from: nil)) {
+                        view.toggle()
+                        return nil
+                    }
+                }
+                return event
+            }
+        }
+    }
 }
 
 private struct SidebarRowReparentTarget: NSViewRepresentable {

@@ -112,114 +112,11 @@ extension AppModel {
         }
         let rest = urls.filter { !folders.contains($0) }
         switch item {
-        case .folder, .subfolder:
-            if !rest.isEmpty { open(rest, into: item) }
-            if !folders.isEmpty { copyFoldersIntoLocation(folders, target: item) }
         case .set(let setID):
             if !rest.isEmpty { open(rest, into: item) }
             if !folders.isEmpty { addFoldersIntoSet(folders, setID: setID) }
         default:
             openOnSidebar(urls)
-        }
-    }
-
-    private func copyFoldersIntoLocation(_ sources: [URL], target: SidebarItem) {
-        guard let location = dropLocation(for: target) else {
-            let name: String = switch target {
-            case .folder(let id): folderName(id)
-            case .subfolder(_, let rel): (rel as NSString).lastPathComponent
-            default: "this location"
-            }
-            return showToast("Couldn’t copy into “\(name)”")
-        }
-        let targetURL = location.folder
-        let targetName = location.name
-        var toCopy: [URL] = []
-        for source in sources {
-            let rel = FolderPath.relationship(between: targetURL, and: source)
-            if rel == .same {
-                showToast("“\(source.lastPathComponent)” is already “\(targetName)”")
-                continue
-            }
-            if rel == .contains {
-                if case .folder(let id) = target, let folder = folder(id), let subRel = FolderPath.relativePath(of: source, inside: folder.url) {
-                    expandAncestors(of: id, relativePath: subRel)
-                    if library.folderTrees[id]?.nodes[subRel] != nil { selection = .subfolder(id, subRel) }
-                } else if case .subfolder(let id, _) = target, let folder = folder(id), let subRel = FolderPath.relativePath(of: source, inside: folder.url) {
-                    expandAncestors(of: id, relativePath: subRel)
-                    if library.folderTrees[id]?.nodes[subRel] != nil { selection = .subfolder(id, subRel) }
-                }
-                showToast("“\(source.lastPathComponent)” is already in “\(targetName)”")
-                continue
-            }
-            if FolderPath.relationship(between: source, and: targetURL) == .contains {
-                showToast("Can’t copy “\(source.lastPathComponent)” into a folder inside itself")
-                continue
-            }
-            toCopy.append(source)
-        }
-        guard !toCopy.isEmpty else { return }
-        Task { [weak self] in
-            var copiedRoots: [URL] = []
-            var emptyNames: [String] = []
-            var failed = 0
-            for source in toCopy {
-                do {
-                    if let result = try await Task.detached(priority: .userInitiated, operation: {
-                        try FolderCopy.copyFontFolders(from: source, into: targetURL)
-                    }).value {
-                        copiedRoots.append(result.copiedRoot)
-                    } else {
-                        emptyNames.append(source.lastPathComponent)
-                    }
-                } catch {
-                    failed += 1
-                }
-            }
-            guard let self else { return }
-            guard !copiedRoots.isEmpty else {
-                if failed > 0 {
-                    return showToast("Couldn’t copy into “\(targetName)”")
-                }
-                return showToast(emptyNames.count == 1
-                    ? "There are no fonts Cicero can read in “\(emptyNames[0])”"
-                    : "There are no fonts Cicero can read in those folders")
-            }
-            switch target {
-            case .folder(let id):
-                if let index = data.folders.firstIndex(where: { $0.id == id }), !data.showsSubfolders(for: data.folders[index]) {
-                    data.folders[index].showsSubfolders = true
-                }
-                data.sidebar.expanded.insert("folder.\(id)")
-            case .subfolder(let id, let rel):
-                expandAncestors(of: id, relativePath: rel)
-                data.sidebar.expanded.insert("folder.\(id)/\(rel)")
-            default:
-                break
-            }
-            rescan()
-            let label = copiedRoots.count == 1 ? "“\(copiedRoots[0].lastPathComponent)”" : "\(copiedRoots.count.plain) folders"
-            showToast("Copied \(label) into “\(targetName)”") { [weak self] in
-                self?.undoCopiedFolders(copiedRoots)
-            }
-        }
-    }
-
-    private func undoCopiedFolders(_ roots: [URL]) {
-        let prefixes = roots.map { $0.standardizedFileURL.path + "/" }
-        let active = library.families.flatMap(\.faces).filter { face in
-            prefixes.contains { face.face.path.hasPrefix($0) } && face.canDeactivate
-        }
-        enqueue { model in
-            if !active.isEmpty {
-                let result = await model.engine.deactivate(active, records: model.data.records)
-                model.data.records = result.records
-            }
-            for root in roots where FileManager.default.fileExists(atPath: root.path) {
-                try? FileManager.default.trashItem(at: root, resultingItemURL: nil)
-            }
-            model.rescan()
-            model.showToast(roots.count == 1 ? "Moved “\(roots[0].lastPathComponent)” to the Trash" : "Moved \(roots.count.plain) folders to the Trash")
         }
     }
 
